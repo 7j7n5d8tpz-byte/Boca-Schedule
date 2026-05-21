@@ -1,0 +1,145 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { supabaseAdmin } from '../lib/supabase.js';
+import { authenticate } from '../middleware/authenticate.js';
+
+const router = Router();
+
+const RegisterSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/).regex(/[!@#$%^&*]/),
+  name: z.string().min(2).max(100),
+  preferredPositions: z.array(z.enum(['GK', 'DEF', 'WIN', 'MID', 'STR'])).optional(),
+});
+
+const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
+// POST /api/auth/register
+// Security: always returns the same 201 response regardless of whether the email
+// is already registered — prevents enumeration of existing accounts.
+router.post('/register', async (req, res, next) => {
+  try {
+    const body = RegisterSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid input', details: body.error.issues } });
+      return;
+    }
+
+    const { email, password, name, preferredPositions } = body.data;
+
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+
+    if (!authError && authData?.user) {
+      // New account — create profile, inactive until admin approves
+      await supabaseAdmin.from('users').insert({
+        user_id: authData.user.id,
+        email,
+        name,
+        role: 'player',
+        preferred_positions: preferredPositions ?? [],
+        is_active: false,
+      }).then(({ error: profileError }) => {
+        if (profileError) supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      });
+    }
+    // If authError (e.g. email already registered), we intentionally fall through
+    // and return the same response to prevent email enumeration.
+
+    res.status(201).json({
+      success: true,
+      message: 'If that email address is valid and not already in use, your registration request has been submitted. An administrator will review and activate your account.',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/login
+router.post('/login', async (req, res, next) => {
+  try {
+    const body = LoginSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid input' } });
+      return;
+    }
+
+    const { email, password } = body.data;
+
+    const { data, error } = await supabaseAdmin.auth.signInWithPassword({ email, password });
+    if (error || !data.session) {
+      res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' } });
+      return;
+    }
+
+    const { data: profile } = await supabaseAdmin.from('users').select('*').eq('user_id', data.user.id).single();
+
+    // Inactive accounts (pending admin approval) return the same error as bad credentials
+    // to avoid revealing that the account exists but isn't approved yet.
+    if (!profile?.is_active) {
+      res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' } });
+      return;
+    }
+
+    await supabaseAdmin.from('users').update({ last_login: new Date().toISOString() }).eq('user_id', data.user.id);
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          userId: data.user.id,
+          email: data.user.email,
+          name: profile?.name,
+          role: profile?.role,
+          preferredPositions: profile?.preferred_positions,
+        },
+        tokens: {
+          accessToken: data.session.access_token,
+          refreshToken: data.session.refresh_token,
+          expiresIn: data.session.expires_in,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/refresh
+router.post('/refresh', async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'refreshToken required' } });
+      return;
+    }
+
+    const { data, error } = await supabaseAdmin.auth.refreshSession({ refresh_token: refreshToken });
+    if (error || !data.session) {
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid refresh token' } });
+      return;
+    }
+
+    res.json({ success: true, data: { accessToken: data.session.access_token, expiresIn: data.session.expires_in } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/logout
+router.post('/logout', authenticate, async (req, res, next) => {
+  try {
+    await supabaseAdmin.auth.admin.signOut(req.headers.authorization!.slice(7));
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+export default router;

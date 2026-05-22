@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import RavenIcon from '../../components/RavenIcon';
+import LocationPicker, { encodeLocation, decodeLocation } from '../../components/LocationPicker';
 
 interface SignupPlayer {
   signupId: string;
@@ -15,8 +17,14 @@ interface MatchData {
   matchId: string;
   matchDate: string;
   matchTime: string;
+  location: string;
+  opponent: string | null;
+  matchType: string;
+  status: string;
   minPlayers: number;
   maxPlayers: number;
+  signupOpenDate: string;
+  signupCloseDate: string;
 }
 
 interface SignupsResponse {
@@ -39,19 +47,18 @@ export default function MatchDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  // local optimistic priority state: signupId → isPriority
   const [priorityMap, setPriorityMap] = useState<Record<string, boolean>>({});
   const [optimizeError, setOptimizeError] = useState('');
+  const [showEdit, setShowEdit] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [editFields, setEditFields] = useState({ matchDate: '', matchTime: '', opponent: '', signupOpenDate: '', signupCloseDate: '', minPlayers: 0, maxPlayers: 0 });
+  const [editVenue, setEditVenue] = useState('');
+  const [editCourt, setEditCourt] = useState('');
 
   const { data, isLoading } = useQuery<SignupsResponse>({
     queryKey: ['match-signups', matchId],
     queryFn: () => api.get(`/matches/${matchId}/signups`).then(r => r.data.data),
-    onSuccess: (d: SignupsResponse) => {
-      const initial: Record<string, boolean> = {};
-      d.signups.forEach(s => { initial[s.signupId] = s.isPriority; });
-      setPriorityMap(initial);
-    },
-  } as any);
+  });
 
   const priorityMutation = useMutation({
     mutationFn: ({ signupId, value }: { signupId: string; value: boolean }) =>
@@ -59,10 +66,46 @@ export default function MatchDetail() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['match-signups', matchId] }),
   });
 
+  const editMutation = useMutation({
+    mutationFn: (fields: { matchDate: string; matchTime: string; location: string; opponent: string; signupOpenDate: string; signupCloseDate: string; minPlayers: number; maxPlayers: number }) =>
+      api.put(`/matches/${matchId}`, {
+        matchDate: fields.matchDate,
+        matchTime: fields.matchTime,
+        location: fields.location,
+        opponent: fields.opponent.trim() || null,
+        signupOpenDate: fields.signupOpenDate + 'T00:00:00Z',
+        signupCloseDate: fields.signupCloseDate + 'T20:00:00Z',
+        minPlayers: fields.minPlayers,
+        maxPlayers: fields.maxPlayers,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['match-signups', matchId] });
+      qc.invalidateQueries({ queryKey: ['matches'] });
+      setShowEdit(false);
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: (status: string) => api.put(`/matches/${matchId}`, { status }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['match-signups', matchId] });
+      qc.invalidateQueries({ queryKey: ['matches'] });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () => api.put(`/matches/${matchId}`, { status: 'cancelled' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['matches'] });
+      navigate('/coach');
+    },
+  });
+
   const optimizeMutation = useMutation({
     mutationFn: () => api.post(`/matches/${matchId}/optimize`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['matches'] });
+      qc.invalidateQueries({ queryKey: ['match-selections', matchId] });
       navigate(`/coach/matches/${matchId}/selections`);
     },
     onError: (err: any) => {
@@ -70,8 +113,28 @@ export default function MatchDetail() {
     },
   });
 
+  function openEdit() {
+    const { venue, court } = decodeLocation(match.location);
+    setEditVenue(venue);
+    setEditCourt(court);
+    setEditFields({
+      matchDate: match.matchDate,
+      matchTime: match.matchTime.slice(0, 5),
+      opponent: match.opponent ?? '',
+      signupOpenDate: match.signupOpenDate?.slice(0, 10) ?? '',
+      signupCloseDate: match.signupCloseDate?.slice(0, 10) ?? '',
+      minPlayers: match.minPlayers,
+      maxPlayers: match.maxPlayers,
+    });
+    setShowEdit(true);
+  }
+
   function togglePriority(signupId: string) {
-    const next = !(priorityMap[signupId] ?? false);
+    // Seed from server data if this signupId hasn't been toggled yet
+    const current = signupId in priorityMap
+      ? priorityMap[signupId]
+      : data?.signups.find(s => s.signupId === signupId)?.isPriority ?? false;
+    const next = !current;
     setPriorityMap(m => ({ ...m, [signupId]: next }));
     priorityMutation.mutate({ signupId, value: next });
   }
@@ -89,32 +152,263 @@ export default function MatchDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link to="/coach" className="text-gray-400 hover:text-gray-600 text-sm">← Matches</Link>
-          <span className="text-gray-300">|</span>
-          <span className="font-bold text-gray-900 text-lg">
-            Boca Schedule <span className="text-blue-600 text-sm font-normal">Coach</span>
-          </span>
+          <Link to="/coach" className="text-white/50 hover:text-white/80 text-sm">← Matches</Link>
+          <span className="text-white/20">|</span>
+          <div className="flex items-center gap-2">
+            <RavenIcon className="w-5 h-5 text-white" />
+            <span className="font-bold text-white text-lg">
+              Boca Schedule <span className="text-brand-green-300 text-sm font-normal">Coach</span>
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">{user?.name}</span>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-700">Logout</button>
+          <span className="text-sm text-white/70">{user?.name}</span>
+          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
         </div>
       </nav>
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </h1>
-          <p className="text-gray-500 mt-1">
-            {match.matchTime.slice(0, 5)} · {summary.totalSignups} signed up
-            {summary.prioritySignups > 0 && (
-              <span className="ml-2 text-amber-600 font-medium">· {summary.prioritySignups} priority</span>
-            )}
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </h1>
+            <p className="text-gray-500 mt-1">
+              {match.matchTime.slice(0, 5)} · {match.location}
+              {match.opponent && <span className="text-gray-700 font-medium"> vs {match.opponent}</span>}
+              {' '}· {summary.totalSignups} signed up
+              {summary.prioritySignups > 0 && (
+                <span className="ml-2 text-amber-600 font-medium">· {summary.prioritySignups} priority</span>
+              )}
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={openEdit}
+              className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setShowCancelConfirm(true)}
+              className="text-sm border border-red-200 text-red-600 hover:bg-red-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Cancel match
+            </button>
+          </div>
         </div>
+
+        {/* Status controls */}
+        {match.status === 'draft' && (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+            <p className="text-sm text-gray-500">Signups are not open yet — players cannot see or join this match.</p>
+            <button
+              onClick={() => statusMutation.mutate('signup_open')}
+              disabled={statusMutation.isPending}
+              className="shrink-0 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Open signups
+            </button>
+          </div>
+        )}
+        {match.status === 'signup_open' && (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+            <p className="text-sm text-green-700">Signups are open — players can join this match.</p>
+            <button
+              onClick={() => statusMutation.mutate('signup_closed')}
+              disabled={statusMutation.isPending}
+              className="shrink-0 border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Close signups
+            </button>
+          </div>
+        )}
+        {match.status === 'signup_closed' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+            <p className="text-sm text-yellow-700">Signups are closed — ready to run the optimizer.</p>
+            <button
+              onClick={() => statusMutation.mutate('signup_open')}
+              disabled={statusMutation.isPending}
+              className="shrink-0 border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Reopen signups
+            </button>
+          </div>
+        )}
+        {match.status === 'optimized' && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+            <p className="text-sm text-blue-700">Optimizer has selected players — review before publishing.</p>
+            <div className="flex gap-2 shrink-0">
+              <Link
+                to={`/coach/matches/${matchId}/selections`}
+                className="border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                View selections
+              </Link>
+              <button
+                onClick={() => statusMutation.mutate('published')}
+                disabled={statusMutation.isPending}
+                className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Publish to players
+              </button>
+            </div>
+          </div>
+        )}
+        {match.status === 'published' && (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+            <p className="text-sm text-green-700">Match is published — players can see the selection.</p>
+            <div className="flex gap-2 shrink-0">
+              <Link
+                to={`/coach/matches/${matchId}/selections`}
+                className="border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                View selections
+              </Link>
+              <button
+                onClick={() => statusMutation.mutate('completed')}
+                disabled={statusMutation.isPending}
+                className="border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Mark completed
+              </button>
+            </div>
+          </div>
+        )}
+        {match.status === 'completed' && (
+          <div className="bg-gray-100 border border-gray-200 rounded-xl px-4 py-3">
+            <p className="text-sm text-gray-500">This match is completed.</p>
+          </div>
+        )}
+
+        {/* Edit form */}
+        {showEdit && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <h2 className="font-semibold text-gray-900">Edit match details</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={editFields.matchDate}
+                  onChange={e => setEditFields(f => ({ ...f, matchDate: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Time</label>
+                <input
+                  type="time"
+                  value={editFields.matchTime}
+                  onChange={e => setEditFields(f => ({ ...f, matchTime: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Min players</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={editFields.minPlayers}
+                  onChange={e => setEditFields(f => ({ ...f, minPlayers: parseInt(e.target.value) || 0 }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Max players</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={editFields.maxPlayers}
+                  onChange={e => setEditFields(f => ({ ...f, maxPlayers: parseInt(e.target.value) || 0 }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  Venue <span className="text-gray-400 font-normal">· Court (optional)</span>
+                </label>
+                <LocationPicker
+                  venue={editVenue}
+                  court={editCourt}
+                  onVenueChange={setEditVenue}
+                  onCourtChange={setEditCourt}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Opponent <span className="text-gray-400">(optional)</span></label>
+                <input
+                  type="text"
+                  placeholder="e.g. FC Vesterbro"
+                  value={editFields.opponent}
+                  onChange={e => setEditFields(f => ({ ...f, opponent: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Signup opens</label>
+                <input
+                  type="date"
+                  value={editFields.signupOpenDate}
+                  onChange={e => setEditFields(f => ({ ...f, signupOpenDate: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Signup deadline</label>
+                <input
+                  type="date"
+                  value={editFields.signupCloseDate}
+                  onChange={e => setEditFields(f => ({ ...f, signupCloseDate: e.target.value }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowEdit(false)}
+                className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Discard
+              </button>
+              <button
+                onClick={() => editMutation.mutate({ ...editFields, location: encodeLocation(editVenue, editCourt) })}
+                disabled={editMutation.isPending}
+                className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                {editMutation.isPending ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+            {editMutation.isError && (
+              <p className="text-sm text-red-500">Failed to save changes.</p>
+            )}
+          </div>
+        )}
+
+        {/* Cancel confirmation */}
+        {showCancelConfirm && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-3">
+            <p className="font-semibold text-red-800">Cancel this match?</p>
+            <p className="text-sm text-red-600">This cannot be undone. The match will be marked as cancelled and removed from the active list.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => cancelMutation.mutate()}
+                disabled={cancelMutation.isPending}
+                className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                {cancelMutation.isPending ? 'Cancelling…' : 'Yes, cancel match'}
+              </button>
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Keep match
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Optimize card */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
@@ -128,7 +422,7 @@ export default function MatchDetail() {
             <button
               onClick={() => { setOptimizeError(''); optimizeMutation.mutate(); }}
               disabled={optimizeMutation.isPending || signups.length === 0}
-              className="shrink-0 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              className="shrink-0 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               {optimizeMutation.isPending ? 'Optimizing…' : 'Optimize'}
             </button>
@@ -148,9 +442,9 @@ export default function MatchDetail() {
             const isPriority = priorityMap[signupId] ?? dbPriority;
             return (
               <div key={signupId} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-4">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="font-medium text-gray-900 truncate">{player.name}</p>
-                  <div className="flex gap-1 mt-1 flex-wrap">
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {player.preferredPositions.map(pos => (
                       <span key={pos} className={`text-xs font-medium px-2 py-0.5 rounded-full ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>
                         {pos}

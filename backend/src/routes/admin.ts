@@ -6,8 +6,25 @@ import { requireRole } from '../middleware/requireRole.js';
 
 const router = Router();
 
-// All admin routes require admin role
 router.use(authenticate, requireRole('admin'));
+
+async function writeAudit(
+  userId: string,
+  action: string,
+  entityType: string,
+  entityId: string | null,
+  oldValues?: object | null,
+  newValues?: object | null,
+) {
+  await supabaseAdmin.from('audit_log').insert({
+    user_id: userId,
+    action,
+    entity_type: entityType,
+    entity_id: entityId,
+    old_values: oldValues ?? null,
+    new_values: newValues ?? null,
+  });
+}
 
 // GET /api/admin/users
 router.get('/users', async (req, res, next) => {
@@ -19,7 +36,9 @@ router.get('/users', async (req, res, next) => {
     if (isActive !== undefined) query = query.eq('is_active', isActive === 'true');
     if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
 
-    const { data, count, error } = await query.range(parseInt(offset as string), parseInt(offset as string) + parseInt(limit as string) - 1);
+    const { data, count, error } = await query
+      .order('name')
+      .range(parseInt(offset as string), parseInt(offset as string) + parseInt(limit as string) - 1);
     if (error) throw error;
 
     res.json({
@@ -47,15 +66,31 @@ router.post('/users', async (req, res, next) => {
   try {
     const { email, password, name, role, preferredPositions } = req.body;
 
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true });
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
     if (authError) {
       res.status(400).json({ success: false, error: { code: 'CREATE_FAILED', message: authError.message } });
       return;
     }
 
-    await supabaseAdmin.from('users').insert({ user_id: authData.user.id, email, name, role: role ?? 'player', preferred_positions: preferredPositions ?? [] });
+    const userRole = role ?? 'player';
+    await supabaseAdmin.from('users').insert({
+      user_id: authData.user.id,
+      email,
+      name,
+      role: userRole,
+      preferred_positions: preferredPositions ?? [],
+    });
 
-    res.status(201).json({ success: true, data: { userId: authData.user.id, email, name, role: role ?? 'player', temporaryPassword: true } });
+    await writeAudit(req.user!.userId, 'user_created', 'user', authData.user.id, null, { email, name, role: userRole });
+
+    res.status(201).json({
+      success: true,
+      data: { userId: authData.user.id, email, name, role: userRole, temporaryPassword: true },
+    });
   } catch (err) {
     next(err);
   }
@@ -71,9 +106,12 @@ router.delete('/users/:userId', async (req, res, next) => {
       return;
     }
 
-    // Cascade deletes handled by DB foreign keys
+    const { data: target } = await supabaseAdmin.from('users').select('email, name, role').eq('user_id', userId).single();
+
     await supabaseAdmin.auth.admin.deleteUser(userId);
     await supabaseAdmin.from('users').delete().eq('user_id', userId);
+
+    await writeAudit(req.user!.userId, 'user_deleted', 'user', userId, target ?? null, null);
 
     res.json({ success: true, message: 'User deleted successfully', data: { deletedUserId: userId } });
   } catch (err) {
@@ -96,7 +134,32 @@ router.put('/users/:userId/role', async (req, res, next) => {
     const { data, error } = await supabaseAdmin.from('users').update({ role }).eq('user_id', userId).select().single();
     if (error) throw error;
 
+    await writeAudit(req.user!.userId, 'role_changed', 'user', userId, { role: current?.role }, { role });
+
     res.json({ success: true, data: { userId, previousRole: current?.role, newRole: role, updatedAt: data.updated_at } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/users/:userId/active
+router.put('/users/:userId/active', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { isActive } = req.body as { isActive: boolean };
+
+    if (userId === req.user!.userId) {
+      res.status(400).json({ success: false, error: { code: 'CANNOT_DEACTIVATE_SELF', message: 'Cannot deactivate your own account' } });
+      return;
+    }
+
+    const { data: current } = await supabaseAdmin.from('users').select('is_active').eq('user_id', userId).single();
+    const { data, error } = await supabaseAdmin.from('users').update({ is_active: isActive }).eq('user_id', userId).select().single();
+    if (error) throw error;
+
+    await writeAudit(req.user!.userId, isActive ? 'user_activated' : 'user_deactivated', 'user', userId, { isActive: current?.is_active }, { isActive });
+
+    res.json({ success: true, data: { userId, isActive, updatedAt: data.updated_at } });
   } catch (err) {
     next(err);
   }
@@ -109,10 +172,29 @@ router.get('/system/health', async (_req, res, next) => {
     res.json({
       success: true,
       data: {
-        database: { status: dbError ? 'unhealthy' : 'healthy' },
-        api: { uptime: process.uptime() },
+        database: { status: dbError ? 'unhealthy' : 'healthy', message: dbError?.message ?? null },
+        api: { uptime: process.uptime(), uptimeHuman: formatUptime(process.uptime()) },
         optimizationService: { status: 'not_configured' },
       },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/admin/system/config
+router.get('/system/config', async (_req, res, next) => {
+  try {
+    const { data, error } = await supabaseAdmin.from('system_config').select('*').order('config_key');
+    if (error) throw error;
+    res.json({
+      success: true,
+      data: (data ?? []).map((c: any) => ({
+        key: c.config_key,
+        value: c.config_value,
+        description: c.description,
+        updatedAt: c.updated_at,
+      })),
     });
   } catch (err) {
     next(err);
@@ -124,7 +206,9 @@ router.get('/audit-log', async (req, res, next) => {
   try {
     const { userId, action, entityType, limit = '100', offset = '0' } = req.query;
 
-    let query = supabaseAdmin.from('audit_log').select('*', { count: 'exact' });
+    let query = supabaseAdmin
+      .from('audit_log')
+      .select('*, actor:users!audit_log_user_id_fkey(name, email)', { count: 'exact' });
     if (userId) query = query.eq('user_id', userId);
     if (action) query = query.eq('action', action);
     if (entityType) query = query.eq('entity_type', entityType);
@@ -135,10 +219,36 @@ router.get('/audit-log', async (req, res, next) => {
 
     if (error) throw error;
 
-    res.json({ success: true, data: { logs: data ?? [], pagination: { total: count ?? 0, limit: parseInt(limit as string), offset: parseInt(offset as string) } } });
+    res.json({
+      success: true,
+      data: {
+        logs: (data ?? []).map((l: any) => ({
+          logId: l.log_id,
+          userId: l.user_id,
+          actorName: l.actor?.name ?? 'Unknown',
+          actorEmail: l.actor?.email ?? '',
+          action: l.action,
+          entityType: l.entity_type,
+          entityId: l.entity_id,
+          oldValues: l.old_values,
+          newValues: l.new_values,
+          createdAt: l.created_at,
+        })),
+        pagination: { total: count ?? 0, limit: parseInt(limit as string), offset: parseInt(offset as string) },
+      },
+    });
   } catch (err) {
     next(err);
   }
 });
+
+function formatUptime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
 
 export default router;

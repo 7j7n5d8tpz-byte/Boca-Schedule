@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import RavenIcon from '../../components/RavenIcon';
 
 interface Match {
   matchId: string;
@@ -79,7 +80,7 @@ function MatchRow({ match }: { match: Match }) {
       <div className="mt-4 flex gap-2">
         <Link
           to={`/coach/matches/${match.matchId}`}
-          className="text-sm text-blue-600 hover:underline"
+          className="text-sm text-brand-green hover:underline"
         >
           View signups
         </Link>
@@ -93,33 +94,88 @@ function MatchRow({ match }: { match: Match }) {
 
 export default function CoachDashboard() {
   const { user, logout } = useAuth();
+  const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['matches', 'coach-all'],
     queryFn: () => api.get('/matches/upcoming?status=all').then(r => r.data.data),
   });
 
+  const { data: pendingPerms } = useQuery<{ requestId: string; playerId: string; playerName: string; requestedAt: string }[]>({
+    queryKey: ['result-permissions-pending'],
+    queryFn: () => api.get('/result-permissions/pending').then(r => r.data.data),
+    refetchInterval: 30_000,
+  });
+
+  const respondPerm = useMutation({
+    mutationFn: ({ requestId, approve }: { requestId: string; approve: boolean }) =>
+      api.put(`/result-permissions/${requestId}/respond`, { approve }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['result-permissions-pending'] }),
+  });
+
   const matches: Match[] = data?.matches ?? [];
   const totalSignups = matches.reduce((s, m) => s + m.currentSignups, 0);
   const readyToOptimize = matches.filter(m => m.status === 'signup_closed').length;
+  const publishedMatches = matches.filter(m => m.status === 'published' || m.status === 'completed');
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Nav */}
-      <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <span className="font-bold text-gray-900 text-lg">
-          Boca Schedule{' '}
-          <span className="text-blue-600 text-sm font-normal">Coach</span>
-        </span>
+      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <RavenIcon className="w-5 h-5 text-white" />
+          <span className="font-bold text-white text-lg">
+            Boca Schedule{' '}
+            <span className="text-brand-green-300 text-sm font-normal">Coach</span>
+          </span>
+        </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">{user?.name}</span>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-700">
-            Logout
-          </button>
+          <Link to="/statistics" className="text-sm text-white/60 hover:text-white">Team Stats</Link>
+          <Link to="/dashboard" className="text-sm text-white/60 hover:text-white">Player view</Link>
+          {user?.role === 'admin' && (
+            <Link to="/admin" className="text-sm text-purple-300 hover:text-purple-200">Admin panel</Link>
+          )}
+          <span className="text-sm text-white/70">{user?.name}</span>
+          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
         </div>
       </nav>
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+
+        {/* Permission requests */}
+        {(pendingPerms ?? []).length > 0 && (
+          <div className="bg-white rounded-xl border border-amber-200 p-5 space-y-3">
+            <h2 className="font-semibold text-gray-900">
+              Result entry requests
+              <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{pendingPerms!.length}</span>
+            </h2>
+            {pendingPerms!.map(req => (
+              <div key={req.requestId} className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{req.playerName}</p>
+                  <p className="text-xs text-gray-400">Wants permission to record match results</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => respondPerm.mutate({ requestId: req.requestId, approve: true })}
+                    disabled={respondPerm.isPending}
+                    className="text-xs bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => respondPerm.mutate({ requestId: req.requestId, approve: false })}
+                    disabled={respondPerm.isPending}
+                    className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -137,11 +193,36 @@ export default function CoachDashboard() {
           </div>
           <Link
             to="/coach/matches/new"
-            className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            className="bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             + New match
           </Link>
         </div>
+
+        {/* Result entry shortcuts for published/completed matches */}
+        {publishedMatches.length > 0 && (
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Record results</h2>
+            {publishedMatches.map(m => {
+              const d = new Date(m.matchDate + 'T' + m.matchTime);
+              return (
+                <Link
+                  key={m.matchId}
+                  to={`/matches/${m.matchId}/results`}
+                  className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-5 py-3 hover:border-blue-300 transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · {m.matchTime.slice(0, 5)}
+                    </p>
+                    <p className="text-xs text-gray-400">{m.location}</p>
+                  </div>
+                  <span className="text-xs text-brand-green font-medium">Enter result →</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
 
         {/* Match list */}
         {isLoading && <p className="text-sm text-gray-400">Loading…</p>}

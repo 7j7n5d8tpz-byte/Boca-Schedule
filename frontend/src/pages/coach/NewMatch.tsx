@@ -1,0 +1,211 @@
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router-dom';
+import { api } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+import RavenIcon from '../../components/RavenIcon';
+import LocationPicker, { encodeLocation } from '../../components/LocationPicker';
+
+export default function NewMatch() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [matchDate, setMatchDate] = useState('');
+  const [matchTime, setMatchTime] = useState('20:00');
+  const [venue, setVenue] = useState('');
+  const [court, setCourt] = useState('');
+  const [opponent, setOpponent] = useState('');
+  const [matchType, setMatchType] = useState<'futsal' | '7-player' | '11-player'>('7-player');
+  const [signupOpenDate, setSignupOpenDate] = useState(today);
+  const [signupCloseDate, setSignupCloseDate] = useState('');
+  const [minPlayers, setMinPlayers] = useState(7);
+  const [maxPlayers, setMaxPlayers] = useState(10);
+  const [error, setError] = useState('');
+
+  const mutation = useMutation({
+    mutationFn: () => api.post('/matches', {
+      matchDate,
+      matchTime: matchTime + ':00',
+      location: encodeLocation(venue, court),
+      opponent: opponent.trim() || undefined,
+      matchType,
+      signupOpenDate: signupOpenDate + 'T00:00:00Z',
+      signupCloseDate: signupCloseDate + 'T20:00:00Z',
+      minPlayers,
+      maxPlayers,
+      priorityEnabled: true,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['matches'] });
+      navigate('/coach');
+    },
+    onError: (err: any) => {
+      setError(err.response?.data?.error?.message ?? 'Failed to create match');
+    },
+  });
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (!matchDate || !signupCloseDate) { setError('Match date and signup deadline are required'); return; }
+    if (!venue) { setError('Please select a venue'); return; }
+    if (minPlayers > maxPlayers) { setError('Min players cannot exceed max players'); return; }
+    mutation.mutate();
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link to="/coach" className="text-white/50 hover:text-white/80 text-sm">← Matches</Link>
+          <span className="text-white/20">|</span>
+          <div className="flex items-center gap-2">
+            <RavenIcon className="w-5 h-5 text-white" />
+            <span className="font-bold text-white text-lg">
+              Boca Schedule <span className="text-brand-green-300 text-sm font-normal">Coach</span>
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-white/70">{user?.name}</span>
+          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
+        </div>
+      </nav>
+
+      <main className="max-w-lg mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">New match</h1>
+
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Match date</label>
+              <input
+                type="date"
+                required
+                value={matchDate}
+                onChange={e => setMatchDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kick-off time</label>
+              <input
+                type="time"
+                required
+                value={matchTime}
+                onChange={e => setMatchTime(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Venue <span className="text-gray-400 font-normal text-xs">· Court number (optional)</span>
+            </label>
+            <LocationPicker
+              venue={venue}
+              court={court}
+              onVenueChange={setVenue}
+              onCourtChange={setCourt}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Opponent team <span className="text-gray-400 font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={opponent}
+              onChange={e => setOpponent(e.target.value)}
+              placeholder="e.g. FC Vesterbro"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Match type</label>
+            <select
+              value={matchType}
+              onChange={e => setMatchType(e.target.value as any)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+            >
+              <option value="7-player">7-player</option>
+              <option value="futsal">Futsal</option>
+              <option value="11-player">11-player</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Signup opens</label>
+              <input
+                type="date"
+                required
+                value={signupOpenDate}
+                onChange={e => setSignupOpenDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Signup deadline</label>
+              <input
+                type="date"
+                required
+                value={signupCloseDate}
+                onChange={e => setSignupCloseDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Min players</label>
+              <input
+                type="number"
+                min={1}
+                max={25}
+                value={minPlayers}
+                onChange={e => setMinPlayers(Number(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Max players</label>
+              <input
+                type="number"
+                min={1}
+                max={25}
+                value={maxPlayers}
+                onChange={e => setMaxPlayers(Number(e.target.value))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              />
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              disabled={mutation.isPending}
+              className="flex-1 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+            >
+              {mutation.isPending ? 'Creating…' : 'Create match'}
+            </button>
+            <Link
+              to="/coach"
+              className="flex-1 text-center border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </Link>
+          </div>
+        </form>
+      </main>
+    </div>
+  );
+}

@@ -8,6 +8,9 @@ import signupRoutes from './routes/signups.js';
 import playerRoutes from './routes/players.js';
 import adminRoutes from './routes/admin.js';
 import optimizeRoutes from './routes/optimize.js';
+import swapRoutes from './routes/swaps.js';
+import resultRoutes from './routes/results.js';
+import locationRoutes from './routes/locations.js';
 
 const app = express();
 
@@ -32,6 +35,9 @@ app.use('/api/signups', signupRoutes);
 app.use('/api/players', playerRoutes);
 app.use('/api/matches', playerRoutes); // performance endpoint lives under /api/matches/:matchId/performance
 app.use('/api/admin', adminRoutes);
+app.use('/api', swapRoutes);
+app.use('/api', resultRoutes);
+app.use('/api/locations', locationRoutes);
 
 app.use(errorHandler);
 

@@ -149,25 +149,44 @@ CREATE INDEX idx_audit_timestamp ON audit_log(created_at);
 -- ============================================================
 
 CREATE VIEW player_statistics AS
+WITH perf AS (
+    SELECT player_id,
+        COUNT(*) FILTER (WHERE attended)  AS total_played,
+        COALESCE(SUM(goals), 0)           AS total_goals,
+        COALESCE(SUM(assists), 0)         AS total_assists,
+        COALESCE(SUM(saves), 0)           AS total_saves,
+        AVG(self_rating)                  AS avg_rating
+    FROM match_performance
+    GROUP BY player_id
+),
+sigs AS (
+    SELECT player_id, COUNT(*) FILTER (WHERE is_active) AS total_signups
+    FROM signups
+    GROUP BY player_id
+),
+sels AS (
+    SELECT player_id, COUNT(*) AS total_selected
+    FROM selections
+    GROUP BY player_id
+)
 SELECT
     u.user_id,
     u.name,
     u.preferred_positions,
-    COUNT(DISTINCT s.match_id) FILTER (WHERE s.is_active) AS total_signups,
-    COUNT(DISTINCT sel.match_id)                           AS total_selected,
-    COUNT(DISTINCT mp.match_id) FILTER (WHERE mp.attended) AS total_played,
-    COALESCE(SUM(mp.goals), 0)                            AS total_goals,
-    COALESCE(SUM(mp.assists), 0)                          AS total_assists,
-    COALESCE(SUM(mp.saves), 0)                            AS total_saves,
-    COALESCE(AVG(mp.self_rating), 0)                      AS avg_rating,
+    COALESCE(sigs.total_signups, 0)  AS total_signups,
+    COALESCE(sels.total_selected, 0) AS total_selected,
+    COALESCE(perf.total_played, 0)   AS total_played,
+    COALESCE(perf.total_goals, 0)    AS total_goals,
+    COALESCE(perf.total_assists, 0)  AS total_assists,
+    COALESCE(perf.total_saves, 0)    AS total_saves,
+    COALESCE(perf.avg_rating, 0)     AS avg_rating,
     ROUND(
-        COUNT(DISTINCT mp.match_id) FILTER (WHERE mp.attended)::numeric /
-        NULLIF(COUNT(DISTINCT s.match_id) FILTER (WHERE s.is_active), 0) * 100,
+        COALESCE(perf.total_played, 0)::numeric /
+        NULLIF(COALESCE(sigs.total_signups, 0), 0)::numeric * 100,
         2
     ) AS attendance_rate
 FROM users u
-LEFT JOIN signups s   ON u.user_id = s.player_id
-LEFT JOIN selections sel ON u.user_id = sel.player_id
-LEFT JOIN match_performance mp ON u.user_id = mp.player_id
-WHERE u.role = 'player' AND u.is_active = true
-GROUP BY u.user_id, u.name, u.preferred_positions;
+LEFT JOIN sigs ON u.user_id = sigs.player_id
+LEFT JOIN sels ON u.user_id = sels.player_id
+LEFT JOIN perf ON u.user_id = perf.player_id
+WHERE u.role = 'player' AND u.is_active = true;

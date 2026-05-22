@@ -15,6 +15,7 @@ const CreateMatchSchema = z.object({
   signupCloseDate: z.string().datetime(),
   minPlayers: z.number().int().positive(),
   maxPlayers: z.number().int().positive(),
+  opponent: z.string().max(100).optional(),
   priorityEnabled: z.boolean().default(true),
   optimizationWeights: z.object({
     fairness: z.number(),
@@ -36,13 +37,14 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     // Fetch matches (left join signups so matches with 0 sign-ups still appear)
     let matchQuery = supabaseAdmin
       .from('matches')
-      .select('*, signups(player_id, is_active)', { count: 'exact' })
+      .select('*, signups(signup_id, player_id, is_active), selections(player_id)', { count: 'exact' })
       .order('match_date', { ascending: true })
       .range(offset, offset + limit - 1);
 
     if (!statusParam || statusParam === 'all') {
-      // Coaches see everything except completed
-      matchQuery = matchQuery.neq('status', 'completed');
+      matchQuery = matchQuery.neq('status', 'completed').neq('status', 'cancelled');
+    } else if (statusParam.includes(',')) {
+      matchQuery = matchQuery.in('status', statusParam.split(','));
     } else {
       matchQuery = matchQuery.eq('status', statusParam);
     }
@@ -50,21 +52,42 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     const { data: matches, error, count } = await matchQuery;
     if (error) throw error;
 
+    const matchIds = (matches ?? []).map((m: any) => m.match_id);
+    const { data: outgoingSwaps } = matchIds.length > 0
+      ? await supabaseAdmin
+          .from('swap_requests')
+          .select('swap_id, match_id, status, target:users!swap_requests_target_id_fkey(user_id, name)')
+          .eq('requester_id', req.user!.userId)
+          .eq('status', 'pending')
+          .in('match_id', matchIds)
+      : { data: [] };
+
+    const swapByMatch = new Map((outgoingSwaps ?? []).map((s: any) => [s.match_id, s]));
+
     const enriched = (matches ?? []).map((m: any) => {
       const signups = (m.signups ?? []).filter((s: any) => s.is_active);
+      const mySignup = signups.find((s: any) => s.player_id === req.user!.userId);
+      const isSelected = (m.selections ?? []).some((s: any) => s.player_id === req.user!.userId);
+      const pendingSwap = swapByMatch.get(m.match_id);
       return {
         matchId: m.match_id,
         matchDate: m.match_date,
         matchTime: m.match_time,
         location: m.location,
         matchType: m.match_type,
+        opponent: m.opponent ?? null,
         status: m.status,
         signupCloseDate: m.signup_close_date,
         minPlayers: m.min_players,
         maxPlayers: m.max_players,
         currentSignups: signups.length,
-        userSignedUp: signups.some((s: any) => s.player_id === req.user!.userId),
+        userSignedUp: !!mySignup,
+        signupId: mySignup?.signup_id ?? null,
         signupDeadlinePassed: new Date(m.signup_close_date) < new Date(),
+        isSelected,
+        pendingSwap: pendingSwap
+          ? { swapId: pendingSwap.swap_id, targetName: pendingSwap.target.name, targetId: pendingSwap.target.user_id }
+          : null,
       };
     });
 
@@ -89,6 +112,7 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
       match_time: d.matchTime,
       location: d.location,
       match_type: d.matchType,
+      opponent: d.opponent ?? null,
       signup_open_date: d.signupOpenDate,
       signup_close_date: d.signupCloseDate,
       min_players: d.minPlayers,
@@ -101,7 +125,7 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
         preferred_position: d.optimizationWeights.preferredPosition,
       } : undefined,
       created_by: req.user!.userId,
-      status: 'draft',
+      status: new Date(d.signupOpenDate) <= new Date() ? 'signup_open' : 'draft',
     }).select().single();
 
     if (error) throw error;
@@ -122,18 +146,39 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
   }
 });
 
+const UpdateMatchSchema = z.object({
+  matchDate: z.string().date().optional(),
+  matchTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+  location: z.string().min(1).max(200).optional(),
+  opponent: z.string().max(100).nullable().optional(),
+  status: z.enum(['draft','signup_open','signup_closed','optimized','published','completed','cancelled']).optional(),
+  minPlayers: z.number().int().positive().optional(),
+  maxPlayers: z.number().int().positive().optional(),
+  signupOpenDate: z.string().datetime().optional(),
+  signupCloseDate: z.string().datetime().optional(),
+});
+
 // PUT /api/matches/:matchId — coach/admin
 router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req, res, next) => {
   try {
     const { matchId } = req.params;
-    const allowed = ['location', 'signup_close_date', 'status', 'min_players', 'max_players'];
-    const updates: Record<string, unknown> = {};
+    const body = UpdateMatchSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid input' } });
+      return;
+    }
 
-    if (req.body.location) updates.location = req.body.location;
-    if (req.body.signupCloseDate) updates.signup_close_date = req.body.signupCloseDate;
-    if (req.body.status) updates.status = req.body.status;
-    if (req.body.minPlayers) updates.min_players = req.body.minPlayers;
-    if (req.body.maxPlayers) updates.max_players = req.body.maxPlayers;
+    const d = body.data;
+    const updates: Record<string, unknown> = {};
+    if (d.matchDate !== undefined) updates.match_date = d.matchDate;
+    if (d.matchTime !== undefined) updates.match_time = d.matchTime;
+    if (d.location !== undefined) updates.location = d.location;
+    if (d.opponent !== undefined) updates.opponent = d.opponent;
+    if (d.status !== undefined) updates.status = d.status;
+    if (d.minPlayers !== undefined) updates.min_players = d.minPlayers;
+    if (d.maxPlayers !== undefined) updates.max_players = d.maxPlayers;
+    if (d.signupOpenDate !== undefined) updates.signup_open_date = d.signupOpenDate;
+    if (d.signupCloseDate !== undefined) updates.signup_close_date = d.signupCloseDate;
 
     const { data, error } = await supabaseAdmin.from('matches').update(updates).eq('match_id', matchId).select().single();
     if (error) throw error;
@@ -159,13 +204,37 @@ router.get('/:matchId/signups', authenticate, requireRole('coach', 'admin'), asy
       return;
     }
 
+    const playerIds = (signups ?? []).map((s: any) => s.users.user_id);
+    const { data: statsData } = playerIds.length > 0
+      ? await supabaseAdmin.from('player_statistics').select('user_id, total_played, total_signups').in('user_id', playerIds)
+      : { data: [] };
+    const statsMap = new Map((statsData ?? []).map((s: any) => [s.user_id, s]));
+
     res.json({
       success: true,
       data: {
-        match: { matchId: match.match_id, matchDate: match.match_date, matchTime: match.match_time, minPlayers: match.min_players, maxPlayers: match.max_players },
+        match: {
+          matchId: match.match_id,
+          matchDate: match.match_date,
+          matchTime: match.match_time,
+          location: match.location,
+          opponent: match.opponent ?? null,
+          matchType: match.match_type,
+          status: match.status,
+          minPlayers: match.min_players,
+          maxPlayers: match.max_players,
+          signupOpenDate: match.signup_open_date,
+          signupCloseDate: match.signup_close_date,
+        },
         signups: (signups ?? []).map((s: any) => ({
           signupId: s.signup_id,
-          player: { userId: s.users.user_id, name: s.users.name, preferredPositions: s.users.preferred_positions },
+          player: {
+            userId: s.users.user_id,
+            name: s.users.name,
+            preferredPositions: s.users.preferred_positions,
+            totalPlayed: Number(statsMap.get(s.users.user_id)?.total_played ?? 0),
+            totalSignups: Number(statsMap.get(s.users.user_id)?.total_signups ?? 0),
+          },
           isPriority: s.is_priority,
           signedUpAt: s.signed_up_at,
         })),
@@ -209,6 +278,14 @@ router.post('/:matchId/publish', authenticate, requireRole('coach', 'admin'), as
       .eq('match_id', matchId)
       .select()
       .single();
+
+    await supabaseAdmin.from('audit_log').insert({
+      user_id: req.user!.userId,
+      action: 'match_published',
+      entity_type: 'match',
+      entity_id: matchId,
+      new_values: { status: 'published', selectionCount },
+    });
 
     res.json({ success: true, data: { matchId: data.match_id, status: 'published', publishedAt: data.published_at, emailsSent: 0 } });
   } catch (err) {

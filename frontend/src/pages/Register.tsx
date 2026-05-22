@@ -123,7 +123,7 @@ export default function Register() {
           </p>
           <button
             onClick={() => navigate('/login')}
-            className="text-blue-600 hover:underline text-sm"
+            className="text-brand-green hover:underline text-sm"
           >
             Back to login
           </button>
@@ -138,7 +138,7 @@ export default function Register() {
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Create account</h1>
         <p className="text-gray-500 text-sm mb-6">
           Already have one?{' '}
-          <Link to="/login" className="text-blue-600 hover:underline">Sign in</Link>
+          <Link to="/login" className="text-brand-green hover:underline">Sign in</Link>
         </p>
 
         {clientError && (
@@ -157,7 +157,7 @@ export default function Register() {
               autoComplete="name"
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               placeholder="John Doe"
             />
           </div>
@@ -171,7 +171,7 @@ export default function Register() {
               autoComplete="email"
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               placeholder="you@example.com"
             />
           </div>
@@ -185,7 +185,7 @@ export default function Register() {
               autoComplete="new-password"
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               placeholder="••••••••"
             />
             <PasswordStrength password={form.password} />
@@ -200,7 +200,7 @@ export default function Register() {
               autoComplete="new-password"
               value={form.confirmPassword}
               onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
-              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green ${
                 form.confirmPassword && form.confirmPassword !== form.password
                   ? 'border-red-300 bg-red-50'
                   : 'border-gray-300'
@@ -227,8 +227,8 @@ export default function Register() {
                     onClick={() => togglePosition(pos)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                       selected
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400'
+                        ? 'bg-brand-green text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:border-brand-green-400'
                     }`}
                   >
                     {pos}
@@ -244,7 +244,7 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2"
+            className="w-full bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2"
           >
             {loading ? 'Submitting...' : 'Create account'}
           </button>

@@ -8,8 +8,18 @@ const router = Router({ mergeParams: true });
 const JULIA_URL = process.env.JULIA_SERVICE_URL || 'http://localhost:3002';
 
 // GET /api/matches/:matchId/selections
-router.get('/selections', authenticate, requireRole('coach', 'admin'), async (req, res, next) => {
+// Accessible to coach/admin OR players with can_enter_results (for result entry page)
+router.get('/selections', authenticate, async (req, res, next) => {
   try {
+    const { role, userId } = req.user!;
+    if (role !== 'coach' && role !== 'admin') {
+      const { data: userRow } = await supabaseAdmin.from('users').select('can_enter_results').eq('user_id', userId).single();
+      if (!userRow?.can_enter_results) {
+        res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } });
+        return;
+      }
+    }
+
     const { matchId } = req.params;
 
     const [{ data: match }, { data: signups }, { data: selections }] = await Promise.all([
@@ -30,6 +40,12 @@ router.get('/selections', authenticate, requireRole('coach', 'admin'), async (re
       return;
     }
 
+    const playerIds = (signups ?? []).map((s: any) => s.player_id);
+    const { data: statsData } = playerIds.length > 0
+      ? await supabaseAdmin.from('player_statistics').select('user_id, total_played, total_signups').in('user_id', playerIds)
+      : { data: [] };
+    const statsMap = new Map((statsData ?? []).map((s: any) => [s.user_id, s]));
+
     const selectedIds = new Set((selections ?? []).map((s: any) => s.player_id));
     const selectionDetails = new Map((selections ?? []).map((s: any) => [s.player_id, s]));
 
@@ -38,6 +54,8 @@ router.get('/selections', authenticate, requireRole('coach', 'admin'), async (re
         userId: s.users.user_id,
         name: s.users.name,
         preferredPositions: s.users.preferred_positions,
+        totalPlayed: Number(statsMap.get(s.users.user_id)?.total_played ?? 0),
+        totalSignups: Number(statsMap.get(s.users.user_id)?.total_signups ?? 0),
       },
       isPriority: s.is_priority ?? false,
       isSelected: selectedIds.has(s.player_id),
@@ -164,7 +182,7 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         match_id: matchId,
-        target_players: match.min_players,
+        target_players: match.max_players,
         max_players: match.max_players,
         total_matches: totalMatches,
         players,

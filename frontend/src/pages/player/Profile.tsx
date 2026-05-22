@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import RavenIcon from '../../components/RavenIcon';
 
 type Position = 'GK' | 'DEF' | 'WIN' | 'MID' | 'STR';
 
@@ -63,15 +64,18 @@ export default function PlayerProfile() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link to="/dashboard" className="text-gray-400 hover:text-gray-600 text-sm">← Dashboard</Link>
-          <span className="text-gray-300">|</span>
-          <span className="font-bold text-gray-900 text-lg">Boca Schedule</span>
+          <Link to="/dashboard" className="text-white/50 hover:text-white/80 text-sm">← Dashboard</Link>
+          <span className="text-white/20">|</span>
+          <div className="flex items-center gap-2">
+            <RavenIcon className="w-5 h-5 text-white" />
+            <span className="font-bold text-white text-lg">Boca Schedule</span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600">{user?.name}</span>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-700">Logout</button>
+          <span className="text-sm text-white/70">{user?.name}</span>
+          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
         </div>
       </nav>
 
@@ -81,7 +85,7 @@ export default function PlayerProfile() {
           {!editing && (
             <button
               onClick={() => setEditing(true)}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-brand-green hover:underline"
             >
               Edit
             </button>
@@ -101,7 +105,7 @@ export default function PlayerProfile() {
                     <input
                       value={name}
                       onChange={e => setName(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
                     />
                   </div>
                   <div>
@@ -127,7 +131,7 @@ export default function PlayerProfile() {
                     <button
                       onClick={() => saveMutation.mutate()}
                       disabled={saveMutation.isPending}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                      className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
                     >
                       {saveMutation.isPending ? 'Saving…' : 'Save changes'}
                     </button>

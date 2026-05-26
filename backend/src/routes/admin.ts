@@ -50,6 +50,7 @@ router.get('/users', async (req, res, next) => {
           name: u.name,
           role: u.role,
           isActive: u.is_active,
+          canEnterResults: u.can_enter_results ?? false,
           createdAt: u.created_at,
           lastLogin: u.last_login,
         })),
@@ -160,6 +161,24 @@ router.put('/users/:userId/active', async (req, res, next) => {
     await writeAudit(req.user!.userId, isActive ? 'user_activated' : 'user_deactivated', 'user', userId, { isActive: current?.is_active }, { isActive });
 
     res.json({ success: true, data: { userId, isActive, updatedAt: data.updated_at } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/users/:userId/results-permission
+router.put('/users/:userId/results-permission', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { canEnterResults } = req.body as { canEnterResults: boolean };
+
+    const { data: current } = await supabaseAdmin.from('users').select('can_enter_results').eq('user_id', userId).single();
+    const { data, error } = await supabaseAdmin.from('users').update({ can_enter_results: canEnterResults }).eq('user_id', userId).select().single();
+    if (error) throw error;
+
+    await writeAudit(req.user!.userId, 'results_permission_changed', 'user', userId, { canEnterResults: current?.can_enter_results }, { canEnterResults });
+
+    res.json({ success: true, data: { userId, canEnterResults, updatedAt: data.updated_at } });
   } catch (err) {
     next(err);
   }

@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.boca-page {
+  isolation: isolate;
+}
+
+.boca-page::after {
+  content: '';
+  position: fixed;
+  top: 50%;
+  right: 0;
+  width: 100vw;
+  height: 100vw;
+  background-image: url('/boca-logo.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  transform: translateY(-50%) translateX(50%);
+  opacity: 0.055;
+  pointer-events: none;
+  z-index: -1;
+}

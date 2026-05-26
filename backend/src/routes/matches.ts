@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { sendSelectionNotifications, sendCancellationNotifications, sendReleaseNotification } from '../lib/mailer.js';
 
 const router = Router();
 
@@ -16,6 +17,8 @@ const CreateMatchSchema = z.object({
   minPlayers: z.number().int().positive(),
   maxPlayers: z.number().int().positive(),
   opponent: z.string().max(100).optional(),
+  matchCategory: z.enum(['serie', 'pokal']).default('serie'),
+  serieLetter: z.string().max(2).optional(),
   priorityEnabled: z.boolean().default(true),
   optimizationWeights: z.object({
     fairness: z.number(),
@@ -76,6 +79,8 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
         location: m.location,
         matchType: m.match_type,
         opponent: m.opponent ?? null,
+        matchCategory: m.match_category ?? 'serie',
+        serieLetter: m.serie_letter ?? null,
         status: m.status,
         signupCloseDate: m.signup_close_date,
         minPlayers: m.min_players,
@@ -113,6 +118,8 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
       location: d.location,
       match_type: d.matchType,
       opponent: d.opponent ?? null,
+      match_category: d.matchCategory,
+      serie_letter: d.matchCategory === 'serie' ? (d.serieLetter ?? 'A') : null,
       signup_open_date: d.signupOpenDate,
       signup_close_date: d.signupCloseDate,
       min_players: d.minPlayers,
@@ -151,6 +158,8 @@ const UpdateMatchSchema = z.object({
   matchTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
   location: z.string().min(1).max(200).optional(),
   opponent: z.string().max(100).nullable().optional(),
+  matchCategory: z.enum(['serie', 'pokal']).optional(),
+  serieLetter: z.string().max(2).nullable().optional(),
   status: z.enum(['draft','signup_open','signup_closed','optimized','published','completed','cancelled']).optional(),
   minPlayers: z.number().int().positive().optional(),
   maxPlayers: z.number().int().positive().optional(),
@@ -174,14 +183,46 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
     if (d.matchTime !== undefined) updates.match_time = d.matchTime;
     if (d.location !== undefined) updates.location = d.location;
     if (d.opponent !== undefined) updates.opponent = d.opponent;
+    if (d.matchCategory !== undefined) {
+      updates.match_category = d.matchCategory;
+      updates.serie_letter = d.matchCategory === 'serie' ? (d.serieLetter ?? 'A') : null;
+    } else if (d.serieLetter !== undefined) {
+      updates.serie_letter = d.serieLetter;
+    }
     if (d.status !== undefined) updates.status = d.status;
     if (d.minPlayers !== undefined) updates.min_players = d.minPlayers;
     if (d.maxPlayers !== undefined) updates.max_players = d.maxPlayers;
     if (d.signupOpenDate !== undefined) updates.signup_open_date = d.signupOpenDate;
     if (d.signupCloseDate !== undefined) updates.signup_close_date = d.signupCloseDate;
 
+    // Fetch current status before update so we can detect a new cancellation
+    const { data: existing } = d.status === 'cancelled'
+      ? await supabaseAdmin.from('matches').select('status, match_date, match_time, location, opponent').eq('match_id', matchId).single()
+      : { data: null };
+
     const { data, error } = await supabaseAdmin.from('matches').update(updates).eq('match_id', matchId).select().single();
     if (error) throw error;
+
+    // Fire cancellation emails only when transitioning into cancelled state
+    if (d.status === 'cancelled' && existing && existing.status !== 'cancelled') {
+      supabaseAdmin
+        .from('selections')
+        .select('users!selections_player_id_fkey(name, email)')
+        .eq('match_id', matchId)
+        .then(({ data: sel }) => {
+          const players = (sel ?? [])
+            .map((s: any) => ({ name: s.users.name as string, email: s.users.email as string }))
+            .filter(p => p.email);
+          if (players.length > 0) {
+            sendCancellationNotifications(players, {
+              matchDate: existing.match_date,
+              matchTime: existing.match_time,
+              location: existing.location,
+              opponent: existing.opponent ?? null,
+            }).catch(err => console.error('Failed to send cancellation notifications:', err));
+          }
+        });
+    }
 
     res.json({ success: true, data: { matchId: data.match_id, ...updates, updatedAt: data.updated_at } });
   } catch (err) {
@@ -220,6 +261,8 @@ router.get('/:matchId/signups', authenticate, requireRole('coach', 'admin'), asy
           location: match.location,
           opponent: match.opponent ?? null,
           matchType: match.match_type,
+          matchCategory: match.match_category ?? 'serie',
+          serieLetter: match.serie_letter ?? null,
           status: match.status,
           minPlayers: match.min_players,
           maxPlayers: match.max_players,
@@ -287,7 +330,139 @@ router.post('/:matchId/publish', authenticate, requireRole('coach', 'admin'), as
       new_values: { status: 'published', selectionCount },
     });
 
-    res.json({ success: true, data: { matchId: data.match_id, status: 'published', publishedAt: data.published_at, emailsSent: 0 } });
+    // Fetch selected players' emails and notify them — fire-and-forget
+    supabaseAdmin
+      .from('selections')
+      .select('users!selections_player_id_fkey(name, email)')
+      .eq('match_id', matchId)
+      .then(({ data: sel }) => {
+        const players = (sel ?? [])
+          .map((s: any) => ({ name: s.users.name as string, email: s.users.email as string }))
+          .filter(p => p.email);
+        if (players.length > 0) {
+          sendSelectionNotifications(players, {
+            matchDate: match.match_date,
+            matchTime: match.match_time,
+            location: match.location,
+            opponent: match.opponent ?? null,
+          }).catch(err => console.error('Failed to send selection notifications:', err));
+        }
+      });
+
+    res.json({ success: true, data: { matchId: data.match_id, status: 'published', publishedAt: data.published_at, emailsSent: selectionCount } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/matches/:matchId/release — selected player releases their spot
+router.post('/:matchId/release', authenticate, async (req, res, next) => {
+  try {
+    const { matchId } = req.params;
+    const playerId = req.user!.userId;
+
+    const { data: match } = await supabaseAdmin
+      .from('matches')
+      .select('match_date, match_time, location, opponent, status')
+      .eq('match_id', matchId)
+      .single();
+
+    if (!match || match.status !== 'published') {
+      res.status(400).json({ success: false, error: { code: 'INVALID_STATE', message: 'Can only release a spot for a published match' } });
+      return;
+    }
+
+    const { data: selection } = await supabaseAdmin
+      .from('selections')
+      .select('selection_id')
+      .eq('match_id', matchId)
+      .eq('player_id', playerId)
+      .single();
+
+    if (!selection) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'You are not selected for this match' } });
+      return;
+    }
+
+    await supabaseAdmin.from('selections').delete().eq('selection_id', selection.selection_id);
+
+    const { data: playerProfile } = await supabaseAdmin.from('users').select('name').eq('user_id', playerId).single();
+
+    // Notify all coaches and admins — fire-and-forget
+    supabaseAdmin
+      .from('users')
+      .select('name, email')
+      .in('role', ['coach', 'admin'])
+      .eq('is_active', true)
+      .then(({ data: coaches }) => {
+        const recipients = (coaches ?? []).filter((c: any) => c.email);
+        if (recipients.length > 0) {
+          sendReleaseNotification(
+            recipients as { name: string; email: string }[],
+            playerProfile?.name ?? 'A player',
+            { matchDate: match.match_date, matchTime: match.match_time, location: match.location, opponent: match.opponent ?? null },
+            matchId,
+          ).catch(err => console.error('Failed to send release notification:', err));
+        }
+      });
+
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/matches/:matchId/guests
+router.get('/:matchId/guests', authenticate, async (req, res, next) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('guest_players')
+      .select('guest_id, name, position, created_at')
+      .eq('match_id', req.params.matchId)
+      .order('created_at');
+    if (error) throw error;
+    res.json({ success: true, data: data ?? [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/matches/:matchId/guests — coach/admin
+router.post('/:matchId/guests', authenticate, requireRole('coach', 'admin'), async (req, res, next) => {
+  try {
+    const { name, position } = req.body;
+    if (!name?.trim()) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Name is required' } });
+      return;
+    }
+    const validPositions = ['GK', 'DEF', 'WIN', 'MID', 'STR'];
+    if (position && !validPositions.includes(position)) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid position' } });
+      return;
+    }
+    const { data, error } = await supabaseAdmin.from('guest_players').insert({
+      match_id: req.params.matchId,
+      name: name.trim(),
+      position: position || null,
+      added_by: req.user!.userId,
+    }).select().single();
+    if (error) throw error;
+    res.status(201).json({ success: true, data: { guestId: data.guest_id, name: data.name, position: data.position } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/matches/:matchId/guests/:guestId — coach/admin
+router.delete('/:matchId/guests/:guestId', authenticate, requireRole('coach', 'admin'), async (req, res, next) => {
+  try {
+    const { error } = await supabaseAdmin
+      .from('guest_players')
+      .delete()
+      .eq('guest_id', req.params.guestId)
+      .eq('match_id', req.params.matchId);
+    if (error) throw error;
+    res.json({ success: true });
   } catch (err) {
     next(err);
   }

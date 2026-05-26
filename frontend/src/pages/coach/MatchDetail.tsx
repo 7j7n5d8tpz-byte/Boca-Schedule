@@ -4,7 +4,8 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import RavenIcon from '../../components/RavenIcon';
-import LocationPicker, { encodeLocation, decodeLocation } from '../../components/LocationPicker';
+import LocationPicker, { encodeLocation, decodeLocation, formatLocation } from '../../components/LocationPicker';
+import { meetingTime } from '../../utils';
 
 interface SignupPlayer {
   signupId: string;
@@ -20,6 +21,8 @@ interface MatchData {
   location: string;
   opponent: string | null;
   matchType: string;
+  matchCategory: string;
+  serieLetter: string | null;
   status: string;
   minPlayers: number;
   maxPlayers: number;
@@ -49,9 +52,10 @@ export default function MatchDetail() {
 
   const [priorityMap, setPriorityMap] = useState<Record<string, boolean>>({});
   const [optimizeError, setOptimizeError] = useState('');
+  const [fairnessWeight, setFairnessWeight] = useState(50); // 0 = positions, 100 = fairness
   const [showEdit, setShowEdit] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [editFields, setEditFields] = useState({ matchDate: '', matchTime: '', opponent: '', signupOpenDate: '', signupCloseDate: '', minPlayers: 0, maxPlayers: 0 });
+  const [editFields, setEditFields] = useState({ matchDate: '', matchTime: '', opponent: '', matchCategory: 'serie' as 'serie' | 'pokal', serieLetter: 'A', signupOpenDate: '', signupCloseDate: '', minPlayers: 0, maxPlayers: 0 });
   const [editVenue, setEditVenue] = useState('');
   const [editCourt, setEditCourt] = useState('');
 
@@ -67,12 +71,14 @@ export default function MatchDetail() {
   });
 
   const editMutation = useMutation({
-    mutationFn: (fields: { matchDate: string; matchTime: string; location: string; opponent: string; signupOpenDate: string; signupCloseDate: string; minPlayers: number; maxPlayers: number }) =>
+    mutationFn: (fields: { matchDate: string; matchTime: string; location: string; opponent: string; matchCategory: 'serie' | 'pokal'; serieLetter: string; signupOpenDate: string; signupCloseDate: string; minPlayers: number; maxPlayers: number }) =>
       api.put(`/matches/${matchId}`, {
         matchDate: fields.matchDate,
         matchTime: fields.matchTime,
         location: fields.location,
         opponent: fields.opponent.trim() || null,
+        matchCategory: fields.matchCategory,
+        serieLetter: fields.matchCategory === 'serie' ? fields.serieLetter : null,
         signupOpenDate: fields.signupOpenDate + 'T00:00:00Z',
         signupCloseDate: fields.signupCloseDate + 'T20:00:00Z',
         minPlayers: fields.minPlayers,
@@ -102,7 +108,7 @@ export default function MatchDetail() {
   });
 
   const optimizeMutation = useMutation({
-    mutationFn: () => api.post(`/matches/${matchId}/optimize`),
+    mutationFn: () => api.post(`/matches/${matchId}/optimize`, { fairnessWeight: 1 - fairnessWeight / 100 }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['matches'] });
       qc.invalidateQueries({ queryKey: ['match-selections', matchId] });
@@ -121,6 +127,8 @@ export default function MatchDetail() {
       matchDate: match.matchDate,
       matchTime: match.matchTime.slice(0, 5),
       opponent: match.opponent ?? '',
+      matchCategory: (match.matchCategory as 'serie' | 'pokal') ?? 'serie',
+      serieLetter: match.serieLetter ?? 'A',
       signupOpenDate: match.signupOpenDate?.slice(0, 10) ?? '',
       signupCloseDate: match.signupCloseDate?.slice(0, 10) ?? '',
       minPlayers: match.minPlayers,
@@ -140,24 +148,24 @@ export default function MatchDetail() {
   }
 
   if (isLoading) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">Loading…</div>;
+    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
   }
 
   if (!data) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">Match not found</div>;
+    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
   }
 
   const { match, signups, summary } = data;
   const date = new Date(`${match.matchDate}T${match.matchTime}`);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 boca-page">
       <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/coach" className="text-white/50 hover:text-white/80 text-sm">← Matches</Link>
           <span className="text-white/20">|</span>
           <div className="flex items-center gap-2">
-            <RavenIcon className="w-5 h-5 text-white" />
+            <RavenIcon className="w-8 h-8" />
             <span className="font-bold text-white text-lg">
               Boca Schedule <span className="text-brand-green-300 text-sm font-normal">Coach</span>
             </span>
@@ -176,7 +184,7 @@ export default function MatchDetail() {
               {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
             </h1>
             <p className="text-gray-500 mt-1">
-              {match.matchTime.slice(0, 5)} · {match.location}
+              {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) · {formatLocation(match.location, match.matchType)}
               {match.opponent && <span className="text-gray-700 font-medium"> vs {match.opponent}</span>}
               {' '}· {summary.totalSignups} signed up
               {summary.prioritySignups > 0 && (
@@ -328,13 +336,16 @@ export default function MatchDetail() {
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Venue <span className="text-gray-400 font-normal">· Court (optional)</span>
+                  Venue <span className="text-gray-400 font-normal">
+                    · {match.matchType === 'futsal' ? 'Hall (optional)' : 'Court (optional)'}
+                  </span>
                 </label>
                 <LocationPicker
                   venue={editVenue}
                   court={editCourt}
                   onVenueChange={setEditVenue}
                   onCourtChange={setEditCourt}
+                  matchType={match.matchType}
                 />
               </div>
               <div>
@@ -347,6 +358,31 @@ export default function MatchDetail() {
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+                <select
+                  value={editFields.matchCategory}
+                  onChange={e => setEditFields(f => ({ ...f, matchCategory: e.target.value as 'serie' | 'pokal' }))}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                >
+                  <option value="serie">Serie</option>
+                  <option value="pokal">Pokal</option>
+                </select>
+              </div>
+              {editFields.matchCategory === 'serie' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Serie letter</label>
+                  <select
+                    value={editFields.serieLetter}
+                    onChange={e => setEditFields(f => ({ ...f, serieLetter: e.target.value }))}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                  >
+                    {['A','B','C','D','E','F'].map(l => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Signup opens</label>
                 <input
@@ -374,7 +410,7 @@ export default function MatchDetail() {
                 Discard
               </button>
               <button
-                onClick={() => editMutation.mutate({ ...editFields, location: encodeLocation(editVenue, editCourt) })}
+                onClick={() => editMutation.mutate({ ...editFields, location: encodeLocation(editVenue, editCourt), matchCategory: editFields.matchCategory, serieLetter: editFields.serieLetter })}
                 disabled={editMutation.isPending}
                 className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
               >
@@ -411,7 +447,7 @@ export default function MatchDetail() {
         )}
 
         {/* Optimize card */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="font-semibold text-gray-900">Run optimizer</p>
@@ -427,6 +463,30 @@ export default function MatchDetail() {
               {optimizeMutation.isPending ? 'Optimizing…' : 'Optimize'}
             </button>
           </div>
+
+          {/* Weight lever */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>⚖️ Fairness</span>
+              <span className="font-medium text-gray-600">
+                {fairnessWeight === 50 ? 'Balanced' : fairnessWeight < 50 ? 'Fairness priority' : 'Positions priority'}
+              </span>
+              <span>🧩 Positions</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={10}
+              value={fairnessWeight}
+              onChange={e => setFairnessWeight(Number(e.target.value))}
+              className="w-full accent-brand-green h-2 cursor-pointer"
+            />
+            <p className="text-xs text-gray-400">
+              Balances playing-time fairness against formation fit.
+            </p>
+          </div>
+
           {optimizeError && <p className="text-sm text-red-500">{optimizeError}</p>}
         </div>
 

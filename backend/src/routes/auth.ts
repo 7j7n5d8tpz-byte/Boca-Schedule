@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
+import { sendAdminRegistrationNotification } from '../lib/mailer.js';
 
 const router = Router();
 
@@ -38,16 +39,22 @@ router.post('/register', async (req, res, next) => {
 
     if (!authError && authData?.user) {
       // New account — create profile, inactive until admin approves
-      await supabaseAdmin.from('users').insert({
+      const { error: profileError } = await supabaseAdmin.from('users').insert({
         user_id: authData.user.id,
         email,
         name,
         role: 'player',
         preferred_positions: preferredPositions ?? [],
         is_active: false,
-      }).then(({ error: profileError }) => {
-        if (profileError) supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       });
+      if (profileError) {
+        supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      } else {
+        // Notify admin — fire-and-forget, don't block the response
+        sendAdminRegistrationNotification(name, email).catch(err =>
+          console.error('Failed to send admin registration notification:', err)
+        );
+      }
     }
     // If authError (e.g. email already registered), we intentionally fall through
     // and return the same response to prevent email enumeration.
@@ -127,6 +134,55 @@ router.post('/refresh', async (req, res, next) => {
     }
 
     res.json({ success: true, data: { accessToken: data.session.access_token, expiresIn: data.session.expires_in } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email || typeof email !== 'string') {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Email is required' } });
+      return;
+    }
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    await supabaseAdmin.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: `${frontendUrl}/reset-password`,
+    });
+    // Always return 200 — prevents email enumeration
+    res.json({ success: true, message: 'If that email is registered, a reset link has been sent.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/reset-password
+router.post('/reset-password', async (req, res, next) => {
+  try {
+    const { accessToken, newPassword } = req.body;
+    if (!accessToken || !newPassword) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'accessToken and newPassword are required' } });
+      return;
+    }
+
+    const passwordCheck = z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/).regex(/[!@#$%^&*]/).safeParse(newPassword);
+    if (!passwordCheck.success) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Password must be at least 8 characters and include an uppercase letter, a number, and a special character (!@#$%^&*).' } });
+      return;
+    }
+
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
+    if (error || !user) {
+      res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Invalid or expired reset link — please request a new one.' } });
+      return;
+    }
+
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword });
+    if (updateError) throw updateError;
+
+    res.json({ success: true, message: 'Password updated successfully.' });
   } catch (err) {
     next(err);
   }

@@ -19,6 +19,8 @@ export default function NewMatch() {
   const [court, setCourt] = useState('');
   const [opponent, setOpponent] = useState('');
   const [matchType, setMatchType] = useState<'futsal' | '7-player' | '11-player'>('7-player');
+  const [matchCategory, setMatchCategory] = useState<'serie' | 'pokal'>('serie');
+  const [serieLetter, setSerieLetter] = useState('A');
   const [signupOpenDate, setSignupOpenDate] = useState(today);
   const [signupCloseDate, setSignupCloseDate] = useState('');
   const [minPlayers, setMinPlayers] = useState(7);
@@ -32,6 +34,8 @@ export default function NewMatch() {
       location: encodeLocation(venue, court),
       opponent: opponent.trim() || undefined,
       matchType,
+      matchCategory,
+      serieLetter: matchCategory === 'serie' ? serieLetter : undefined,
       signupOpenDate: signupOpenDate + 'T00:00:00Z',
       signupCloseDate: signupCloseDate + 'T20:00:00Z',
       minPlayers,
@@ -57,13 +61,13 @@ export default function NewMatch() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 boca-page">
       <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/coach" className="text-white/50 hover:text-white/80 text-sm">← Matches</Link>
           <span className="text-white/20">|</span>
           <div className="flex items-center gap-2">
-            <RavenIcon className="w-5 h-5 text-white" />
+            <RavenIcon className="w-8 h-8" />
             <span className="font-bold text-white text-lg">
               Boca Schedule <span className="text-brand-green-300 text-sm font-normal">Coach</span>
             </span>
@@ -104,13 +108,16 @@ export default function NewMatch() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Venue <span className="text-gray-400 font-normal text-xs">· Court number (optional)</span>
+              Venue <span className="text-gray-400 font-normal text-xs">
+                · {matchType === 'futsal' ? 'Hall (optional)' : 'Court number (optional)'}
+              </span>
             </label>
             <LocationPicker
               venue={venue}
               court={court}
               onVenueChange={setVenue}
               onCourtChange={setCourt}
+              matchType={matchType}
               required
             />
           </div>
@@ -126,18 +133,52 @@ export default function NewMatch() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Match type</label>
-            <select
-              value={matchType}
-              onChange={e => setMatchType(e.target.value as any)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-            >
-              <option value="7-player">7-player</option>
-              <option value="futsal">Futsal</option>
-              <option value="11-player">11-player</option>
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Match type</label>
+              <select
+                value={matchType}
+                onChange={e => {
+                  const t = e.target.value as 'futsal' | '7-player' | '11-player';
+                  setMatchType(t);
+                  if (t === 'futsal') setMinPlayers(5);
+                  else if (t === '7-player') setMinPlayers(7);
+                  else if (t === '11-player') setMinPlayers(11);
+                }}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              >
+                <option value="7-player">7-player</option>
+                <option value="futsal">Futsal</option>
+                <option value="11-player">11-player</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <select
+                value={matchCategory}
+                onChange={e => setMatchCategory(e.target.value as 'serie' | 'pokal')}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              >
+                <option value="serie">Serie</option>
+                <option value="pokal">Pokal</option>
+              </select>
+            </div>
           </div>
+
+          {matchCategory === 'serie' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Serie letter</label>
+              <select
+                value={serieLetter}
+                onChange={e => setSerieLetter(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              >
+                {['A','B','C','D','E','F'].map(l => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>

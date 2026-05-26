@@ -27,7 +27,13 @@ router.get('/matches/:matchId/results', authenticate, async (req, res, next) => 
       success: true,
       data: {
         result: result
-          ? { goalsFor: result.goals_for, goalsAgainst: result.goals_against, recordedAt: result.recorded_at }
+          ? {
+              goalsFor: result.goals_for,
+              goalsAgainst: result.goals_against,
+              gameAssessment: result.game_assessment ?? null,
+              goalEvents: result.goal_events ?? [],
+              recordedAt: result.recorded_at,
+            }
           : null,
         performances: (performances ?? []).map((p: any) => ({
           playerId: p.player_id,
@@ -36,7 +42,9 @@ router.get('/matches/:matchId/results', authenticate, async (req, res, next) => 
           attended: p.attended,
           goals: p.goals ?? 0,
           assists: p.assists ?? 0,
-          saves: p.saves ?? 0,
+          cleanSheet: p.clean_sheet ?? false,
+          yellowCards: p.yellow_cards ?? 0,
+          redCards: p.red_cards ?? 0,
           minutesPlayed: p.minutes_played,
           positionPlayed: p.position_played,
           selfRating: p.self_rating,
@@ -61,15 +69,19 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
       return;
     }
 
-    const { goalsFor, goalsAgainst, players } = req.body as {
+    const { goalsFor, goalsAgainst, gameAssessment, goalEvents, players } = req.body as {
       goalsFor: number;
       goalsAgainst: number;
+      gameAssessment?: string | null;
+      goalEvents?: Array<{ scorerId: string | null; assisterId: string | null }>;
       players: Array<{
         playerId: string;
         attended: boolean;
         goals: number;
         assists: number;
-        saves: number;
+        cleanSheet?: boolean;
+        yellowCards?: number;
+        redCards?: number;
         minutesPlayed?: number;
         positionPlayed?: string;
         selfRating?: number;
@@ -86,6 +98,8 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
       match_id: matchId,
       goals_for: goalsFor,
       goals_against: goalsAgainst,
+      game_assessment: gameAssessment ?? null,
+      goal_events: goalEvents ?? null,
       recorded_by: userId,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'match_id' });
@@ -98,7 +112,9 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
         attended: p.attended ?? false,
         goals: p.goals ?? 0,
         assists: p.assists ?? 0,
-        saves: p.saves ?? 0,
+        clean_sheet: p.cleanSheet ?? false,
+        yellow_cards: p.yellowCards ?? 0,
+        red_cards: p.redCards ?? 0,
         minutes_played: p.minutesPlayed ?? null,
         position_played: p.positionPlayed ?? null,
         self_rating: p.selfRating ?? null,

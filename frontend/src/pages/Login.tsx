@@ -17,28 +17,28 @@ export default function Login() {
     try {
       const role = await login(email, password);
       navigate(role === 'coach' || role === 'admin' ? '/coach' : '/dashboard');
-    } catch {
-      setError('Invalid email or password.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message ?? '';
+      if (msg.toLowerCase().includes('too many requests') || err?.response?.status === 429) {
+        setError('Too many sign-in attempts. Please wait a few minutes and try again.');
+      } else {
+        setError('Invalid email or password.');
+      }
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center">
       <div className="w-full max-w-md">
         {/* Brand header */}
         <div className="bg-brand-dark rounded-t-2xl px-8 pt-8 pb-6 relative overflow-hidden">
           {/* Stripe accent — mirrors the shirt stripe */}
           <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-brand-green" />
           <div className="absolute left-1.5 top-0 bottom-0 w-0.5 bg-brand-red" />
-          <div className="flex items-center gap-3">
-            {/* Raven circle icon */}
-            <div className="w-10 h-10 rounded-full border-2 border-white/20 flex items-center justify-center shrink-0">
-              <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2C8 2 5 5 5 8c0 1.5.5 2.8 1.4 3.8L4 20h3l1-3h8l1 3h3l-2.4-8.2C18.5 10.8 19 9.5 19 8c0-3-3-6-7-6zm0 2c2.8 0 5 2.2 5 4s-2.2 4-5 4-5-2.2-5-4 2.2-4 5-4zm-1 1.5v3l-2-1 2-2zm2 0l2 2-2 1v-3z"/>
-              </svg>
-            </div>
+          <div className="flex items-center gap-4">
+            <img src="/boca-logo.png" alt="Boca" className="w-14 h-14 shrink-0 drop-shadow-md" />
             <div>
               <h1 className="text-xl font-bold text-white leading-tight">Boca Schedule</h1>
               <p className="text-white/50 text-xs">Team management</p>
@@ -72,7 +72,10 @@ export default function Login() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <Link to="/forgot-password" className="text-xs text-brand-green hover:underline">Forgot password?</Link>
+              </div>
               <input
                 type="password"
                 required

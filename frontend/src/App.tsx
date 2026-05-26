@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import PlayerDashboard from './pages/player/Dashboard';
 import CoachDashboard from './pages/coach/Dashboard';
 import MatchDetail from './pages/coach/MatchDetail';
@@ -35,6 +37,8 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerDashboard /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerProfile /></ProtectedRoute>} />
             <Route path="/statistics" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><Statistics /></ProtectedRoute>} />

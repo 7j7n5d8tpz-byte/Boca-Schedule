@@ -71,6 +71,7 @@ router.get('/selections', authenticate, async (req, res, next) => {
           matchId: match.match_id,
           matchDate: match.match_date,
           matchTime: match.match_time,
+          matchType: match.match_type,
           status: match.status,
           minPlayers: match.min_players,
           maxPlayers: match.max_players,
@@ -132,6 +133,11 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
   try {
     const { matchId } = req.params;
 
+    const { fairnessWeight } = req.body as { fairnessWeight?: number };
+    const fairness_weight = typeof fairnessWeight === 'number'
+      ? Math.min(1, Math.max(0, fairnessWeight))
+      : 0.5;
+
     const { data: match } = await supabaseAdmin.from('matches').select('*').eq('match_id', matchId).single();
     if (!match) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
@@ -182,9 +188,11 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         match_id: matchId,
+        match_type: match.match_type,
         target_players: match.max_players,
         max_players: match.max_players,
         total_matches: totalMatches,
+        fairness_weight,
         players,
       }),
     });

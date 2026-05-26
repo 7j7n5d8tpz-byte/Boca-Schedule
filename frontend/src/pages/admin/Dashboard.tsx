@@ -13,6 +13,7 @@ interface AdminUser {
   name: string;
   role: 'player' | 'coach' | 'admin';
   isActive: boolean;
+  canEnterResults: boolean;
   createdAt: string;
   lastLogin: string | null;
 }
@@ -93,6 +94,12 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
   const activeMutation = useMutation({
     mutationFn: ({ userId, isActive }: { userId: string; isActive: boolean }) =>
       api.put(`/admin/users/${userId}/active`, { isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  });
+
+  const resultsMutation = useMutation({
+    mutationFn: ({ userId, canEnterResults }: { userId: string; canEnterResults: boolean }) =>
+      api.put(`/admin/users/${userId}/results-permission`, { canEnterResults }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   });
 
@@ -244,13 +251,14 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Results</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Joined</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {users.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No users found</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No users found</td></tr>
               )}
               {users.map(u => (
                 <tr key={u.userId} className={u.isActive ? '' : 'opacity-50'}>
@@ -278,6 +286,23 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                     >
                       {u.isActive ? 'Active' : 'Inactive'}
                     </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.role === 'coach' || u.role === 'admin' ? (
+                      <span className="text-xs text-gray-300">Always</span>
+                    ) : (
+                      <button
+                        onClick={() => resultsMutation.mutate({ userId: u.userId, canEnterResults: !u.canEnterResults })}
+                        disabled={resultsMutation.isPending}
+                        className={`text-xs font-medium px-2 py-1 rounded-full transition-colors disabled:opacity-50 ${
+                          u.canEnterResults
+                            ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                        }`}
+                      >
+                        {u.canEnterResults ? 'Enabled' : 'Disabled'}
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-400">{fmtDate(u.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
@@ -443,7 +468,7 @@ function AuditLogTab() {
         >
           <option value="">All actions</option>
           {KNOWN_ACTIONS.map(a => (
-            <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>
+            <option key={a} value={a}>{a.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
           ))}
         </select>
         <p className="text-xs text-gray-400">{total} entries</p>
@@ -477,7 +502,7 @@ function AuditLogTab() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ACTION_COLORS[l.action] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {l.action.replace(/_/g, ' ')}
+                      {l.action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">
@@ -485,9 +510,12 @@ function AuditLogTab() {
                     {l.entityId && <span className="text-gray-300 ml-1">{l.entityId.slice(0, 8)}…</span>}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500 max-w-xs">
-                    {l.newValues && (
-                      <span className="font-mono">{JSON.stringify(l.newValues)}</span>
-                    )}
+                    {l.newValues && Object.entries(l.newValues as Record<string, unknown>).map(([k, v]) => (
+                      <span key={k} className="block">
+                        <span className="text-gray-400">{k.replace(/_/g, ' ')}:</span>{' '}
+                        <span className="font-medium text-gray-700">{String(v)}</span>
+                      </span>
+                    ))}
                   </td>
                 </tr>
               ))}
@@ -535,10 +563,10 @@ export default function AdminDashboard() {
   const inactiveCount = inactiveData?.pagination.total ?? 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 boca-page">
       <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <RavenIcon className="w-5 h-5 text-white" />
+          <RavenIcon className="w-8 h-8" />
           <span className="font-bold text-white text-lg">
             Boca Schedule{' '}
             <span className="text-purple-300 text-sm font-normal">Admin</span>

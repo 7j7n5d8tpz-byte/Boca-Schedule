@@ -113,7 +113,7 @@ export default function Register() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-md p-8 w-full max-w-md text-center space-y-4">
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto text-2xl">✓</div>
           <h2 className="text-xl font-bold text-gray-900">Request submitted</h2>
@@ -133,9 +133,20 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4">
-      <div className="bg-white rounded-2xl shadow-md p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Create account</h1>
+    <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center py-12 px-4">
+      <div className="w-full max-w-md">
+        <div className="bg-brand-dark rounded-t-2xl px-8 pt-8 pb-6 relative overflow-hidden">
+          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-brand-green" />
+          <div className="absolute left-1.5 top-0 bottom-0 w-0.5 bg-brand-red" />
+          <div className="flex items-center gap-4">
+            <img src="/boca-logo.png" alt="Boca" className="w-14 h-14 shrink-0 drop-shadow-md" />
+            <div>
+              <h1 className="text-xl font-bold text-white leading-tight">Boca Schedule</h1>
+              <p className="text-white/50 text-xs">Create account</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-b-2xl shadow-md p-8">
         <p className="text-gray-500 text-sm mb-6">
           Already have one?{' '}
           <Link to="/login" className="text-brand-green hover:underline">Sign in</Link>
@@ -227,7 +238,7 @@ export default function Register() {
                     onClick={() => togglePosition(pos)}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                       selected
-                        ? 'bg-brand-green text-white border-blue-600'
+                        ? 'bg-brand-green text-white border-brand-green-700'
                         : 'bg-white text-gray-600 border-gray-300 hover:border-brand-green-400'
                     }`}
                   >
@@ -249,6 +260,7 @@ export default function Register() {
             {loading ? 'Submitting...' : 'Create account'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );

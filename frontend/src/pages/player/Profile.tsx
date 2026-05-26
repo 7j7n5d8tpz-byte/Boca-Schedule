@@ -60,16 +60,14 @@ export default function PlayerProfile() {
     );
   }
 
-  const stats = data?.seasonStats;
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 boca-page">
       <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to="/dashboard" className="text-white/50 hover:text-white/80 text-sm">← Dashboard</Link>
           <span className="text-white/20">|</span>
           <div className="flex items-center gap-2">
-            <RavenIcon className="w-5 h-5 text-white" />
+            <RavenIcon className="w-8 h-8" />
             <span className="font-bold text-white text-lg">Boca Schedule</span>
           </div>
         </div>
@@ -163,40 +161,6 @@ export default function PlayerProfile() {
           )}
         </div>
 
-        {/* Season stats */}
-        {stats && (
-          <div className="space-y-3">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Season Stats</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: 'Matches played', value: stats.total_played ?? 0 },
-                { label: 'Selected', value: stats.total_selected ?? 0 },
-                { label: 'Sign-ups', value: stats.total_signups ?? 0 },
-                { label: 'Attendance', value: `${stats.attendance_rate ?? 0}%` },
-              ].map(s => (
-                <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-                  <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                  <p className="text-xs text-gray-500 mt-1">{s.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {(stats.total_played ?? 0) > 0 && (
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: 'Goals', value: stats.total_goals ?? 0 },
-                  { label: 'Assists', value: stats.total_assists ?? 0 },
-                  { label: 'Avg rating', value: stats.avg_rating ? Number(stats.avg_rating).toFixed(1) : '—' },
-                ].map(s => (
-                  <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-                    <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                    <p className="text-xs text-gray-500 mt-1">{s.label}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </main>
     </div>
   );

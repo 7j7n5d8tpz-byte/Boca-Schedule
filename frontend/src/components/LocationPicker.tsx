@@ -20,15 +20,25 @@ export function decodeLocation(location: string): { venue: string; court: string
   return { venue: location, court: '' };
 }
 
+export function formatLocation(location: string, matchType: string): string {
+  const { venue, court } = decodeLocation(location);
+  if (!court) return venue;
+  const prefix = matchType === 'futsal' ? 'Hall' : 'Court';
+  return `${venue} · ${prefix} ${court}`;
+}
+
 interface Props {
   venue: string;
   court: string;
   onVenueChange: (v: string) => void;
   onCourtChange: (c: string) => void;
   required?: boolean;
+  matchType?: string;
 }
 
-export default function LocationPicker({ venue, court, onVenueChange, onCourtChange, required }: Props) {
+export default function LocationPicker({ venue, court, onVenueChange, onCourtChange, required, matchType }: Props) {
+  const isFutsal = matchType === 'futsal';
+  const subLabel = isFutsal ? 'Hall' : 'Court';
   const qc = useQueryClient();
   const [addingNew, setAddingNew] = useState(false);
   const [newVenue, setNewVenue] = useState('');
@@ -98,11 +108,11 @@ export default function LocationPicker({ venue, court, onVenueChange, onCourtCha
             <option value={ADD_SENTINEL}>+ Add location…</option>
           </select>
         </div>
-        <div className="w-24 shrink-0">
+        <div className="w-28 shrink-0">
           <input
             type="text"
             inputMode="numeric"
-            placeholder="Court"
+            placeholder={subLabel}
             value={court}
             onChange={handleCourtInput}
             maxLength={3}

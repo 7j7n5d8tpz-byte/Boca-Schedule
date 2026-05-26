@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { meetingTime } from '../../utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
@@ -18,6 +19,7 @@ interface MatchInfo {
   matchId: string;
   matchDate: string;
   matchTime: string;
+  matchType: string;
   status: string;
   minPlayers: number;
   maxPlayers: number;
@@ -29,28 +31,36 @@ interface SelectionsResponse {
   summary: { totalSignups: number; totalSelected: number };
 }
 
+interface Guest {
+  guest_id: string;
+  name: string;
+  position: string | null;
+}
+
 // ─── Pitch visualization ────────────────────────────────────────────────────
 
-// x = % from left (GK side) to right (STR side) on a landscape 105:68 pitch
-const PITCH_X: Record<string, number> = {
-  GK:  11,
-  DEF: 28,
-  MID: 50,
-  WIN: 70,
-  STR: 88,
+const PITCH_X_7: Record<string, number> = {
+  GK: 11, DEF: 28, MID: 50, WIN: 70, STR: 88,
+};
+const FORMATION_MIN_7: Record<string, number> = {
+  GK: 1, DEF: 2, WIN: 2, MID: 1, STR: 1,
 };
 
-const FORMATION_MIN: Record<string, number> = {
-  GK: 1, DEF: 2, WIN: 2, MID: 1, STR: 1,
+const PITCH_X_FUTSAL: Record<string, number> = {
+  GK: 11, MID: 38, WIN: 62, STR: 88,
+};
+const FORMATION_MIN_FUTSAL: Record<string, number> = {
+  GK: 1, WIN: 2, MID: 1, STR: 1,
 };
 
 // Tailwind classes must be complete strings so JIT includes them
 const TOKEN_STYLES: Record<string, string> = {
-  GK:  'bg-yellow-400 ring-yellow-200',
-  DEF: 'bg-blue-500   ring-blue-300',
-  WIN: 'bg-green-600  ring-green-400',
-  MID: 'bg-purple-500 ring-purple-300',
-  STR: 'bg-red-500    ring-red-300',
+  GK:    'bg-yellow-400 ring-yellow-200',
+  DEF:   'bg-blue-500   ring-blue-300',
+  WIN:   'bg-green-600  ring-green-400',
+  MID:   'bg-purple-500 ring-purple-300',
+  STR:   'bg-red-500    ring-red-300',
+  GUEST: 'bg-gray-400   ring-gray-200',
 };
 
 const TOKEN_BG: Record<string, string> = {
@@ -66,7 +76,6 @@ const POS_TAG: Record<string, string> = {
   STR: 'bg-red-100 text-red-700',
 };
 
-// Spread n players vertically for a given position
 function yPositions(count: number, pos: string): number[] {
   if (count === 0) return [];
   if (count === 1) return [50];
@@ -83,15 +92,42 @@ function shortName(full: string): string {
   return last.length > 8 ? last.slice(0, 7) + '…' : last;
 }
 
-function PitchView({ players, ids }: { players: SelectionPlayer[]; ids: Set<string> }) {
+// For futsal display, remap DEF → MID (no DEF position in futsal)
+function futsalPositions(prefs: string[]): string[] {
+  return prefs.map(p => p === 'DEF' ? 'MID' : p).filter(p => p !== 'DEF');
+}
+
+function PitchView({ players, ids, matchType, guests }: { players: SelectionPlayer[]; ids: Set<string>; matchType: string; guests: Guest[] }) {
+  const isFutsal = matchType === 'futsal';
+  const PITCH_X     = isFutsal ? PITCH_X_FUTSAL     : PITCH_X_7;
+  const FORMATION_MIN = isFutsal ? FORMATION_MIN_FUTSAL : FORMATION_MIN_7;
+
   const selected = players.filter(p => ids.has(p.player.userId));
 
   const byPos: Record<string, SelectionPlayer[]> = Object.fromEntries(
     Object.keys(PITCH_X).map(pos => [
       pos,
-      selected.filter(p => p.player.preferredPositions.includes(pos)),
+      selected.filter(p => {
+        const positions = isFutsal ? futsalPositions(p.player.preferredPositions) : p.player.preferredPositions;
+        return positions.includes(pos);
+      }),
     ])
   );
+
+  // For futsal: players with no mapped positions are shown at MID (pivot role)
+  if (isFutsal) {
+    const assignedIds = new Set(Object.values(byPos).flatMap(arr => arr.map(p => p.player.userId)));
+    selected.filter(p => !assignedIds.has(p.player.userId)).forEach(p => {
+      byPos['MID'] = [...(byPos['MID'] ?? []), p];
+    });
+  }
+
+  // Guests with a position slot into the pitch; unpositioned guests go to MID
+  const guestByPos: Record<string, Guest[]> = Object.fromEntries(Object.keys(PITCH_X).map(p => [p, []]));
+  guests.forEach(g => {
+    const pos = (g.position && PITCH_X[g.position]) ? (isFutsal && g.position === 'DEF' ? 'MID' : g.position) : 'MID';
+    guestByPos[pos] = [...(guestByPos[pos] ?? []), g];
+  });
 
   const allMet = Object.entries(FORMATION_MIN).every(
     ([pos, min]) => byPos[pos].length >= min
@@ -99,7 +135,6 @@ function PitchView({ players, ids }: { players: SelectionPlayer[]; ids: Set<stri
 
   return (
     <div className="space-y-2">
-      {/* Title row */}
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Formation</h2>
         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${allMet ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
@@ -107,15 +142,21 @@ function PitchView({ players, ids }: { players: SelectionPlayer[]; ids: Set<stri
         </span>
       </div>
 
-      {/* Pitch */}
       <div
         className="relative w-full rounded-xl overflow-hidden select-none"
-        style={{ aspectRatio: '105/68', boxShadow: 'inset 0 0 60px rgba(0,0,0,0.35)' }}
+        style={{ aspectRatio: isFutsal ? '40/20' : '105/68', boxShadow: 'inset 0 0 60px rgba(0,0,0,0.35)' }}
       >
-        {/* Grass stripes */}
-        <div className="absolute inset-0" style={{
-          background: 'repeating-linear-gradient(90deg, #14532d 0, #14532d 9.5%, #166534 9.5%, #166534 19%)',
-        }} />
+        {isFutsal ? (
+          /* Futsal: parquet wood floor */
+          <div className="absolute inset-0" style={{
+            background: 'repeating-linear-gradient(90deg, #c8954a 0, #c8954a 9.5%, #b8843c 9.5%, #b8843c 19%)',
+          }} />
+        ) : (
+          /* Grass stripes */
+          <div className="absolute inset-0" style={{
+            background: 'repeating-linear-gradient(90deg, #14532d 0, #14532d 9.5%, #166534 9.5%, #166534 19%)',
+          }} />
+        )}
 
         {/* Pitch boundary */}
         <div className="absolute pointer-events-none" style={{
@@ -145,68 +186,113 @@ function PitchView({ players, ids }: { players: SelectionPlayer[]; ids: Set<stri
           transform: 'translate(-50%, -50%)',
         }} />
 
-        {/* Left penalty area */}
-        <div className="absolute pointer-events-none" style={{
-          top: '21%', left: '3.5%', width: '15.5%', bottom: '21%',
-          borderTop: '2px solid rgba(255,255,255,0.8)',
-          borderRight: '2px solid rgba(255,255,255,0.8)',
-          borderBottom: '2px solid rgba(255,255,255,0.8)',
-        }} />
-
-        {/* Left goal area */}
-        <div className="absolute pointer-events-none" style={{
-          top: '37%', left: '3.5%', width: '6%', bottom: '37%',
-          borderTop: '2px solid rgba(255,255,255,0.8)',
-          borderRight: '2px solid rgba(255,255,255,0.8)',
-          borderBottom: '2px solid rgba(255,255,255,0.8)',
-        }} />
-
-        {/* Left goal */}
-        <div className="absolute pointer-events-none" style={{
-          top: '41%', left: 0, width: '3.5%', bottom: '41%',
-          background: 'rgba(255,255,255,0.12)',
-          borderTop: '2px solid rgba(255,255,255,0.9)',
-          borderRight: '2px solid rgba(255,255,255,0.9)',
-          borderBottom: '2px solid rgba(255,255,255,0.9)',
-        }} />
-
-        {/* Right penalty area */}
-        <div className="absolute pointer-events-none" style={{
-          top: '21%', right: '3.5%', width: '15.5%', bottom: '21%',
-          borderTop: '2px solid rgba(255,255,255,0.8)',
-          borderLeft: '2px solid rgba(255,255,255,0.8)',
-          borderBottom: '2px solid rgba(255,255,255,0.8)',
-        }} />
-
-        {/* Right goal area */}
-        <div className="absolute pointer-events-none" style={{
-          top: '37%', right: '3.5%', width: '6%', bottom: '37%',
-          borderTop: '2px solid rgba(255,255,255,0.8)',
-          borderLeft: '2px solid rgba(255,255,255,0.8)',
-          borderBottom: '2px solid rgba(255,255,255,0.8)',
-        }} />
-
-        {/* Right goal */}
-        <div className="absolute pointer-events-none" style={{
-          top: '41%', right: 0, width: '3.5%', bottom: '41%',
-          background: 'rgba(255,255,255,0.12)',
-          borderTop: '2px solid rgba(255,255,255,0.9)',
-          borderLeft: '2px solid rgba(255,255,255,0.9)',
-          borderBottom: '2px solid rgba(255,255,255,0.9)',
-        }} />
-
-        {/* Corner arcs */}
-        {([
-          { top: '4.5%',  left:  '3%',   borderRadius: '0 0 100% 0' },
-          { top: '4.5%',  right: '3%',   borderRadius: '0 0 0 100%' },
-          { bottom: '4.5%', left: '3%',  borderRadius: '0 100% 0 0' },
-          { bottom: '4.5%', right: '3%', borderRadius: '100% 0 0 0' },
-        ] as React.CSSProperties[]).map((style, i) => (
-          <div key={i} className="absolute pointer-events-none" style={{
-            ...style, width: '2.8%', aspectRatio: '1',
-            border: '2px solid rgba(255,255,255,0.6)',
-          }} />
-        ))}
+        {isFutsal ? (
+          <>
+            {/* Left penalty arc — semicircle centered at the goal line, clipped by overflow:hidden */}
+            <div className="absolute pointer-events-none rounded-full" style={{
+              top: '50%', left: '3.5%',
+              width: '28%', aspectRatio: '1',
+              border: '2px solid rgba(255,255,255,0.75)',
+              transform: 'translate(-50%, -50%)',
+            }} />
+            {/* Left penalty spot */}
+            <div className="absolute pointer-events-none rounded-full" style={{
+              top: '50%', left: '18%',
+              width: '1.3%', aspectRatio: '1',
+              background: 'rgba(255,255,255,0.85)',
+              transform: 'translate(-50%, -50%)',
+            }} />
+            {/* Right penalty arc */}
+            <div className="absolute pointer-events-none rounded-full" style={{
+              top: '50%', right: '3.5%',
+              width: '28%', aspectRatio: '1',
+              border: '2px solid rgba(255,255,255,0.75)',
+              transform: 'translate(50%, -50%)',
+            }} />
+            {/* Right penalty spot */}
+            <div className="absolute pointer-events-none rounded-full" style={{
+              top: '50%', right: '18%',
+              width: '1.3%', aspectRatio: '1',
+              background: 'rgba(255,255,255,0.85)',
+              transform: 'translate(50%, -50%)',
+            }} />
+            {/* Left goal */}
+            <div className="absolute pointer-events-none" style={{
+              top: '38%', left: 0, width: '3.5%', bottom: '38%',
+              background: 'rgba(255,255,255,0.12)',
+              borderTop: '2px solid rgba(255,255,255,0.9)',
+              borderRight: '2px solid rgba(255,255,255,0.9)',
+              borderBottom: '2px solid rgba(255,255,255,0.9)',
+            }} />
+            {/* Right goal */}
+            <div className="absolute pointer-events-none" style={{
+              top: '38%', right: 0, width: '3.5%', bottom: '38%',
+              background: 'rgba(255,255,255,0.12)',
+              borderTop: '2px solid rgba(255,255,255,0.9)',
+              borderLeft: '2px solid rgba(255,255,255,0.9)',
+              borderBottom: '2px solid rgba(255,255,255,0.9)',
+            }} />
+          </>
+        ) : (
+          <>
+            {/* Left penalty area */}
+            <div className="absolute pointer-events-none" style={{
+              top: '21%', left: '3.5%', width: '15.5%', bottom: '21%',
+              borderTop: '2px solid rgba(255,255,255,0.8)',
+              borderRight: '2px solid rgba(255,255,255,0.8)',
+              borderBottom: '2px solid rgba(255,255,255,0.8)',
+            }} />
+            {/* Left goal area */}
+            <div className="absolute pointer-events-none" style={{
+              top: '37%', left: '3.5%', width: '6%', bottom: '37%',
+              borderTop: '2px solid rgba(255,255,255,0.8)',
+              borderRight: '2px solid rgba(255,255,255,0.8)',
+              borderBottom: '2px solid rgba(255,255,255,0.8)',
+            }} />
+            {/* Left goal */}
+            <div className="absolute pointer-events-none" style={{
+              top: '41%', left: 0, width: '3.5%', bottom: '41%',
+              background: 'rgba(255,255,255,0.12)',
+              borderTop: '2px solid rgba(255,255,255,0.9)',
+              borderRight: '2px solid rgba(255,255,255,0.9)',
+              borderBottom: '2px solid rgba(255,255,255,0.9)',
+            }} />
+            {/* Right penalty area */}
+            <div className="absolute pointer-events-none" style={{
+              top: '21%', right: '3.5%', width: '15.5%', bottom: '21%',
+              borderTop: '2px solid rgba(255,255,255,0.8)',
+              borderLeft: '2px solid rgba(255,255,255,0.8)',
+              borderBottom: '2px solid rgba(255,255,255,0.8)',
+            }} />
+            {/* Right goal area */}
+            <div className="absolute pointer-events-none" style={{
+              top: '37%', right: '3.5%', width: '6%', bottom: '37%',
+              borderTop: '2px solid rgba(255,255,255,0.8)',
+              borderLeft: '2px solid rgba(255,255,255,0.8)',
+              borderBottom: '2px solid rgba(255,255,255,0.8)',
+            }} />
+            {/* Right goal */}
+            <div className="absolute pointer-events-none" style={{
+              top: '41%', right: 0, width: '3.5%', bottom: '41%',
+              background: 'rgba(255,255,255,0.12)',
+              borderTop: '2px solid rgba(255,255,255,0.9)',
+              borderLeft: '2px solid rgba(255,255,255,0.9)',
+              borderBottom: '2px solid rgba(255,255,255,0.9)',
+            }} />
+            {/* Corner arcs */}
+            {([
+              { top: '4.5%',    left:  '3%',   borderRadius: '0 0 100% 0' },
+              { top: '4.5%',    right: '3%',   borderRadius: '0 0 0 100%' },
+              { bottom: '4.5%', left:  '3%',   borderRadius: '0 100% 0 0' },
+              { bottom: '4.5%', right: '3%',   borderRadius: '100% 0 0 0' },
+            ] as React.CSSProperties[]).map((style, i) => (
+              <div key={i} className="absolute pointer-events-none" style={{
+                ...style, width: '2.8%', aspectRatio: '1',
+                border: '2px solid rgba(255,255,255,0.6)',
+              }} />
+            ))}
+          </>
+        )}
 
         {/* Ghost slots for uncovered positions */}
         {Object.entries(FORMATION_MIN).flatMap(([pos, min]) => {
@@ -225,20 +311,42 @@ function PitchView({ players, ids }: { players: SelectionPlayer[]; ids: Set<stri
           ));
         })}
 
-        {/* Player tokens — one per (position, player) pair, so multi-pos players appear in each */}
+        {/* Player tokens */}
         {Object.entries(PITCH_X).flatMap(([pos, cx]) => {
+          const allAtPos = [...byPos[pos], ...(guestByPos[pos] ?? []).map(g => ({ _guest: g }))];
           const posPlayers = byPos[pos];
-          const ys = yPositions(posPlayers.length, pos);
-          const met = posPlayers.length >= FORMATION_MIN[pos];
+          const ys = yPositions(allAtPos.length, pos);
+          const met = (posPlayers.length + (guestByPos[pos]?.length ?? 0)) >= FORMATION_MIN[pos];
 
-          return posPlayers.map((sp, i) => {
-            const others = sp.player.preferredPositions.filter(p => p !== pos);
+          return allAtPos.map((item, i) => {
+            const isGuest = '_guest' in item;
+            if (isGuest) {
+              const g = (item as any)._guest as Guest;
+              return (
+                <div key={`guest-${g.guest_id}`} className="absolute flex flex-col items-center" style={{
+                  left: `${cx}%`, top: `${ys[i]}%`,
+                  transform: 'translate(-50%, -50%)', width: '11%', zIndex: 10,
+                }}>
+                  <div className="relative w-8 h-8 rounded-full bg-gray-400 ring-2 ring-gray-200 shadow-xl flex items-center justify-center">
+                    <span className="text-white text-[7px] font-extrabold tracking-tight drop-shadow">GST</span>
+                  </div>
+                  <p className="text-white text-[10px] font-semibold mt-1 text-center leading-none truncate w-full"
+                    style={{ textShadow: '0 1px 4px rgba(0,0,0,0.95)' }}>
+                    {shortName(g.name)}
+                  </p>
+                </div>
+              );
+            }
+            const sp = item as SelectionPlayer;
+            const displayPos = isFutsal
+              ? futsalPositions(sp.player.preferredPositions)
+              : sp.player.preferredPositions;
+            const others = displayPos.filter(p => p !== pos);
             return (
               <div key={`${pos}-${sp.player.userId}`} className="absolute flex flex-col items-center" style={{
                 left: `${cx}%`, top: `${ys[i]}%`,
                 transform: 'translate(-50%, -50%)', width: '11%', zIndex: 10,
               }}>
-                {/* Circle */}
                 <div className={`relative w-8 h-8 rounded-full ${TOKEN_STYLES[pos]} ring-2 shadow-xl flex items-center justify-center`}>
                   <span className="text-white text-[8px] font-extrabold tracking-tight drop-shadow">{pos}</span>
                   {sp.isPriority && (
@@ -253,14 +361,10 @@ function PitchView({ players, ids }: { players: SelectionPlayer[]; ids: Set<stri
                     </span>
                   )}
                 </div>
-
-                {/* Name */}
                 <p className="text-white text-[10px] font-semibold mt-1 text-center leading-none truncate w-full"
                   style={{ textShadow: '0 1px 4px rgba(0,0,0,0.95)' }}>
                   {shortName(sp.player.name)}
                 </p>
-
-                {/* Other positions this player also covers */}
                 {others.length > 0 && (
                   <p className="text-white/55 text-[7px] text-center leading-none mt-px">
                     +{others.join('/')}
@@ -285,6 +389,10 @@ function PitchView({ players, ids }: { players: SelectionPlayer[]; ids: Set<stri
           <span className="text-xs text-gray-400">Priority</span>
         </div>
         <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-full bg-gray-400" />
+          <span className="text-xs text-gray-400">Guest</span>
+        </div>
+        <div className="flex items-center gap-1.5">
           <span className="text-xs text-gray-400 border border-dashed border-gray-300 rounded px-1">empty</span>
           <span className="text-xs text-gray-400">Uncovered slot</span>
         </div>
@@ -304,10 +412,32 @@ export default function Selections() {
   const [selectedIds, setSelectedIds] = useState<Set<string> | null>(null);
   const [publishError, setPublishError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [guestName, setGuestName] = useState('');
+  const [guestPosition, setGuestPosition] = useState('');
+  const [showAddGuest, setShowAddGuest] = useState(false);
 
   const { data, isLoading } = useQuery<SelectionsResponse>({
     queryKey: ['match-selections', matchId],
     queryFn: () => api.get(`/matches/${matchId}/selections`).then(r => r.data.data),
+  });
+
+  const { data: guests = [] } = useQuery<Guest[]>({
+    queryKey: ['match-guests', matchId],
+    queryFn: () => api.get(`/matches/${matchId}/guests`).then(r => r.data.data),
+  });
+
+  const addGuestMutation = useMutation({
+    mutationFn: ({ name, position }: { name: string; position: string }) =>
+      api.post(`/matches/${matchId}/guests`, { name, position: position || undefined }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['match-guests', matchId] });
+      setGuestName(''); setGuestPosition(''); setShowAddGuest(false);
+    },
+  });
+
+  const removeGuestMutation = useMutation({
+    mutationFn: (guestId: string) => api.delete(`/matches/${matchId}/guests/${guestId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['match-guests', matchId] }),
   });
 
   const saveMutation = useMutation({
@@ -338,25 +468,25 @@ export default function Selections() {
     setSelectedIds(next);
   }
 
-  if (isLoading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-400">Loading…</div>;
-  if (!data) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">Match not found</div>;
+  if (isLoading) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
+  if (!data) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
 
   const { match, players } = data;
   const date = new Date(`${match.matchDate}T${match.matchTime}`);
   const ids = selectedIds ?? new Set(players.filter(p => p.isSelected).map(p => p.player.userId));
-  const selectedCount = ids.size;
+  const selectedCount = ids.size + guests.length;
   const tooFew = selectedCount < match.minPlayers;
   const tooMany = selectedCount > match.maxPlayers;
   const isDirty = players.some(p => p.isSelected !== ids.has(p.player.userId));
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 boca-page">
       <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link to={`/coach/matches/${matchId}`} className="text-white/50 hover:text-white/80 text-sm">← Sign-ups</Link>
           <span className="text-white/20">|</span>
           <div className="flex items-center gap-2">
-            <RavenIcon className="w-5 h-5 text-white" />
+            <RavenIcon className="w-8 h-8" />
             <span className="font-bold text-white text-lg">
               Boca Schedule <span className="text-brand-green-300 text-sm font-normal">Coach</span>
             </span>
@@ -373,7 +503,7 @@ export default function Selections() {
           <h1 className="text-2xl font-bold text-gray-900">
             {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
           </h1>
-          <p className="text-gray-500 mt-1">{match.matchTime.slice(0, 5)} · Selections</p>
+          <p className="text-gray-500 mt-1">{match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) · Selections</p>
         </div>
 
         {/* Counter + publish */}
@@ -408,8 +538,75 @@ export default function Selections() {
           {isDirty && <p className="text-xs text-amber-600">Unsaved changes — save before publishing.</p>}
         </div>
 
-        {/* Football pitch formation view */}
-        {ids.size > 0 && <PitchView players={players} ids={ids} />}
+        {/* Pitch formation view */}
+        {(ids.size > 0 || guests.length > 0) && <PitchView players={players} ids={ids} matchType={match.matchType} guests={guests} />}
+
+        {/* Guest players */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Guest players</h2>
+            <button
+              onClick={() => setShowAddGuest(v => !v)}
+              className="text-xs font-medium text-brand-green hover:text-brand-green-700"
+            >
+              {showAddGuest ? 'Cancel' : '+ Add guest'}
+            </button>
+          </div>
+
+          {showAddGuest && (
+            <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+              <input
+                type="text"
+                placeholder="Guest name"
+                value={guestName}
+                onChange={e => setGuestName(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                autoFocus
+              />
+              <select
+                value={guestPosition}
+                onChange={e => setGuestPosition(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
+              >
+                <option value="">Position (optional)</option>
+                {(match.matchType === 'futsal'
+                  ? ['GK', 'WIN', 'MID', 'STR']
+                  : ['GK', 'DEF', 'WIN', 'MID', 'STR']
+                ).map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+              <button
+                onClick={() => { if (guestName.trim()) addGuestMutation.mutate({ name: guestName.trim(), position: guestPosition }); }}
+                disabled={!guestName.trim() || addGuestMutation.isPending}
+                className="w-full bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+              >
+                {addGuestMutation.isPending ? 'Adding…' : 'Add guest'}
+              </button>
+            </div>
+          )}
+
+          {guests.length === 0 && !showAddGuest && (
+            <p className="text-sm text-gray-400">No guest players added.</p>
+          )}
+
+          {guests.map(g => (
+            <div key={g.guest_id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center shrink-0">
+                <span className="text-white text-[9px] font-bold">GST</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900 text-sm">{g.name}</p>
+                {g.position && <p className="text-xs text-gray-400">{g.position}</p>}
+              </div>
+              <button
+                onClick={() => removeGuestMutation.mutate(g.guest_id)}
+                disabled={removeGuestMutation.isPending}
+                className="text-xs text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
 
         {/* Player list */}
         <div className="space-y-2">

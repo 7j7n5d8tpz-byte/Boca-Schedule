@@ -1,14 +1,18 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import RavenIcon from '../../components/RavenIcon';
+import { formatLocation } from '../../components/LocationPicker';
+import { meetingTime } from '../../utils';
 
 interface Match {
   matchId: string;
   matchDate: string;
   matchTime: string;
   location: string;
+  opponent: string | null;
   matchType: string;
   status: string;
   currentSignups: number;
@@ -47,10 +51,17 @@ function MatchRow({ match }: { match: Match }) {
         <div className="min-w-0">
           <p className="font-semibold text-gray-900">
             {date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-            {' '}—{' '}
-            {match.matchTime.slice(0, 5)}
+            {match.opponent && <span className="text-gray-500 font-normal"> · vs {match.opponent}</span>}
           </p>
-          <p className="text-sm text-gray-500 mt-0.5 truncate">{match.location}</p>
+          <p className="text-sm text-gray-700">
+            {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)})
+          </p>
+          <p className="text-sm text-gray-500 mt-0.5 truncate">
+            {formatLocation(match.location, match.matchType)}
+            <span className={`ml-2 text-xs font-medium px-1.5 py-0.5 rounded ${match.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+              {match.matchType}
+            </span>
+          </p>
         </div>
 
         {/* Status badge */}
@@ -113,17 +124,20 @@ export default function CoachDashboard() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['result-permissions-pending'] }),
   });
 
+  const [showRecordedResults, setShowRecordedResults] = useState(false);
+
   const matches: Match[] = data?.matches ?? [];
   const totalSignups = matches.reduce((s, m) => s + m.currentSignups, 0);
   const readyToOptimize = matches.filter(m => m.status === 'signup_closed').length;
-  const publishedMatches = matches.filter(m => m.status === 'published' || m.status === 'completed');
+  const pendingResults   = matches.filter(m => m.status === 'published');
+  const completedResults = matches.filter(m => m.status === 'completed');
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 boca-page">
       {/* Nav */}
       <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <RavenIcon className="w-5 h-5 text-white" />
+          <RavenIcon className="w-8 h-8" />
           <span className="font-bold text-white text-lg">
             Boca Schedule{' '}
             <span className="text-brand-green-300 text-sm font-normal">Coach</span>
@@ -199,28 +213,61 @@ export default function CoachDashboard() {
           </Link>
         </div>
 
-        {/* Result entry shortcuts for published/completed matches */}
-        {publishedMatches.length > 0 && (
+        {/* Result entry shortcuts */}
+        {(pendingResults.length > 0 || completedResults.length > 0) && (
           <div className="space-y-2">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Record results</h2>
-            {publishedMatches.map(m => {
+            {pendingResults.length === 0 && (
+              <p className="text-sm text-gray-400">All results recorded.</p>
+            )}
+            {pendingResults.map(m => {
               const d = new Date(m.matchDate + 'T' + m.matchTime);
               return (
                 <Link
                   key={m.matchId}
                   to={`/matches/${m.matchId}/results`}
-                  className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-5 py-3 hover:border-blue-300 transition-colors"
+                  className="flex items-center justify-between bg-white rounded-xl border border-gray-200 px-5 py-3 hover:border-brand-green transition-colors"
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-900">
                       {d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · {m.matchTime.slice(0, 5)}
+                      {m.opponent && <span className="text-gray-400 font-normal"> vs {m.opponent}</span>}
                     </p>
                     <p className="text-xs text-gray-400">{m.location}</p>
                   </div>
-                  <span className="text-xs text-brand-green font-medium">Enter result →</span>
+                  <span className="text-xs text-brand-green font-medium shrink-0">Enter result →</span>
                 </Link>
               );
             })}
+            {completedResults.length > 0 && (
+              <>
+                <button
+                  onClick={() => setShowRecordedResults(v => !v)}
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showRecordedResults ? 'Hide recorded matches' : `+ ${completedResults.length} already recorded`}
+                </button>
+                {showRecordedResults && completedResults.map(m => {
+                  const d = new Date(m.matchDate + 'T' + m.matchTime);
+                  return (
+                    <Link
+                      key={m.matchId}
+                      to={`/matches/${m.matchId}/results`}
+                      className="flex items-center justify-between bg-white rounded-xl border border-gray-100 opacity-60 hover:opacity-90 px-5 py-3 transition-opacity"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · {m.matchTime.slice(0, 5)}
+                          {m.opponent && <span className="text-gray-400 font-normal"> vs {m.opponent}</span>}
+                        </p>
+                        <p className="text-xs text-gray-400">{m.location}</p>
+                      </div>
+                      <span className="text-xs text-gray-400 font-medium shrink-0">Edit result →</span>
+                    </Link>
+                  );
+                })}
+              </>
+            )}
           </div>
         )}
 

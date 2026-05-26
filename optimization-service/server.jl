@@ -3,9 +3,11 @@ import MathOptInterface as MOI
 
 const PORT = parse(Int, get(ENV, "JULIA_PORT", "3002"))
 
-# Formation targets (7-player futsal/small-sided)
-const POSITIONS       = ["GK", "DEF", "WIN", "MID", "STR"]
-const FORMATION_MIN   = Dict("GK" => 1, "DEF" => 2, "WIN" => 2, "MID" => 1, "STR" => 1)
+# Formation targets per match type
+const POSITIONS_7      = ["GK", "DEF", "WIN", "MID", "STR"]
+const FORMATION_7      = Dict("GK" => 1, "DEF" => 2, "WIN" => 2, "MID" => 1, "STR" => 1)
+const POSITIONS_FUTSAL = ["GK", "WIN", "MID", "STR"]
+const FORMATION_FUTSAL = Dict("GK" => 1, "WIN" => 2, "MID" => 1, "STR" => 1)
 
 # Objective weights
 const W_FAIRNESS  = 0.9    # played vs signed-up fairness
@@ -24,11 +26,13 @@ struct Player
 end
 
 struct OptimizeRequest
-    match_id       :: String
-    target_players :: Int   # min_players (antalUdtagede)
-    max_players    :: Int
-    total_matches  :: Int   # historical total for fairness metric
-    players        :: Vector{Player}
+    match_id        :: String
+    match_type      :: String    # "futsal", "7-player", "11-player"
+    target_players  :: Int       # min_players
+    max_players     :: Int
+    total_matches   :: Int       # historical total for fairness metric
+    fairness_weight :: Float64   # 0 = positions only, 1 = fairness only (default 0.5)
+    players         :: Vector{Player}
 end
 
 function parse_request(body::Vector{UInt8}) :: OptimizeRequest
@@ -48,9 +52,11 @@ function parse_request(body::Vector{UInt8}) :: OptimizeRequest
 
     OptimizeRequest(
         string(d.match_id),
+        string(get(d, :match_type, "7-player")),
         Int(d.target_players),
         Int(d.max_players),
         Int(get(d, :total_matches, 15)),
+        Float64(clamp(get(d, :fairness_weight, 0.5), 0.0, 1.0)),
         players,
     )
 end
@@ -61,7 +67,21 @@ function optimize(req :: OptimizeRequest)
         return Dict("error" => "No players signed up")
     end
 
-    total = max(req.total_matches, 1)
+    is_futsal   = req.match_type == "futsal"
+    positions   = is_futsal ? POSITIONS_FUTSAL : POSITIONS_7
+    formation   = is_futsal ? FORMATION_FUTSAL : FORMATION_7
+
+    # For futsal, only GK preference is used; outfield players are selected on fairness.
+    effective_prefs = if is_futsal
+        [filter(p -> p == "GK", player.preferred) for player in req.players]
+    else
+        [player.preferred for player in req.players]
+    end
+
+    total  = max(req.total_matches, 1)
+    α      = req.fairness_weight          # 0 = positions only, 1 = fairness only
+    w_fair = 2.0 * α                      # 0→0, 0.5→1 (default), 1→2
+    w_pos  = 2.0 * (1.0 - α)             # 1→2, 0.5→1 (default), 0→0
 
     # Fairness measure: higher = more games played relative to sign-ups → costlier to select
     measure = [
@@ -74,20 +94,19 @@ function optimize(req :: OptimizeRequest)
     model = Model(HiGHS.Optimizer)
     set_silent(model)
 
-    @variable(model, x[1:n], Bin)                        # selected?
-    @variable(model, y[1:n], Bin)                        # priority & selected?
-    @variable(model, d >= 0, Int)                        # deficit below target
-    @variable(model, pos_covered[p=POSITIONS], Bin)      # formation slot met?
+    @variable(model, x[1:n], Bin)                          # selected?
+    @variable(model, y[1:n], Bin)                          # priority & selected?
+    @variable(model, d >= 0, Int)                          # deficit below target
+    @variable(model, pos_covered[p=positions], Bin)        # formation slot met?
 
     @objective(model, Min,
-        sum(measure[i] * x[i] for i in 1:n)
+        w_fair * sum(measure[i] * x[i] for i in 1:n)
         + W_DEFICIT * d
         + R_PRIORITY * sum(y[i] for i in priority_idx)
-        + W_POSITION * sum(pos_covered[p] for p in POSITIONS)
-        + W_WINGER * pos_covered["WIN"]
+        + w_pos * W_POSITION * sum(pos_covered[p] for p in positions)
+        + w_pos * W_WINGER * pos_covered["WIN"]
     )
 
-    # All players are already signed up — no A matrix needed
     @constraint(model, sum(x[i] for i in 1:n) + d == req.target_players)
     @constraint(model, sum(x[i] for i in 1:n) <= req.max_players)
 
@@ -98,13 +117,13 @@ function optimize(req :: OptimizeRequest)
         fix(y[i], 0; force=true)
     end
 
-    for pos in POSITIONS
-        eligible = [i for (i, p) in enumerate(req.players) if pos in p.preferred]
+    for pos in positions
+        eligible = [i for (i, prefs) in enumerate(effective_prefs) if pos in prefs]
         if isempty(eligible)
             fix(pos_covered[pos], 0; force=true)
         else
             @constraint(model,
-                FORMATION_MIN[pos] * pos_covered[pos] <= sum(x[i] for i in eligible)
+                formation[pos] * pos_covered[pos] <= sum(x[i] for i in eligible)
             )
         end
     end
@@ -120,16 +139,16 @@ function optimize(req :: OptimizeRequest)
     end
 
     selected = [req.players[i].id for i in 1:n if value(x[i]) > 0.9]
-    formation = Dict(
+    result_formation = Dict(
         pos => Dict(
             "covered"  => value(pos_covered[pos]) > 0.9,
-            "required" => FORMATION_MIN[pos],
+            "required" => formation[pos],
             "filled"   => Int(round(sum(
-                value(x[i]) for (i, p) in enumerate(req.players) if pos in p.preferred;
+                value(x[i]) for (i, prefs) in enumerate(effective_prefs) if pos in prefs;
                 init=0.0,
             ))),
         )
-        for pos in POSITIONS
+        for pos in positions
     )
 
     return Dict(
@@ -137,7 +156,7 @@ function optimize(req :: OptimizeRequest)
         "objective"     => round(objective_value(model); digits=4),
         "deficit"       => Int(round(value(d))),
         "selected_ids"  => selected,
-        "formation"     => formation,
+        "formation"     => result_formation,
         "solve_time_ms" => round(solve_time(model) * 1000; digits=1),
     )
 end

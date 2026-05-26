@@ -4,12 +4,15 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import RavenIcon from '../../components/RavenIcon';
+import { formatLocation } from '../../components/LocationPicker';
+import { meetingTime } from '../../utils';
 
 interface Match {
   matchId: string;
   matchDate: string;
   matchTime: string;
   location: string;
+  opponent: string | null;
   matchType: string;
   status: string;
   signupCloseDate: string;
@@ -116,9 +119,64 @@ function SwapModal({
 
 // ─── Match card ───────────────────────────────────────────────────────────────
 
+function CantAttendDialog({
+  match,
+  onSwap,
+  onClose,
+}: {
+  match: Match;
+  onSwap: () => void;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [releaseError, setReleaseError] = useState('');
+
+  const releaseMutation = useMutation({
+    mutationFn: () => api.post(`/matches/${match.matchId}/release`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['matches'] }); onClose(); },
+    onError: (err: any) => setReleaseError(err.response?.data?.error?.message ?? 'Failed to release spot'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-gray-900">Can't attend?</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+        </div>
+        <p className="text-sm text-gray-500">
+          {new Date(match.matchDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {' — '}{match.matchTime.slice(0, 5)}
+        </p>
+
+        <div className="space-y-2">
+          <button
+            onClick={onSwap}
+            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-brand-green hover:bg-brand-green-50 transition-colors"
+          >
+            <p className="font-medium text-gray-900 text-sm">Find a replacement</p>
+            <p className="text-xs text-gray-400 mt-0.5">Request a teammate to take your spot</p>
+          </button>
+          <button
+            onClick={() => { setReleaseError(''); releaseMutation.mutate(); }}
+            disabled={releaseMutation.isPending}
+            className="w-full text-left px-4 py-3 rounded-xl border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
+          >
+            <p className="font-medium text-red-600 text-sm">{releaseMutation.isPending ? 'Releasing…' : 'Release my spot'}</p>
+            <p className="text-xs text-gray-400 mt-0.5">No replacement — the coach will be notified</p>
+          </button>
+        </div>
+
+        {releaseError && <p className="text-sm text-red-500">{releaseError}</p>}
+      </div>
+    </div>
+  );
+}
+
 function MatchCard({ match }: { match: Match }) {
   const qc = useQueryClient();
   const [showSwapModal, setShowSwapModal] = useState(false);
+  const [showCantAttend, setShowCantAttend] = useState(false);
 
   const signupMutation = useMutation({
     mutationFn: () => api.post('/signups', { matchId: match.matchId }),
@@ -147,14 +205,30 @@ function MatchCard({ match }: { match: Match }) {
       {showSwapModal && (
         <SwapModal matchId={match.matchId} onClose={() => setShowSwapModal(false)} />
       )}
+      {showCantAttend && (
+        <CantAttendDialog
+          match={match}
+          onSwap={() => { setShowCantAttend(false); setShowSwapModal(true); }}
+          onClose={() => setShowCantAttend(false)}
+        />
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
         <div className="flex items-start justify-between">
           <div>
             <p className="font-semibold text-gray-900">
-              {new Date(match.matchDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} &mdash; {match.matchTime.slice(0, 5)}
+              {new Date(match.matchDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {match.opponent && <span className="text-gray-500 font-normal"> · vs {match.opponent}</span>}
             </p>
-            <p className="text-sm text-gray-500">{match.location} <span className="capitalize">({match.matchType})</span></p>
+            <p className="text-sm text-gray-700">
+              {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)})
+            </p>
+            <p className="text-sm text-gray-500">
+              {formatLocation(match.location, match.matchType)}
+              <span className={`ml-2 text-xs font-medium px-1.5 py-0.5 rounded ${match.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                {match.matchType}
+              </span>
+            </p>
           </div>
           <div className="flex flex-col items-end gap-1">
             {match.userSignedUp && match.status === 'published' && match.isSelected && (
@@ -221,7 +295,7 @@ function MatchCard({ match }: { match: Match }) {
 
           {match.isSelected && match.status === 'published' && !match.pendingSwap && (
             <button
-              onClick={() => setShowSwapModal(true)}
+              onClick={() => setShowCantAttend(true)}
               className="flex-1 border border-orange-300 text-orange-600 hover:bg-orange-50 text-sm font-medium py-2 rounded-lg transition-colors"
             >
               Can't attend
@@ -234,6 +308,71 @@ function MatchCard({ match }: { match: Match }) {
         </div>
       </div>
     </>
+  );
+}
+
+// ─── Record results section ───────────────────────────────────────────────────
+
+function ResultMatchesList({
+  pending,
+  recorded,
+}: {
+  pending: { matchId: string; matchDate: string; matchTime: string; location: string; opponent: string | null }[];
+  recorded: { matchId: string; matchDate: string; matchTime: string; location: string; opponent: string | null }[];
+}) {
+  const [showRecorded, setShowRecorded] = useState(false);
+
+  return (
+    <div className="space-y-3">
+      <h2 className="text-lg font-semibold text-gray-900">Record results</h2>
+      {pending.length === 0 && (
+        <p className="text-sm text-gray-400">All results recorded.</p>
+      )}
+      {pending.map(m => (
+        <Link
+          key={m.matchId}
+          to={`/matches/${m.matchId}/results`}
+          className="flex items-center justify-between bg-white rounded-xl border border-gray-200 hover:border-brand-green px-5 py-3 transition-colors"
+        >
+          <div>
+            <p className="text-sm font-medium text-gray-900">
+              {new Date(m.matchDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+              {' · '}{m.matchTime.slice(0, 5)}
+              {m.opponent && <span className="text-gray-400 font-normal"> vs {m.opponent}</span>}
+            </p>
+            <p className="text-xs text-gray-400">{m.location}</p>
+          </div>
+          <span className="text-xs font-medium text-brand-green shrink-0">Enter result →</span>
+        </Link>
+      ))}
+      {recorded.length > 0 && (
+        <>
+          <button
+            onClick={() => setShowRecorded(v => !v)}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            {showRecorded ? 'Hide recorded matches' : `+ ${recorded.length} already recorded`}
+          </button>
+          {showRecorded && recorded.map(m => (
+            <Link
+              key={m.matchId}
+              to={`/matches/${m.matchId}/results`}
+              className="flex items-center justify-between bg-white rounded-xl border border-gray-100 opacity-60 hover:opacity-90 px-5 py-3 transition-opacity"
+            >
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  {new Date(m.matchDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {' · '}{m.matchTime.slice(0, 5)}
+                  {m.opponent && <span className="text-gray-400 font-normal"> vs {m.opponent}</span>}
+                </p>
+                <p className="text-xs text-gray-400">{m.location}</p>
+              </div>
+              <span className="text-xs font-medium text-gray-400 shrink-0">Edit result →</span>
+            </Link>
+          ))}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -260,6 +399,15 @@ export default function PlayerDashboard() {
     enabled: !!user,
   });
 
+  const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
+  const canEnterResults = isCoachOrAdmin || myPermission?.canEnterResults;
+
+  const { data: resultMatches } = useQuery<{ matchId: string; matchDate: string; matchTime: string; location: string; status: string; matchType: string; opponent: string | null }[]>({
+    queryKey: ['result-matches'],
+    queryFn: () => api.get('/matches/upcoming?status=published,completed').then(r => r.data.data.matches ?? []),
+    enabled: !!canEnterResults,
+  });
+
   const requestPermMutation = useMutation({
     mutationFn: () => api.post('/result-permissions/request'),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['my-permission'] }),
@@ -283,10 +431,10 @@ export default function PlayerDashboard() {
   const stats = statsData?.seasonStats;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 boca-page">
       <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <RavenIcon className="w-5 h-5 text-white" />
+          <RavenIcon className="w-8 h-8" />
           <span className="font-bold text-white text-lg">Boca Schedule</span>
         </div>
         <div className="flex items-center gap-4">
@@ -308,21 +456,53 @@ export default function PlayerDashboard() {
           <p className="text-gray-500 text-sm mt-1">Here's what's coming up.</p>
         </div>
 
-        {/* Quick stats */}
-        {stats && (
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: 'Matches Played', value: stats.totalPlayed ?? 0 },
-              { label: 'Selected', value: stats.totalSelected ?? 0 },
-              { label: 'Attendance', value: `${stats.attendanceRate ?? 0}%` },
-            ].map(s => (
-              <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+        {/* Stats */}
+        {stats && (() => {
+          const played   = stats.total_played  ?? 0;
+          const signups  = stats.total_signups ?? 0;
+          const goals    = stats.total_goals     ?? 0;
+          const assists  = stats.total_assists   ?? 0;
+          const sheets   = stats.total_clean_sheets ?? 0;
+          const attend   = stats.attendance_rate ?? 0;
+
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Played',        value: played },
+                  { label: 'Goals',         value: goals },
+                  { label: 'Assists',       value: assists },
+                  { label: 'Signed up',     value: signups },
+                  { label: 'Clean sheets',  value: sheets },
+                  { label: 'Attendance',    value: `${Math.round(attend)}%` },
+                ].map(s => (
+                  <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+                    <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+                    <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+
+              {/* Quick links */}
+              <div className="grid grid-cols-2 gap-3">
+                <Link to="/statistics" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Team Stats</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Leaderboards &amp; match highlights</p>
+                  </div>
+                  <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
+                </Link>
+                <Link to="/profile" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">My Profile</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Positions &amp; account info</p>
+                  </div>
+                  <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
+                </Link>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Result entry permission */}
         {myPermission && !myPermission.canEnterResults && (
@@ -349,12 +529,14 @@ export default function PlayerDashboard() {
             )}
           </div>
         )}
-        {myPermission?.canEnterResults && (
-          <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-            <p className="text-sm font-medium text-green-700">You can record match results</p>
-            <p className="text-xs text-green-600 mt-0.5">Visit <Link to="/statistics" className="underline">Team Stats</Link> to enter results for published matches.</p>
-          </div>
-        )}
+        {canEnterResults && (() => {
+          const pending  = (resultMatches ?? []).filter(m => m.status === 'published');
+          const recorded = (resultMatches ?? []).filter(m => m.status === 'completed');
+          if (!resultMatches || (!pending.length && !recorded.length)) return null;
+          return (
+            <ResultMatchesList pending={pending} recorded={recorded} />
+          );
+        })()}
 
         {/* Incoming swap requests */}
         {(incomingSwaps ?? []).length > 0 && (

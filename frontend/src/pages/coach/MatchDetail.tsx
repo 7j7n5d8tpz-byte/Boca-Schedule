@@ -268,21 +268,12 @@ export default function MatchDetail() {
         {match.status === 'published' && (
           <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
             <p className="text-sm text-green-700">Match is published — players can see the selection.</p>
-            <div className="flex gap-2 shrink-0">
-              <Link
-                to={`/coach/matches/${matchId}/selections`}
-                className="border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                View selections
-              </Link>
-              <button
-                onClick={() => statusMutation.mutate('completed')}
-                disabled={statusMutation.isPending}
-                className="border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                Mark completed
-              </button>
-            </div>
+            <Link
+              to={`/coach/matches/${matchId}/selections`}
+              className="shrink-0 border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              View selections
+            </Link>
           </div>
         )}
         {match.status === 'completed' && (

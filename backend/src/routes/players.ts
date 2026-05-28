@@ -50,8 +50,8 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       userId: string; name: string; preferredPositions: string[];
       totalSignups: number; totalSelected: number; totalPlayed: number;
       totalGoals: number; totalAssists: number; totalCleanSheets: number;
-      totalYellowCards: number; totalRedCards: number;
-      avgRating: number; attendanceRate: number;
+      totalYellowCards: number; totalRedCards: number; totalManOfMatch: number;
+      avgRating: number; attendanceRate: number; gkAppearances: number;
     };
     type MatchRow = { matchId: string; matchDate: string; location: string; opponent: string | null; goalsFor: number; goalsAgainst: number };
 
@@ -65,17 +65,24 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       const matchIds = (yearMatches ?? []).map((m: any) => m.match_id);
       if (matchIds.length === 0) return { players: [], matchHistory: [] };
 
-      const [{ data: perfData }, { data: signupData }, { data: selectionData }, { data: historyData }, { data: completedMatchData }] = await Promise.all([
-        supabaseAdmin.from('match_performance').select('player_id, goals, assists, clean_sheet, self_rating, yellow_cards, red_cards').in('match_id', matchIds),
+      const [{ data: perfData }, { data: signupData }, { data: selectionData }, { data: historyData }, { data: completedMatchData }, { data: gkData }] = await Promise.all([
+        supabaseAdmin.from('match_performance').select('player_id, goals, assists, clean_sheet, self_rating, yellow_cards, red_cards, man_of_match').in('match_id', matchIds),
         supabaseAdmin.from('signups').select('player_id').eq('is_active', true).in('match_id', matchIds),
         supabaseAdmin.from('selections').select('player_id, match_id').in('match_id', matchIds),
         supabaseAdmin.from('match_results')
           .select('match_id, goals_for, goals_against, matches(match_date, location, opponent)')
           .in('match_id', matchIds).order('recorded_at', { ascending: true }),
         supabaseAdmin.from('matches').select('match_id').eq('status', 'completed').in('match_id', matchIds),
+        supabaseAdmin.from('match_results').select('gk_first_half, gk_second_half').in('match_id', matchIds),
       ]);
 
       const completedIds = new Set((completedMatchData ?? []).map((m: any) => m.match_id));
+
+      const gkAppearanceMap = new Map<string, number>();
+      for (const r of (gkData ?? [])) {
+        if (r.gk_first_half)  gkAppearanceMap.set(r.gk_first_half,  (gkAppearanceMap.get(r.gk_first_half)  ?? 0) + 1);
+        if (r.gk_second_half) gkAppearanceMap.set(r.gk_second_half, (gkAppearanceMap.get(r.gk_second_half) ?? 0) + 1);
+      }
 
       const signupMap = new Map<string, number>();
       (signupData ?? []).forEach((s: any) => signupMap.set(s.player_id, (signupMap.get(s.player_id) ?? 0) + 1));
@@ -89,22 +96,23 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
         }
       });
 
-      const perfMap = new Map<string, { goals: number; assists: number; cleanSheets: number; yellowCards: number; redCards: number; ratingSum: number; ratingCount: number }>();
+      const perfMap = new Map<string, { goals: number; assists: number; cleanSheets: number; yellowCards: number; redCards: number; motmCount: number; ratingSum: number; ratingCount: number }>();
       (perfData ?? []).forEach((p: any) => {
-        const c = perfMap.get(p.player_id) ?? { goals: 0, assists: 0, cleanSheets: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratingCount: 0 };
+        const c = perfMap.get(p.player_id) ?? { goals: 0, assists: 0, cleanSheets: 0, yellowCards: 0, redCards: 0, motmCount: 0, ratingSum: 0, ratingCount: 0 };
         perfMap.set(p.player_id, {
           goals: c.goals + (p.goals ?? 0),
           assists: c.assists + (p.assists ?? 0),
           cleanSheets: c.cleanSheets + (p.clean_sheet ? 1 : 0),
           yellowCards: c.yellowCards + (p.yellow_cards ?? 0),
           redCards: c.redCards + (p.red_cards ?? 0),
+          motmCount: c.motmCount + (p.man_of_match ? 1 : 0),
           ratingSum: c.ratingSum + (p.self_rating ?? 0),
           ratingCount: c.ratingCount + (p.self_rating != null ? 1 : 0),
         });
       });
 
       const players: PlayerRow[] = (allUsers ?? []).map((u: any) => {
-        const perf = perfMap.get(u.user_id) ?? { goals: 0, assists: 0, cleanSheets: 0, yellowCards: 0, redCards: 0, ratingSum: 0, ratingCount: 0 };
+        const perf = perfMap.get(u.user_id) ?? { goals: 0, assists: 0, cleanSheets: 0, yellowCards: 0, redCards: 0, motmCount: 0, ratingSum: 0, ratingCount: 0 };
         const signups = signupMap.get(u.user_id) ?? 0;
         const selected = selectedMap.get(u.user_id) ?? 0;
         const played = playedMap.get(u.user_id) ?? 0;
@@ -112,9 +120,10 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
           userId: u.user_id, name: u.name, preferredPositions: u.preferred_positions ?? [],
           totalSignups: signups, totalSelected: selected, totalPlayed: played,
           totalGoals: perf.goals, totalAssists: perf.assists, totalCleanSheets: perf.cleanSheets,
-          totalYellowCards: perf.yellowCards, totalRedCards: perf.redCards,
+          totalYellowCards: perf.yellowCards, totalRedCards: perf.redCards, totalManOfMatch: perf.motmCount,
           avgRating: perf.ratingCount > 0 ? +(perf.ratingSum / perf.ratingCount).toFixed(2) : 0,
           attendanceRate: signups > 0 ? +((played / signups) * 100).toFixed(2) : 0,
+          gkAppearances: gkAppearanceMap.get(u.user_id) ?? 0,
         };
       }).filter((p: PlayerRow) => p.totalSignups > 0 || p.totalPlayed > 0);
 
@@ -144,6 +153,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       const topScorer   = players.reduce((b, p) => p.totalGoals        > (b?.totalGoals ?? -1)        ? p : b, null as PlayerRow | null);
       const topAssister = players.reduce((b, p) => p.totalAssists      > (b?.totalAssists ?? -1)      ? p : b, null as PlayerRow | null);
       const topKeeper   = players.reduce((b, p) => p.totalCleanSheets  > (b?.totalCleanSheets ?? -1)  ? p : b, null as PlayerRow | null);
+      const topMotm     = players.reduce((b, p) => p.totalManOfMatch   > (b?.totalManOfMatch ?? -1)   ? p : b, null as PlayerRow | null);
       return {
         totalPlayers: active.length, totalGoals, totalGoalsAgainst, totalAssists, totalCleanSheets,
         avgAttendanceRate: avgAttendance, gamesWithResults, wins, draws, losses,
@@ -152,6 +162,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
         topScorer:   topScorer?.totalGoals        ? { name: topScorer.name,   value: topScorer.totalGoals }         : null,
         topAssister: topAssister?.totalAssists    ? { name: topAssister.name, value: topAssister.totalAssists }     : null,
         topKeeper:   topKeeper?.totalCleanSheets  ? { name: topKeeper.name,   value: topKeeper.totalCleanSheets }   : null,
+        topMotm:     topMotm?.totalManOfMatch     ? { name: topMotm.name,     value: topMotm.totalManOfMatch }      : null,
       };
     }
 
@@ -182,7 +193,7 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
 
     let q = supabaseAdmin
       .from('match_results')
-      .select('match_id, goals_for, goals_against, game_assessment, goal_events, matches!inner(match_date, match_time, location, opponent, match_type, status)')
+      .select('match_id, goals_for, goals_against, game_assessment, goal_events, long_read, matches!inner(match_date, match_time, location, opponent, match_type, status)')
       .eq('matches.status', 'completed')
       .gte('matches.match_date', `${y}-01-01`)
       .lte('matches.match_date', `${y}-12-31`);
@@ -207,7 +218,7 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
         : Promise.resolve({ data: [] as any[], error: null }),
       matchIds.length > 0
         ? supabaseAdmin.from('match_performance')
-            .select('match_id, player_id, clean_sheet, yellow_cards, red_cards, users!match_performance_player_id_fkey(name)')
+            .select('match_id, player_id, clean_sheet, yellow_cards, red_cards, man_of_match, users!match_performance_player_id_fkey(name)')
             .in('match_id', matchIds)
         : Promise.resolve({ data: [] as any[], error: null }),
     ]);
@@ -218,6 +229,7 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
     const cleanSheetMap = new Map<string, string[]>();
     const yellowCardMap = new Map<string, string[]>();
     const redCardMap    = new Map<string, string[]>();
+    const motmMap       = new Map<string, string>();
     for (const p of (cardPerfs ?? [])) {
       const pname = p.users?.name ?? 'Unknown';
       if (p.clean_sheet) {
@@ -234,6 +246,9 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
         const arr = redCardMap.get(p.match_id) ?? [];
         arr.push(pname);
         redCardMap.set(p.match_id, arr);
+      }
+      if (p.man_of_match) {
+        motmMap.set(p.match_id, pname);
       }
     }
 
@@ -254,6 +269,8 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
       cleanSheets:  cleanSheetMap.get(r.match_id) ?? [],
       yellowCards:  yellowCardMap.get(r.match_id) ?? [],
       redCards:     redCardMap.get(r.match_id)    ?? [],
+      manOfMatch:   motmMap.get(r.match_id)       ?? null,
+      longRead:     r.long_read                   ?? null,
     })).sort((a: any, b: any) => b.matchDate.localeCompare(a.matchDate));
 
     res.json({ success: true, data: { highlights } });
@@ -276,7 +293,7 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
     const [{ data: profile }, { data: recent }, { data: perfRows }, { data: signupRows }, { data: selectionMatchRows }] = await Promise.all([
       supabaseAdmin.from('users').select('user_id, name, preferred_positions').eq('user_id', playerId).single(),
       supabaseAdmin.from('match_performance').select('*, matches(match_date)').eq('player_id', playerId).order('submitted_at', { ascending: false }).limit(10),
-      supabaseAdmin.from('match_performance').select('goals, assists, saves, clean_sheet, self_rating').eq('player_id', playerId),
+      supabaseAdmin.from('match_performance').select('goals, assists, saves, clean_sheet, self_rating, man_of_match').eq('player_id', playerId),
       supabaseAdmin.from('signups').select('signup_id').eq('player_id', playerId).eq('is_active', true),
       supabaseAdmin.from('selections').select('match_id').eq('player_id', playerId),
     ]);
@@ -303,6 +320,7 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
     const assists     = rows.reduce((s: number, r: any) => s + (r.assists ?? 0), 0);
     const saves       = rows.reduce((s: number, r: any) => s + (r.saves ?? 0), 0);
     const cleanSheets = rows.filter((r: any) => r.clean_sheet).length;
+    const manOfMatch  = rows.filter((r: any) => r.man_of_match).length;
     const totalSignups = signupRows?.length ?? 0;
     const ratedRows   = rows.filter((r: any) => r.self_rating != null);
     const avgRating   = ratedRows.length > 0 ? +(ratedRows.reduce((s: number, r: any) => s + r.self_rating, 0) / ratedRows.length).toFixed(2) : null;
@@ -311,6 +329,7 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
       total_played: playedCount,
       total_goals: goals, total_assists: assists,
       total_saves: saves, total_clean_sheets: cleanSheets,
+      total_man_of_match: manOfMatch,
       total_signups: totalSignups,
       avg_self_rating: avgRating,
       attendance_rate: totalSignups > 0 ? +((playedCount / totalSignups) * 100).toFixed(2) : 0,

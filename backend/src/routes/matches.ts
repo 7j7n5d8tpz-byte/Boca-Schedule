@@ -37,6 +37,22 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     const limit  = parseInt(req.query.limit  as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
 
+    const { role } = req.user!;
+    const isCoachView = (role === 'coach' || role === 'admin') && (!statusParam || statusParam === 'all');
+
+    // Auto-complete any published match whose date+time has passed.
+    // Runs only on the coach/admin 'all' view to avoid affecting player queries.
+    if (isCoachView) {
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);          // YYYY-MM-DD
+      const nowTimeStr = now.toTimeString().slice(0, 8);        // HH:MM:SS
+      await supabaseAdmin
+        .from('matches')
+        .update({ status: 'completed', completed_at: now.toISOString() })
+        .eq('status', 'published')
+        .or(`match_date.lt.${todayStr},and(match_date.eq.${todayStr},match_time.lte.${nowTimeStr})`);
+    }
+
     // Fetch matches (left join signups so matches with 0 sign-ups still appear)
     let matchQuery = supabaseAdmin
       .from('matches')
@@ -44,7 +60,16 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
       .order('match_date', { ascending: true })
       .range(offset, offset + limit - 1);
 
-    if (!statusParam || statusParam === 'all') {
+    if (isCoachView) {
+      // Include non-cancelled matches + completed matches from the last 60 days so the
+      // "Record results" section on the dashboard shows recently auto-completed matches.
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 60);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      matchQuery = matchQuery
+        .neq('status', 'cancelled')
+        .or(`status.neq.completed,and(status.eq.completed,match_date.gte.${cutoffStr})`);
+    } else if (!statusParam || statusParam === 'all') {
       matchQuery = matchQuery.neq('status', 'completed').neq('status', 'cancelled');
     } else if (statusParam.includes(',')) {
       matchQuery = matchQuery.in('status', statusParam.split(','));
@@ -178,6 +203,26 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
     }
 
     const d = body.data;
+
+    // Reject premature manual completion — the match must have already been played.
+    if (d.status === 'completed') {
+      const { data: existing } = await supabaseAdmin
+        .from('matches')
+        .select('match_date, match_time')
+        .eq('match_id', matchId)
+        .single();
+      if (existing) {
+        const matchDateTime = new Date(`${existing.match_date}T${existing.match_time}`);
+        if (matchDateTime > new Date()) {
+          res.status(422).json({
+            success: false,
+            error: { code: 'PREMATURE_COMPLETION', message: 'Match cannot be marked as completed before it has been played' },
+          });
+          return;
+        }
+      }
+    }
+
     const updates: Record<string, unknown> = {};
     if (d.matchDate !== undefined) updates.match_date = d.matchDate;
     if (d.matchTime !== undefined) updates.match_time = d.matchTime;

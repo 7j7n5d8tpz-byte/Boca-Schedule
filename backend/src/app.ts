@@ -11,6 +11,7 @@ import optimizeRoutes from './routes/optimize.js';
 import swapRoutes from './routes/swaps.js';
 import resultRoutes from './routes/results.js';
 import locationRoutes from './routes/locations.js';
+import batchOptimizeRoutes from './routes/batch-optimize.js';
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api', swapRoutes);
 app.use('/api', resultRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/optimize', batchOptimizeRoutes);
 
 app.use(errorHandler);
 

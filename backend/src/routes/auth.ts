@@ -188,6 +188,42 @@ router.post('/reset-password', async (req, res, next) => {
   }
 });
 
+// PUT /api/auth/change-password
+router.put('/change-password', authenticate, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'currentPassword and newPassword are required' } });
+      return;
+    }
+
+    const passwordCheck = z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/).regex(/[!@#$%^&*]/).safeParse(newPassword);
+    if (!passwordCheck.success) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Password must be at least 8 characters and include an uppercase letter, a number, and a special character (!@#$%^&*).' } });
+      return;
+    }
+
+    const { data: profile } = await supabaseAdmin.from('users').select('email').eq('user_id', req.user!.userId).single();
+    if (!profile?.email) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
+      return;
+    }
+
+    const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({ email: profile.email, password: currentPassword });
+    if (verifyError) {
+      res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Current password is incorrect' } });
+      return;
+    }
+
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.user!.userId, { password: newPassword });
+    if (updateError) throw updateError;
+
+    res.json({ success: true, message: 'Password updated successfully.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/auth/logout
 router.post('/logout', authenticate, async (req, res, next) => {
   try {

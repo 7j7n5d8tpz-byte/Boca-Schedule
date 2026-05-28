@@ -126,9 +126,20 @@ export default function CoachDashboard() {
 
   const [showRecordedResults, setShowRecordedResults] = useState(false);
 
-  const matches: Match[] = data?.matches ?? [];
+  const STATUS_ORDER: Record<string, number> = {
+    signup_open:   0,
+    signup_closed: 1,
+    optimized:     2,
+    published:     3,
+  };
+
+  const matches: Match[] = (data?.matches ?? []).slice().sort((a, b) => {
+    const sd = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
+    if (sd !== 0) return sd;
+    return a.matchDate < b.matchDate ? -1 : a.matchDate > b.matchDate ? 1 : 0;
+  });
   const totalSignups = matches.reduce((s, m) => s + m.currentSignups, 0);
-  const readyToOptimize = matches.filter(m => m.status === 'signup_closed').length;
+  const readyToOptimize = matches.filter(m => m.status === 'signup_closed' || m.status === 'optimized').length;
   const pendingResults   = matches.filter(m => m.status === 'published');
   const completedResults = matches.filter(m => m.status === 'completed');
 
@@ -205,12 +216,22 @@ export default function CoachDashboard() {
               </p>
             )}
           </div>
-          <Link
-            to="/coach/matches/new"
-            className="bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            + New match
-          </Link>
+          <div className="flex gap-2">
+            {readyToOptimize >= 2 && (
+              <Link
+                to="/coach/optimize"
+                className="border border-brand-green text-brand-green hover:bg-brand-green/5 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Optimize multiple
+              </Link>
+            )}
+            <Link
+              to="/coach/matches/new"
+              className="bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              + New match
+            </Link>
+          </div>
         </div>
 
         {/* Result entry shortcuts */}
@@ -277,7 +298,7 @@ export default function CoachDashboard() {
           <p className="text-sm text-gray-400">No matches yet. Create one to get started.</p>
         )}
         <div className="space-y-4">
-          {matches.map(m => <MatchRow key={m.matchId} match={m} />)}
+          {matches.filter(m => m.status !== 'completed').map(m => <MatchRow key={m.matchId} match={m} />)}
         </div>
       </main>
     </div>

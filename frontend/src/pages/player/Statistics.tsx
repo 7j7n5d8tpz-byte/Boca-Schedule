@@ -32,8 +32,10 @@ interface PlayerStat {
   totalCleanSheets: number;
   totalYellowCards: number;
   totalRedCards: number;
+  totalManOfMatch: number;
   avgRating: number;
   attendanceRate: number;
+  gkAppearances: number;
 }
 
 interface MatchHistory {
@@ -59,6 +61,8 @@ interface MatchHighlight {
   cleanSheets: string[];
   yellowCards: string[];
   redCards: string[];
+  manOfMatch: string | null;
+  longRead: string | null;
 }
 
 interface Overview {
@@ -77,6 +81,7 @@ interface Overview {
   topScorer: { name: string; value: number } | null;
   topAssister: { name: string; value: number } | null;
   topKeeper: { name: string; value: number } | null;
+  topMotm: { name: string; value: number } | null;
 }
 
 interface TeamStats {
@@ -245,6 +250,9 @@ export default function Statistics() {
   const topCleanSheets = [...players].sort((a, b) => b.totalCleanSheets - a.totalCleanSheets).slice(0, 5);
   const topAttenders = [...players]
     .sort((a, b) => b.attendanceRate - a.attendanceRate).slice(0, 7);
+  const gkLeaderboard = [...players]
+    .filter(p => p.gkAppearances > 0)
+    .sort((a, b) => b.gkAppearances - a.gkAppearances || b.totalCleanSheets - a.totalCleanSheets);
   const cardedPlayers = [...players]
     .filter(p => p.totalYellowCards > 0 || p.totalRedCards > 0)
     .sort((a, b) => (b.totalYellowCards + b.totalRedCards * 2) - (a.totalYellowCards + a.totalRedCards * 2));
@@ -483,6 +491,26 @@ export default function Statistics() {
                       )}
                     </div>
                   )}
+
+                  {h.manOfMatch && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">⭐</span>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Man of the match</p>
+                        <p className="text-sm font-semibold text-amber-600 mt-0.5">{h.manOfMatch}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {h.longRead && (
+                    <details className="group">
+                      <summary className="cursor-pointer text-xs font-semibold text-gray-400 uppercase tracking-wide select-none list-none flex items-center gap-1">
+                        <span className="transition-transform group-open:rotate-90 inline-block">›</span>
+                        Match report
+                      </summary>
+                      <p className="mt-2 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{h.longRead}</p>
+                    </details>
+                  )}
                 </div>
               );
             })}
@@ -509,7 +537,7 @@ export default function Statistics() {
             </div>
 
             {/* Honours row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
                 <span className="text-2xl">⚽</span>
                 <div>
@@ -534,6 +562,15 @@ export default function Statistics() {
                   <p className="text-xs text-gray-500">Most clean sheets</p>
                   {overview.topKeeper
                     ? <><p className="font-semibold text-gray-900">{overview.topKeeper.name}</p><p className="text-sm text-green-600">{overview.topKeeper.value} clean sheets</p></>
+                    : <p className="text-sm text-gray-300">No data yet</p>}
+                </div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+                <span className="text-2xl">⭐</span>
+                <div>
+                  <p className="text-xs text-gray-500">Top man of match</p>
+                  {overview.topMotm
+                    ? <><p className="font-semibold text-gray-900">{overview.topMotm.name}</p><p className="text-sm text-amber-500">{overview.topMotm.value}×</p></>
                     : <p className="text-sm text-gray-300">No data yet</p>}
                 </div>
               </div>
@@ -644,6 +681,37 @@ export default function Statistics() {
                       <LeaderBar key={p.userId} name={p.name} value={p.totalCleanSheets}
                         max={maxCleanSheets} color={CHART_COLORS.cleanSheets} isMe={p.userId === user?.userId} />
                     ))}
+                  </div>
+                )}
+
+                {/* GK leaderboard */}
+                {gkLeaderboard.length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <h2 className="text-sm font-semibold text-gray-700 mb-3">🥅 Goalkeepers</h2>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
+                        <span className="text-xs text-gray-400 w-28 shrink-0">Player</span>
+                        <span className="text-xs text-gray-400 w-16 text-center">Halves</span>
+                        <span className="text-xs text-gray-400 w-16 text-center">Clean sheets</span>
+                        <span className="text-xs text-gray-400 flex-1 text-right">CS rate</span>
+                      </div>
+                      {gkLeaderboard.map(p => {
+                        const isMe = p.userId === user?.userId;
+                        const csRate = p.gkAppearances > 0 ? Math.round((p.totalCleanSheets / p.gkAppearances) * 100) : 0;
+                        return (
+                          <div key={p.userId} className={`flex items-center gap-2 py-0.5 ${isMe ? 'font-semibold' : ''}`}>
+                            <span className="text-xs text-gray-700 w-28 truncate shrink-0">
+                              {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
+                            </span>
+                            <span className="text-xs text-gray-600 w-16 text-center">{p.gkAppearances}</span>
+                            <span className="text-xs text-gray-600 w-16 text-center">{p.totalCleanSheets}</span>
+                            <span className={`text-xs font-medium flex-1 text-right ${csRate >= 50 ? 'text-green-600' : csRate >= 25 ? 'text-amber-600' : 'text-gray-500'}`}>
+                              {csRate}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -784,6 +852,7 @@ export default function Statistics() {
               <StatCard label="Assists"    value={focusPlayer.totalAssists}      sub={focusPlayer.totalPlayed > 0 ? `${(focusPlayer.totalAssists      / focusPlayer.totalPlayed).toFixed(2)}/game` : undefined} />
               <StatCard label="Clean sheets" value={focusPlayer.totalCleanSheets} sub={focusPlayer.totalPlayed > 0 ? `${(focusPlayer.totalCleanSheets / focusPlayer.totalPlayed).toFixed(2)}/game` : undefined} />
               <StatCard label="Avg rating" value={focusPlayer.avgRating > 0 ? focusPlayer.avgRating.toFixed(1) : '—'} />
+              {focusPlayer.totalManOfMatch > 0 && <StatCard label="Man of match" value={focusPlayer.totalManOfMatch} color="text-amber-500" />}
               {focusPlayer.totalYellowCards > 0 && <StatCard label="Yellow cards" value={focusPlayer.totalYellowCards} color="text-amber-500" />}
               {focusPlayer.totalRedCards > 0 && <StatCard label="Red cards" value={focusPlayer.totalRedCards} color="text-red-600" />}
             </div>

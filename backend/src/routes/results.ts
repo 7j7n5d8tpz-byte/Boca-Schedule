@@ -32,6 +32,9 @@ router.get('/matches/:matchId/results', authenticate, async (req, res, next) => 
               goalsAgainst: result.goals_against,
               gameAssessment: result.game_assessment ?? null,
               goalEvents: result.goal_events ?? [],
+              longRead: result.long_read ?? null,
+              gkFirstHalfId: result.gk_first_half ?? null,
+              gkSecondHalfId: result.gk_second_half ?? null,
               recordedAt: result.recorded_at,
             }
           : null,
@@ -48,6 +51,7 @@ router.get('/matches/:matchId/results', authenticate, async (req, res, next) => 
           minutesPlayed: p.minutes_played,
           positionPlayed: p.position_played,
           selfRating: p.self_rating,
+          manOfMatch: p.man_of_match ?? false,
         })),
       },
     });
@@ -69,11 +73,15 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
       return;
     }
 
-    const { goalsFor, goalsAgainst, gameAssessment, goalEvents, players } = req.body as {
+    const { goalsFor, goalsAgainst, gameAssessment, goalEvents, longRead, manOfMatchId, gkFirstHalfId, gkSecondHalfId, players } = req.body as {
       goalsFor: number;
       goalsAgainst: number;
       gameAssessment?: string | null;
       goalEvents?: Array<{ scorerId: string | null; assisterId: string | null }>;
+      longRead?: string | null;
+      manOfMatchId?: string | null;
+      gkFirstHalfId?: string | null;
+      gkSecondHalfId?: string | null;
       players: Array<{
         playerId: string;
         attended: boolean;
@@ -100,6 +108,9 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
       goals_against: goalsAgainst,
       game_assessment: gameAssessment ?? null,
       goal_events: goalEvents ?? null,
+      long_read: longRead ?? null,
+      gk_first_half: gkFirstHalfId ?? null,
+      gk_second_half: gkSecondHalfId ?? null,
       recorded_by: userId,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'match_id' });
@@ -118,6 +129,7 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
         minutes_played: p.minutesPlayed ?? null,
         position_played: p.positionPlayed ?? null,
         self_rating: p.selfRating ?? null,
+        man_of_match: manOfMatchId ? p.playerId === manOfMatchId : false,
         submitted_by: userId,
       }));
       await supabaseAdmin.from('match_performance').upsert(rows, { onConflict: 'match_id,player_id' });

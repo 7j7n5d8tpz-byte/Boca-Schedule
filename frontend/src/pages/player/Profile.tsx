@@ -5,6 +5,34 @@ import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import RavenIcon from '../../components/RavenIcon';
 
+function PasswordStrength({ password }: { password: string }) {
+  const checks = [
+    { label: '8+ characters', ok: password.length >= 8 },
+    { label: 'Uppercase letter', ok: /[A-Z]/.test(password) },
+    { label: 'Number', ok: /[0-9]/.test(password) },
+    { label: 'Special character', ok: /[!@#$%^&*]/.test(password) },
+  ];
+  const score = checks.filter(c => c.ok).length;
+  const colors = ['bg-red-400', 'bg-orange-400', 'bg-yellow-400', 'bg-green-500'];
+  if (!password) return null;
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="flex gap-1">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i < score ? colors[score - 1] : 'bg-gray-200'}`} />
+        ))}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+        {checks.map(c => (
+          <li key={c.label} className={`text-xs flex items-center gap-1 ${c.ok ? 'text-green-600' : 'text-gray-400'}`}>
+            <span>{c.ok ? '✓' : '○'}</span> {c.label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 type Position = 'GK' | 'DEF' | 'WIN' | 'MID' | 'STR';
 
 const ALL_POSITIONS: Position[] = ['GK', 'DEF', 'WIN', 'MID', 'STR'];
@@ -25,6 +53,13 @@ export default function PlayerProfile() {
   const [name, setName] = useState('');
   const [positions, setPositions] = useState<Position[]>([]);
   const [saveError, setSaveError] = useState('');
+
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['player-stats', user?.userId],
@@ -53,6 +88,31 @@ export default function PlayerProfile() {
       setSaveError(err.response?.data?.error?.message ?? 'Failed to save');
     },
   });
+
+  const changePasswordMutation = useMutation({
+    mutationFn: () => api.put('/auth/change-password', { currentPassword, newPassword }),
+    onSuccess: () => {
+      setPasswordSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordError('');
+    },
+    onError: (err: any) => {
+      setPasswordError(err.response?.data?.error?.message ?? 'Failed to update password');
+    },
+  });
+
+  function submitPasswordChange() {
+    if (!currentPassword) { setPasswordError('Enter your current password.'); return; }
+    if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[!@#$%^&*]/.test(newPassword)) {
+      setPasswordError('New password must be 8+ characters with an uppercase letter, number, and special character.');
+      return;
+    }
+    if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return; }
+    setPasswordError('');
+    changePasswordMutation.mutate();
+  }
 
   function togglePosition(pos: Position) {
     setPositions(prev =>
@@ -158,6 +218,86 @@ export default function PlayerProfile() {
                 </div>
               )}
             </>
+          )}
+        </div>
+
+        {/* Change password */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <button
+            onClick={() => { setChangingPassword(p => !p); setPasswordError(''); setPasswordSuccess(false); }}
+            className="w-full flex items-center justify-between text-sm font-medium text-gray-700 hover:text-gray-900"
+          >
+            <span>Change password</span>
+            <span className="text-gray-400">{changingPassword ? '▲' : '▼'}</span>
+          </button>
+
+          {changingPassword && (
+            <div className="mt-4 space-y-4">
+              {passwordSuccess ? (
+                <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm">
+                  Password updated successfully.
+                  <button onClick={() => { setChangingPassword(false); setPasswordSuccess(false); }} className="ml-2 underline">Close</button>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      value={currentPassword}
+                      onChange={e => setCurrentPassword(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                      placeholder="••••••••"
+                    />
+                    <PasswordStrength password={newPassword} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
+                    <input
+                      type="password"
+                      autoComplete="new-password"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green ${
+                        confirmPassword && confirmPassword !== newPassword ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                      }`}
+                      placeholder="••••••••"
+                    />
+                    {confirmPassword && confirmPassword !== newPassword && (
+                      <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                    )}
+                  </div>
+                  {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={submitPasswordChange}
+                      disabled={changePasswordMutation.isPending}
+                      className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                    >
+                      {changePasswordMutation.isPending ? 'Updating…' : 'Update password'}
+                    </button>
+                    <button
+                      onClick={() => { setChangingPassword(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPasswordError(''); }}
+                      className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
 

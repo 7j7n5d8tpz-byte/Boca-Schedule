@@ -1,10 +1,8 @@
-import AppNav from '../components/AppNav';
 import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
 import LocationPicker, { encodeLocation, decodeLocation, formatLocation } from '../../components/LocationPicker';
 import { meetingTime } from '../../utils';
 
@@ -47,7 +45,6 @@ const POS_COLOR: Record<string, string> = {
 
 export default function MatchDetail() {
   const { matchId } = useParams<{ matchId: string }>();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
 

@@ -1,11 +1,9 @@
-import AppNav from '../components/AppNav';
 import AppNav from './../components/AppNav';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { api } from '../api/client';
-import { useAuth } from '../context/AuthContext';
 
 const POS_COLOR: Record<string, string> = {
   GK:  'bg-yellow-100 text-yellow-700',
@@ -59,7 +57,7 @@ interface HighlightsProps {
   longRead: string | null;
 }
 
-function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: React.RefObject<HTMLDivElement> }) {
+function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: React.RefObject<HTMLDivElement | null> }) {
   const won  = props.goalsFor > props.goalsAgainst;
   const drew = props.goalsFor === props.goalsAgainst;
   const assessment = props.gameAssessment ? ASSESSMENT_LABEL[props.gameAssessment] : null;
@@ -248,7 +246,6 @@ function StepProgress({ step, goalIndex, goalsFor }: { step: Step; goalIndex: nu
 
 export default function MatchResults() {
   const { matchId } = useParams<{ matchId: string }>();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
 

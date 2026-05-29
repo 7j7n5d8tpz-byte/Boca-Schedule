@@ -1,10 +1,8 @@
-import AppNav from '../components/AppNav';
 import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
 import { formatLocation } from '../../components/LocationPicker';
 import { meetingTime } from '../../utils';
 
@@ -105,7 +103,6 @@ function MatchRow({ match }: { match: Match }) {
 }
 
 export default function CoachDashboard() {
-  const { user } = useAuth();
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -134,7 +131,7 @@ export default function CoachDashboard() {
     published:     3,
   };
 
-  const matches: Match[] = (data?.matches ?? []).slice().sort((a, b) => {
+  const matches: Match[] = (data?.matches ?? []).slice().sort((a: any, b: any) => {
     const sd = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
     if (sd !== 0) return sd;
     return a.matchDate < b.matchDate ? -1 : a.matchDate > b.matchDate ? 1 : 0;

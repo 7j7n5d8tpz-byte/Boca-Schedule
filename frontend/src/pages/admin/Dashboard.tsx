@@ -1,9 +1,6 @@
-import AppNav from '../components/AppNav';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
 import AppNav from '../../components/AppNav';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -553,7 +550,6 @@ function AuditLogTab() {
 type Tab = 'users' | 'health' | 'audit';
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('users');
 
   const { data: inactiveData } = useQuery<{ pagination: { total: number } }>({

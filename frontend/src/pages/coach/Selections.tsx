@@ -1,11 +1,9 @@
-import AppNav from '../components/AppNav';
 import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { meetingTime } from '../../utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
 import { PitchView, POS_TAG, type SelectionPlayer, type Guest } from '../../components/PitchView';
 
 interface MatchInfo {
@@ -28,7 +26,6 @@ interface SelectionsResponse {
 
 export default function Selections() {
   const { matchId } = useParams<{ matchId: string }>();
-  const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
 

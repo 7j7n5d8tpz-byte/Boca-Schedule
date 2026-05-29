@@ -1,8 +1,6 @@
-import AppNav from '../components/AppNav';
 import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 
@@ -62,7 +60,7 @@ export default function PlayerProfile() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<any>({
     queryKey: ['player-stats', user?.userId],
     queryFn: () => api.get(`/players/${user!.userId}/statistics`).then(r => r.data.data),
     enabled: !!user,

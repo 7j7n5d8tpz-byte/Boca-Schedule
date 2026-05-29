@@ -1,14 +1,11 @@
-import AppNav from '../components/AppNav';
 import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
 import LocationPicker, { encodeLocation } from '../../components/LocationPicker';
 
 export default function NewMatch() {
-  const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
 

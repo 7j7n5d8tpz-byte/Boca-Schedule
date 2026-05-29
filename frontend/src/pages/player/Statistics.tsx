@@ -1,8 +1,6 @@
-import AppNav from '../components/AppNav';
 import AppNav from '../../components/AppNav';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, LineChart, Line, RadarChart, Radar,
@@ -605,9 +603,9 @@ export default function Statistics() {
                     <Tooltip content={<ResultTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Bar dataKey="Goals for"     fill={CHART_COLORS.goals}   radius={[3, 3, 0, 0]} cursor="pointer"
-                      onClick={(data) => { if (data?.matchId) { setSelectedMatchId(data.matchId); setView('highlights'); } }} />
+                      onClick={(data: any) => { if (data?.matchId) { setSelectedMatchId(data.matchId); setView('highlights'); } }} />
                     <Bar dataKey="Goals against" fill={CHART_COLORS.against} radius={[3, 3, 0, 0]} cursor="pointer"
-                      onClick={(data) => { if (data?.matchId) { setSelectedMatchId(data.matchId); setView('highlights'); } }} />
+                      onClick={(data: any) => { if (data?.matchId) { setSelectedMatchId(data.matchId); setView('highlights'); } }} />
                   </BarChart>
                 </ResponsiveContainer>
                 <p className="text-xs text-gray-400 mt-2 text-right">Click a bar to view match highlights</p>

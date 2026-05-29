@@ -1,10 +1,7 @@
-import AppNav from '../components/AppNav';
 import AppNav from '../../components/AppNav';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
 import { PitchView, POS_TAG, type SelectionPlayer } from '../../components/PitchView';
 import { meetingTime } from '../../utils';
 import { formatLocation } from '../../components/LocationPicker';
@@ -65,8 +62,6 @@ type Step = 'select' | 'configure' | 'optimizing' | 'review';
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BatchOptimize() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [step, setStep] = useState<Step>('select');

@@ -1,7 +1,7 @@
+import AppNav from '../../components/AppNav';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import RavenIcon from '../../components/RavenIcon';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, LineChart, Line, RadarChart, Radar,
@@ -63,6 +63,7 @@ interface MatchHighlight {
   redCards: string[];
   manOfMatch: string | null;
   longRead: string | null;
+  players: { name: string; isScorer: boolean; isAssister: boolean; isGoalkeeper: boolean }[];
 }
 
 interface Overview {
@@ -183,7 +184,7 @@ function LeaderBar({ name, value, max, color, isMe }: {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Statistics() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all' | '7-player' | 'futsal'>('all');
@@ -313,20 +314,7 @@ export default function Statistics() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to="/dashboard" className="text-white/50 hover:text-white/80 text-sm">← Dashboard</Link>
-          <span className="text-white/20">|</span>
-          <div className="flex items-center gap-2">
-            <RavenIcon className="w-8 h-8" />
-            <span className="font-bold text-white text-lg">Boca Schedule</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link to="/profile" className="text-sm text-white/70 hover:text-white">{user?.name}</Link>
-          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
-        </div>
-      </nav>
+      <AppNav backHref="/dashboard" backLabel="← Dashboard" />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
 
@@ -502,15 +490,42 @@ export default function Statistics() {
                     </div>
                   )}
 
-                  {h.longRead && (
-                    <details className="group">
-                      <summary className="cursor-pointer text-xs font-semibold text-gray-400 uppercase tracking-wide select-none list-none flex items-center gap-1">
-                        <span className="transition-transform group-open:rotate-90 inline-block">›</span>
-                        Match report
-                      </summary>
-                      <p className="mt-2 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{h.longRead}</p>
-                    </details>
-                  )}
+                  <details className="group">
+                    <summary className="cursor-pointer text-xs font-semibold text-gray-400 uppercase tracking-wide select-none list-none flex items-center gap-1">
+                      <span className="transition-transform group-open:rotate-90 inline-block">›</span>
+                      Match Details
+                    </summary>
+                    <div className="mt-2 space-y-3">
+                      {h.players.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">No player data recorded.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {h.players.map((p, i) => (
+                            <div key={i} className="flex items-center gap-2 text-sm">
+                              <span className={`flex-1 ${p.isGoalkeeper ? 'font-semibold text-yellow-700' : 'text-gray-700'}`}>
+                                {p.name}
+                              </span>
+                              {p.isGoalkeeper && (
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-semibold">GK</span>
+                              )}
+                              {p.isScorer && (
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-semibold">⚽ Goal</span>
+                              )}
+                              {p.isAssister && (
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold">A</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {h.longRead && (
+                        <div className="pt-2 border-t border-gray-100">
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Match Report</p>
+                          <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{h.longRead}</p>
+                        </div>
+                      )}
+                    </div>
+                  </details>
                 </div>
               );
             })}

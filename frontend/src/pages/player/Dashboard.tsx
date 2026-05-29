@@ -1,9 +1,9 @@
+import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import RavenIcon from '../../components/RavenIcon';
 import { formatLocation } from '../../components/LocationPicker';
 import { meetingTime } from '../../utils';
 
@@ -379,7 +379,7 @@ function ResultMatchesList({
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
 export default function PlayerDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -432,23 +432,7 @@ export default function PlayerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <RavenIcon className="w-8 h-8" />
-          <span className="font-bold text-white text-lg">Boca Schedule</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link to="/statistics" className="text-sm text-white/60 hover:text-white">Team Stats</Link>
-          {(user?.role === 'coach' || user?.role === 'admin') && (
-            <Link to="/coach" className="text-sm text-white/60 hover:text-white">Coach view</Link>
-          )}
-          {user?.role === 'admin' && (
-            <Link to="/admin" className="text-sm text-purple-300 hover:text-purple-200">Admin panel</Link>
-          )}
-          <Link to="/profile" className="text-sm text-white/70 hover:text-white">{user?.name}</Link>
-          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
-        </div>
-      </nav>
+      <AppNav />
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         <div>

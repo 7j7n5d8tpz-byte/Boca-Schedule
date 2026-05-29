@@ -1,9 +1,9 @@
+import AppNav from '../../components/AppNav';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import RavenIcon from '../../components/RavenIcon';
 import { PitchView, POS_TAG, type SelectionPlayer } from '../../components/PitchView';
 import { meetingTime } from '../../utils';
 import { formatLocation } from '../../components/LocationPicker';
@@ -64,7 +64,7 @@ type Step = 'select' | 'configure' | 'optimizing' | 'review';
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BatchOptimize() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -192,22 +192,7 @@ export default function BatchOptimize() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to="/coach" className="text-white/50 hover:text-white/80 text-sm">← Matches</Link>
-          <span className="text-white/20">|</span>
-          <div className="flex items-center gap-2">
-            <RavenIcon className="w-8 h-8" />
-            <span className="font-bold text-white text-lg">
-              Boca Schedule <span className="text-brand-green-300 text-sm font-normal">Coach</span>
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-white/70">{user?.name}</span>
-          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
-        </div>
-      </nav>
+      <AppNav backHref="/coach" backLabel="← Matches" />
 
       <main className={`${step === 'review' ? 'max-w-4xl' : 'max-w-2xl'} mx-auto px-4 py-8 space-y-6`}>
 

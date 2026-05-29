@@ -193,7 +193,7 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
 
     let q = supabaseAdmin
       .from('match_results')
-      .select('match_id, goals_for, goals_against, game_assessment, goal_events, long_read, matches!inner(match_date, match_time, location, opponent, match_type, status)')
+      .select('match_id, goals_for, goals_against, game_assessment, goal_events, long_read, gk_first_half, gk_second_half, matches!inner(match_date, match_time, location, opponent, match_type, status)')
       .eq('matches.status', 'completed')
       .gte('matches.match_date', `${y}-01-01`)
       .lte('matches.match_date', `${y}-12-31`);
@@ -218,7 +218,7 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
         : Promise.resolve({ data: [] as any[], error: null }),
       matchIds.length > 0
         ? supabaseAdmin.from('match_performance')
-            .select('match_id, player_id, clean_sheet, yellow_cards, red_cards, man_of_match, users!match_performance_player_id_fkey(name)')
+            .select('match_id, player_id, attended, clean_sheet, yellow_cards, red_cards, man_of_match, users!match_performance_player_id_fkey(name)')
             .in('match_id', matchIds)
         : Promise.resolve({ data: [] as any[], error: null }),
     ]);
@@ -226,10 +226,30 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
     const nameMap = new Map<string, string>();
     for (const u of (users ?? [])) nameMap.set(u.user_id, u.name);
 
+    // Build per-match scorer/assister/GK sets
+    const scorersByMatch   = new Map<string, Set<string>>();
+    const assistersByMatch = new Map<string, Set<string>>();
+    const gkByMatch        = new Map<string, Set<string>>();
+    for (const r of (results ?? [])) {
+      const scorers   = new Set<string>();
+      const assisters = new Set<string>();
+      for (const g of (r.goal_events ?? [])) {
+        if (g.scorerId)   scorers.add(g.scorerId);
+        if (g.assisterId) assisters.add(g.assisterId);
+      }
+      scorersByMatch.set(r.match_id, scorers);
+      assistersByMatch.set(r.match_id, assisters);
+      const gks = new Set<string>();
+      if (r.gk_first_half)  gks.add(r.gk_first_half);
+      if (r.gk_second_half) gks.add(r.gk_second_half);
+      gkByMatch.set(r.match_id, gks);
+    }
+
     const cleanSheetMap = new Map<string, string[]>();
     const yellowCardMap = new Map<string, string[]>();
     const redCardMap    = new Map<string, string[]>();
     const motmMap       = new Map<string, string>();
+    const playersMap    = new Map<string, { name: string; isScorer: boolean; isAssister: boolean; isGoalkeeper: boolean }[]>();
     for (const p of (cardPerfs ?? [])) {
       const pname = p.users?.name ?? 'Unknown';
       if (p.clean_sheet) {
@@ -250,6 +270,25 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
       if (p.man_of_match) {
         motmMap.set(p.match_id, pname);
       }
+      if (p.attended) {
+        const arr = playersMap.get(p.match_id) ?? [];
+        arr.push({
+          name:         pname,
+          isScorer:     (scorersByMatch.get(p.match_id)   ?? new Set()).has(p.player_id),
+          isAssister:   (assistersByMatch.get(p.match_id) ?? new Set()).has(p.player_id),
+          isGoalkeeper: (gkByMatch.get(p.match_id)        ?? new Set()).has(p.player_id),
+        });
+        playersMap.set(p.match_id, arr);
+      }
+    }
+
+    // Sort each match's player list: GKs first, then alphabetically
+    for (const [mid, arr] of playersMap) {
+      arr.sort((a, b) => {
+        if (a.isGoalkeeper !== b.isGoalkeeper) return a.isGoalkeeper ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+      playersMap.set(mid, arr);
     }
 
     const highlights = (results ?? []).map((r: any) => ({
@@ -271,6 +310,7 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
       redCards:     redCardMap.get(r.match_id)    ?? [],
       manOfMatch:   motmMap.get(r.match_id)       ?? null,
       longRead:     r.long_read                   ?? null,
+      players:      playersMap.get(r.match_id)    ?? [],
     })).sort((a: any, b: any) => b.matchDate.localeCompare(a.matchDate));
 
     res.json({ success: true, data: { highlights } });

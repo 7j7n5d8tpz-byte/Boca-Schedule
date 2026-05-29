@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import RavenIcon from '../../components/RavenIcon';
+import AppNav from '../../components/AppNav';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -552,7 +552,7 @@ function AuditLogTab() {
 type Tab = 'users' | 'health' | 'audit';
 
 export default function AdminDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('users');
 
   const { data: inactiveData } = useQuery<{ pagination: { total: number } }>({
@@ -564,21 +564,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <RavenIcon className="w-8 h-8" />
-          <span className="font-bold text-white text-lg">
-            Boca Schedule{' '}
-            <span className="text-purple-300 text-sm font-normal">Admin</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link to="/coach" className="text-sm text-white/60 hover:text-white">Coach view</Link>
-          <Link to="/dashboard" className="text-sm text-white/60 hover:text-white">Player view</Link>
-          <span className="text-sm text-white/70">{user?.name}</span>
-          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
-        </div>
-      </nav>
+      <AppNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         <h1 className="text-2xl font-bold text-gray-900">Admin panel</h1>

@@ -1,10 +1,10 @@
+import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { meetingTime } from '../../utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import RavenIcon from '../../components/RavenIcon';
 import { PitchView, POS_TAG, type SelectionPlayer, type Guest } from '../../components/PitchView';
 
 interface MatchInfo {
@@ -27,7 +27,7 @@ interface SelectionsResponse {
 
 export default function Selections() {
   const { matchId } = useParams<{ matchId: string }>();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -103,22 +103,7 @@ export default function Selections() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link to={`/coach/matches/${matchId}`} className="text-white/50 hover:text-white/80 text-sm">← Sign-ups</Link>
-          <span className="text-white/20">|</span>
-          <div className="flex items-center gap-2">
-            <RavenIcon className="w-8 h-8" />
-            <span className="font-bold text-white text-lg">
-              Boca Schedule <span className="text-brand-green-300 text-sm font-normal">Coach</span>
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-white/70">{user?.name}</span>
-          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
-        </div>
-      </nav>
+      <AppNav backHref={`/coach/matches/${matchId}`} backLabel="← Sign-ups" />
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div>

@@ -72,6 +72,7 @@ router.get('/selections', authenticate, async (req, res, next) => {
           matchDate: match.match_date,
           matchTime: match.match_time,
           matchType: match.match_type,
+          opponent: match.opponent ?? null,
           status: match.status,
           minPlayers: match.min_players,
           maxPlayers: match.max_players,

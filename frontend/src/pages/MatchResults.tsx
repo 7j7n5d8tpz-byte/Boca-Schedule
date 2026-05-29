@@ -1,10 +1,10 @@
+import AppNav from './../components/AppNav';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import RavenIcon from '../components/RavenIcon';
 
 const POS_COLOR: Record<string, string> = {
   GK:  'bg-yellow-100 text-yellow-700',
@@ -34,7 +34,7 @@ interface GoalEntry {
   assisterId: string | null;
 }
 
-type Step = 'score' | 'goals' | 'cleansheets' | 'goalkeepers' | 'cards' | 'motm' | 'assessment';
+type Step = 'score' | 'goals' | 'goalkeepers' | 'cards' | 'motm' | 'assessment';
 
 // ─── Highlights card ──────────────────────────────────────────────────────────
 
@@ -45,6 +45,7 @@ interface GoalDetail {
 
 interface HighlightsProps {
   date: Date;
+  opponent: string | null;
   goalsFor: number;
   goalsAgainst: number;
   gameAssessment: string | null;
@@ -54,9 +55,10 @@ interface HighlightsProps {
   redCardNames: string[];
   matchType: string;
   manOfMatchName: string | null;
+  longRead: string | null;
 }
 
-function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef: React.RefObject<HTMLDivElement> }) {
+function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: React.RefObject<HTMLDivElement> }) {
   const won  = props.goalsFor > props.goalsAgainst;
   const drew = props.goalsFor === props.goalsAgainst;
   const assessment = props.gameAssessment ? ASSESSMENT_LABEL[props.gameAssessment] : null;
@@ -72,9 +74,9 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef: R
     <div ref={cardRef} style={{ fontFamily: 'system-ui, sans-serif', background: '#0f1f0f', width: 480, padding: 32, borderRadius: 16 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-        <img src="/boca-logo.png" alt="Boca" style={{ width: 36, height: 36, borderRadius: 18 }} />
+        <img src="/boca-logo.png" alt="Boca" style={{ width: 52, height: 52, borderRadius: 26 }} />
         <div>
-          <p style={{ color: '#fff', fontWeight: 700, fontSize: 15, margin: 0 }}>Boca Schedule</p>
+          <p style={{ color: '#fff', fontWeight: 700, fontSize: 15, margin: 0 }}>Boca Boldisch</p>
           <p style={{ color: '#6b9e6b', fontSize: 11, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>{props.matchType}</p>
         </div>
         <div style={{ marginLeft: 'auto' }}>
@@ -84,17 +86,20 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef: R
 
       {/* Score */}
       <div style={{ textAlign: 'center', marginBottom: assessment ? 20 : showBottomSection ? 24 : 0 }}>
-        <p style={{ color: '#9ca3af', fontSize: 12, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 }}>Final score</p>
+        <p style={{ color: '#9ca3af', fontSize: 12, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Final score</p>
+        {/* Team labels — separate row so the separator aligns with the numbers only */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 4 }}>
+          <p style={{ color: '#d1fae5', fontSize: 12, margin: 0, minWidth: 80, textAlign: 'center' }}>Boca Boldisch</p>
+          <div style={{ width: 32 }} />
+          <p style={{ color: '#9ca3af', fontSize: 12, margin: 0, minWidth: 80, textAlign: 'center' }}>
+            {props.opponent ?? 'Opponent'}
+          </p>
+        </div>
+        {/* Score numbers row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ color: '#d1fae5', fontSize: 12, marginBottom: 4 }}>Boca</p>
-            <p style={{ color: '#fff', fontSize: 64, fontWeight: 800, lineHeight: 1, margin: 0 }}>{props.goalsFor}</p>
-          </div>
-          <p style={{ color: '#4b5563', fontSize: 32, fontWeight: 300, margin: 0 }}>—</p>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ color: '#9ca3af', fontSize: 12, marginBottom: 4 }}>Opponent</p>
-            <p style={{ color: '#9ca3af', fontSize: 64, fontWeight: 800, lineHeight: 1, margin: 0 }}>{props.goalsAgainst}</p>
-          </div>
+          <p style={{ color: '#fff', fontSize: 64, fontWeight: 800, lineHeight: 1, margin: 0, minWidth: 80, textAlign: 'center' }}>{props.goalsFor}</p>
+          <p style={{ color: '#4b5563', fontSize: 32, fontWeight: 300, margin: 0, width: 32, textAlign: 'center' }}>—</p>
+          <p style={{ color: '#9ca3af', fontSize: 64, fontWeight: 800, lineHeight: 1, margin: 0, minWidth: 80, textAlign: 'center' }}>{props.goalsAgainst}</p>
         </div>
         <p style={{ marginTop: 12, fontSize: 18, fontWeight: 700, color: won ? '#4ade80' : drew ? '#fbbf24' : '#f87171' }}>
           {won ? 'WIN' : drew ? 'DRAW' : 'LOSS'}
@@ -103,8 +108,8 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef: R
 
       {/* Assessment badge */}
       {assessment && (
-        <div style={{ textAlign: 'center', marginBottom: props.manOfMatchName || showBottomSection ? 20 : 0 }}>
-          <span style={{ background: assessment.bg, color: assessment.color, fontSize: 13, fontWeight: 600, padding: '6px 16px', borderRadius: 20, display: 'inline-block' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: props.manOfMatchName || showBottomSection ? 20 : 0 }}>
+          <span style={{ background: assessment.bg, color: assessment.color, fontSize: 13, fontWeight: 600, padding: '6px 16px', borderRadius: 20 }}>
             {assessment.label}
           </span>
         </div>
@@ -127,14 +132,14 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef: R
               <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>⚽ Goals</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {props.goalDetails.map((g, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span style={{ color: '#4b5563', fontSize: 11, minWidth: 16 }}>{i + 1}.</span>
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                    <span style={{ color: '#4b5563', fontSize: 11, minWidth: 16, flexShrink: 0, paddingTop: 1 }}>{i + 1}.</span>
                     <div>
-                      <span style={{ color: '#d1fae5', fontSize: 13, fontWeight: 600 }}>
+                      <span style={{ color: '#d1fae5', fontSize: 13, fontWeight: 600, display: 'block' }}>
                         {g.scorerName ?? 'Own goal'}
                       </span>
                       {g.assisterName && (
-                        <span style={{ color: '#86efac', fontSize: 12 }}> · {g.assisterName}</span>
+                        <span style={{ color: '#86efac', fontSize: 11, display: 'block' }}>↳ {g.assisterName}</span>
                       )}
                     </div>
                   </div>
@@ -177,6 +182,14 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef: R
           )}
         </div>
       )}
+
+      {/* Long read / match report */}
+      {props.longRead && (
+        <div style={{ borderTop: '1px solid #1f2f1f', marginTop: 20, paddingTop: 16 }}>
+          <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Match Report</p>
+          <p style={{ color: '#d1d5db', fontSize: 12, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>{props.longRead}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -210,7 +223,6 @@ function StepProgress({ step, goalIndex, goalsFor }: { step: Step; goalIndex: nu
   const steps = [
     { key: 'score',       label: 'Score' },
     ...(goalsFor > 0 ? [{ key: 'goals', label: step === 'goals' ? `Goal ${goalIndex + 1}/${goalsFor}` : 'Goals' }] : []),
-    { key: 'cleansheets', label: 'Clean sheets' },
     { key: 'goalkeepers', label: 'Goalkeepers' },
     { key: 'cards',       label: 'Cards' },
     { key: 'motm',        label: 'Man of match' },
@@ -235,7 +247,7 @@ function StepProgress({ step, goalIndex, goalsFor }: { step: Step; goalIndex: nu
 
 export default function MatchResults() {
   const { matchId } = useParams<{ matchId: string }>();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -244,7 +256,8 @@ export default function MatchResults() {
   const [goalsFor, setGoalsFor]       = useState(0);
   const [goalsAgainst, setGoalsAgainst] = useState(0);
   const [goalEntries, setGoalEntries] = useState<GoalEntry[]>([]);
-  const [cleanSheetIds, setCleanSheetIds] = useState<string[]>([]);
+  const [gkFirstHalfCleanSheet,  setGkFirstHalfCleanSheet]  = useState(false);
+  const [gkSecondHalfCleanSheet, setGkSecondHalfCleanSheet] = useState(false);
   const [yellowCardIds, setYellowCardIds] = useState<string[]>([]);
   const [redCardIds, setRedCardIds]       = useState<string[]>([]);
   const [gameAssessment, setGameAssessment] = useState<string | null>(null);
@@ -255,7 +268,8 @@ export default function MatchResults() {
   const [showHighlights, setShowHighlights] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError]             = useState('');
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef    = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const { data: selectionsData, isLoading: selectionsLoading } = useQuery({
     queryKey: ['match-selections', matchId],
@@ -290,25 +304,41 @@ export default function MatchResults() {
     }
     while (stored.length < gf) stored.push({ scorerId: null, assisterId: null });
     setGoalEntries(stored.slice(0, gf));
-    setCleanSheetIds((existingResults.performances ?? []).filter((p: any) => p.cleanSheet).map((p: any) => p.playerId));
     setYellowCardIds((existingResults.performances ?? []).filter((p: any) => (p.yellowCards ?? 0) > 0).map((p: any) => p.playerId));
     setRedCardIds((existingResults.performances ?? []).filter((p: any) => (p.redCards ?? 0) > 0).map((p: any) => p.playerId));
     const motmPlayer = (existingResults.performances ?? []).find((p: any) => p.manOfMatch);
     setMotmId(motmPlayer?.playerId ?? null);
-    setGkFirstHalfId(existingResults.result.gkFirstHalfId ?? null);
-    setGkSecondHalfId(existingResults.result.gkSecondHalfId ?? null);
+    const gkFirst  = existingResults.result.gkFirstHalfId  ?? null;
+    const gkSecond = existingResults.result.gkSecondHalfId ?? null;
+    setGkFirstHalfId(gkFirst);
+    setGkSecondHalfId(gkSecond);
+    const existingCsIds = new Set((existingResults.performances ?? []).filter((p: any) => p.cleanSheet).map((p: any) => p.playerId));
+    setGkFirstHalfCleanSheet(!!gkFirst  && existingCsIds.has(gkFirst));
+    setGkSecondHalfCleanSheet(!!gkSecond && existingCsIds.has(gkSecond));
     setLongRead(existingResults.result.longRead ?? '');
   }, [existingResults]);
 
-  const selectedPlayers: SelectedPlayer[] = (selectionsData?.players ?? [])
-    .filter((p: any) => p.isSelected)
-    .map((p: any) => ({ userId: p.player.userId, name: p.player.name, preferredPositions: p.player.preferredPositions ?? [] }));
+  // Build player pool: selected players → all signed-up players → existing performances (editing fallback)
+  const selectedPlayers: SelectedPlayer[] = (() => {
+    const fromSelections = (selectionsData?.players ?? [])
+      .filter((p: any) => p.isSelected)
+      .map((p: any) => ({ userId: p.player.userId, name: p.player.name, preferredPositions: p.player.preferredPositions ?? [] }));
+    if (fromSelections.length > 0) return fromSelections;
+
+    const fromSignups = (selectionsData?.players ?? [])
+      .map((p: any) => ({ userId: p.player.userId, name: p.player.name, preferredPositions: p.player.preferredPositions ?? [] }));
+    if (fromSignups.length > 0) return fromSignups;
+
+    // When no signups exist (e.g. simulation data), fall back to previously-saved performances
+    return (existingResults?.performances ?? [])
+      .map((p: any) => ({ userId: p.playerId, name: p.name, preferredPositions: p.preferredPositions ?? [] }));
+  })();
 
   function handleContinueFromScore() {
     const entries = Array.from({ length: goalsFor }, (_, i) => goalEntries[i] ?? { scorerId: null, assisterId: null });
     setGoalEntries(entries);
     setGoalIndex(0);
-    setStep(goalsFor > 0 ? 'goals' : 'cleansheets');
+    setStep(goalsFor > 0 ? 'goals' : 'goalkeepers');
   }
 
   function setGoalField(field: 'scorerId' | 'assisterId', value: string | null) {
@@ -317,16 +347,12 @@ export default function MatchResults() {
 
   function goToNextGoal() {
     if (goalIndex < goalsFor - 1) setGoalIndex(i => i + 1);
-    else setStep('cleansheets');
+    else setStep('goalkeepers');
   }
 
   function goToPrevGoal() {
     if (goalIndex > 0) setGoalIndex(i => i - 1);
     else setStep('score');
-  }
-
-  function toggleCleanSheet(playerId: string) {
-    setCleanSheetIds(prev => prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]);
   }
 
   function toggleYellowCard(playerId: string) {
@@ -339,12 +365,15 @@ export default function MatchResults() {
 
   const saveMutation = useMutation({
     mutationFn: () => {
+      const csIds = new Set<string>();
+      if (gkFirstHalfId  && gkFirstHalfCleanSheet)  csIds.add(gkFirstHalfId);
+      if (gkSecondHalfId && gkSecondHalfCleanSheet) csIds.add(gkSecondHalfId);
       const players = selectedPlayers.map(p => ({
         playerId: p.userId,
         attended: true,
         goals:       goalEntries.filter(g => g.scorerId  === p.userId).length,
         assists:     goalEntries.filter(g => g.assisterId === p.userId).length,
-        cleanSheet:  cleanSheetIds.includes(p.userId),
+        cleanSheet:  csIds.has(p.userId),
         yellowCards: yellowCardIds.includes(p.userId) ? 1 : 0,
         redCards:    redCardIds.includes(p.userId) ? 1 : 0,
       }));
@@ -381,6 +410,10 @@ export default function MatchResults() {
     assisterName: g.assisterId ? (selectedPlayers.find(p => p.userId === g.assisterId)?.name ?? null)     : null,
   }));
 
+  const cleanSheetIds   = [...new Set([
+    ...(gkFirstHalfId  && gkFirstHalfCleanSheet  ? [gkFirstHalfId]  : []),
+    ...(gkSecondHalfId && gkSecondHalfCleanSheet ? [gkSecondHalfId] : []),
+  ])];
   const cleanSheetNames  = cleanSheetIds.map(id => selectedPlayers.find(p => p.userId === id)?.name ?? 'Unknown');
   const yellowCardNames  = yellowCardIds.map(id => selectedPlayers.find(p => p.userId === id)?.name ?? 'Unknown');
   const redCardNames     = redCardIds.map(id => selectedPlayers.find(p => p.userId === id)?.name ?? 'Unknown');
@@ -396,20 +429,7 @@ export default function MatchResults() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <nav className="bg-brand-dark border-b border-brand-green/40 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="text-white/50 hover:text-white/80 text-sm">← Back</button>
-          <span className="text-white/20">|</span>
-          <div className="flex items-center gap-2">
-            <RavenIcon className="w-8 h-8" />
-            <span className="font-bold text-white text-lg">Boca Schedule</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-white/70">{user?.name}</span>
-          <button onClick={logout} className="text-sm text-white/60 hover:text-white/90">Logout</button>
-        </div>
-      </nav>
+      <AppNav onBack={() => navigate(-1)} />
 
       <main className="max-w-lg mx-auto px-4 py-8 space-y-6">
 
@@ -533,109 +553,99 @@ export default function MatchResults() {
           </div>
         )}
 
-        {/* ── Clean sheets ── */}
-        {step === 'cleansheets' && (
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-              <h2 className="font-semibold text-gray-900">Clean sheets</h2>
-              <p className="text-sm text-gray-500">
-                {goalsAgainst === 0
-                  ? 'Clean sheet! Select who kept goal.'
-                  : 'Did any player keep a clean sheet? Leave empty if none.'}
-              </p>
-              <div className="space-y-1.5">
-                {selectedPlayers.map(p => (
-                  <PlayerButton
-                    key={p.userId}
-                    player={p}
-                    selected={cleanSheetIds.includes(p.userId)}
-                    onClick={() => toggleCleanSheet(p.userId)}
-                  />
-                ))}
-              </div>
-              {cleanSheetIds.length === 0 && (
-                <p className="text-xs text-gray-400">Nothing selected — no clean sheets recorded.</p>
-              )}
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setGoalIndex(Math.max(0, goalsFor - 1)); setStep(goalsFor > 0 ? 'goals' : 'score'); }}
-                className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={() => setStep('goalkeepers')}
-                className="flex-[2] bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
-              >
-                Continue →
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Goalkeepers ── */}
+        {/* ── Goalkeepers + Clean sheets ── */}
         {step === 'goalkeepers' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
               <div>
                 <h2 className="font-semibold text-gray-900">Goalkeepers</h2>
-                <p className="text-sm text-gray-500 mt-1">Who played in goal each half?</p>
+                <p className="text-sm text-gray-500 mt-1">Who played in goal each half, and did they keep a clean sheet?</p>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">1st half</p>
-                <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                  <button
-                    onClick={() => setGkFirstHalfId(null)}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg border-2 text-sm transition-colors ${
-                      gkFirstHalfId === null
-                        ? 'border-gray-400 bg-gray-50 text-gray-600 font-medium'
-                        : 'border-gray-200 text-gray-400 hover:border-gray-300'
-                    }`}
+              {/* 1st half */}
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium text-gray-700">1st half goalkeeper</p>
+                  <select
+                    value={gkFirstHalfId ?? ''}
+                    onChange={e => {
+                      const val = e.target.value || null;
+                      setGkFirstHalfId(val);
+                      if (!val) setGkFirstHalfCleanSheet(false);
+                    }}
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-green appearance-none"
                   >
-                    Unknown
-                  </button>
-                  {selectedPlayers.map(p => (
-                    <PlayerButton
-                      key={p.userId}
-                      player={p}
-                      selected={gkFirstHalfId === p.userId}
-                      onClick={() => setGkFirstHalfId(prev => prev === p.userId ? null : p.userId)}
-                    />
-                  ))}
+                    <option value="">Unknown</option>
+                    {selectedPlayers.map(p => (
+                      <option key={p.userId} value={p.userId}>{p.name}</option>
+                    ))}
+                  </select>
                 </div>
+                <button
+                  onClick={() => setGkFirstHalfCleanSheet(prev => !prev)}
+                  disabled={!gkFirstHalfId}
+                  className={`flex items-center justify-between w-full px-4 py-3 rounded-lg border transition-colors ${
+                    !gkFirstHalfId
+                      ? 'border-gray-100 bg-gray-50 opacity-40 cursor-not-allowed'
+                      : gkFirstHalfCleanSheet
+                        ? 'border-brand-green bg-brand-green-50'
+                        : 'border-gray-200 bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <span className={`text-sm font-medium ${gkFirstHalfCleanSheet ? 'text-brand-green-700' : 'text-gray-700'}`}>
+                    🧤 Clean sheet
+                  </span>
+                  <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${gkFirstHalfCleanSheet ? 'bg-brand-green' : 'bg-gray-300'}`}>
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${gkFirstHalfCleanSheet ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </div>
+                </button>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">2nd half</p>
-                <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                  <button
-                    onClick={() => setGkSecondHalfId(null)}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg border-2 text-sm transition-colors ${
-                      gkSecondHalfId === null
-                        ? 'border-gray-400 bg-gray-50 text-gray-600 font-medium'
-                        : 'border-gray-200 text-gray-400 hover:border-gray-300'
-                    }`}
+              <div className="border-t border-gray-100" />
+
+              {/* 2nd half */}
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <p className="text-sm font-medium text-gray-700">2nd half goalkeeper</p>
+                  <select
+                    value={gkSecondHalfId ?? ''}
+                    onChange={e => {
+                      const val = e.target.value || null;
+                      setGkSecondHalfId(val);
+                      if (!val) setGkSecondHalfCleanSheet(false);
+                    }}
+                    className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-green appearance-none"
                   >
-                    Unknown
-                  </button>
-                  {selectedPlayers.map(p => (
-                    <PlayerButton
-                      key={p.userId}
-                      player={p}
-                      selected={gkSecondHalfId === p.userId}
-                      onClick={() => setGkSecondHalfId(prev => prev === p.userId ? null : p.userId)}
-                    />
-                  ))}
+                    <option value="">Unknown</option>
+                    {selectedPlayers.map(p => (
+                      <option key={p.userId} value={p.userId}>{p.name}</option>
+                    ))}
+                  </select>
                 </div>
+                <button
+                  onClick={() => setGkSecondHalfCleanSheet(prev => !prev)}
+                  disabled={!gkSecondHalfId}
+                  className={`flex items-center justify-between w-full px-4 py-3 rounded-lg border transition-colors ${
+                    !gkSecondHalfId
+                      ? 'border-gray-100 bg-gray-50 opacity-40 cursor-not-allowed'
+                    : gkSecondHalfCleanSheet
+                        ? 'border-brand-green bg-brand-green-50'
+                        : 'border-gray-200 bg-white hover:bg-gray-50'
+                  }`}
+                >
+                  <span className={`text-sm font-medium ${gkSecondHalfCleanSheet ? 'text-brand-green-700' : 'text-gray-700'}`}>
+                    🧤 Clean sheet
+                  </span>
+                  <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${gkSecondHalfCleanSheet ? 'bg-brand-green' : 'bg-gray-300'}`}>
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${gkSecondHalfCleanSheet ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </div>
+                </button>
               </div>
             </div>
 
             <div className="flex gap-2">
               <button
-                onClick={() => setStep('cleansheets')}
+                onClick={() => { setGoalIndex(Math.max(0, goalsFor - 1)); setStep(goalsFor > 0 ? 'goals' : 'score'); }}
                 className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 ← Back
@@ -818,38 +828,49 @@ export default function MatchResults() {
 
         {/* ── Highlights overlay ── */}
         {showHighlights && match && date && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-            <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full space-y-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-bold text-gray-900 text-lg">Result saved!</h2>
-                <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
-              </div>
-              <p className="text-sm text-gray-500">Download the highlights card to share with your team.</p>
-              <div className="overflow-hidden rounded-xl flex justify-center bg-gray-900">
-                <div style={{ zoom: 0.7 }}>
-                  <HighlightsCard
-                    props={{ date, goalsFor, goalsAgainst, gameAssessment, goalDetails, cleanSheetNames, yellowCardNames, redCardNames, matchType: match.matchType ?? '7-player', manOfMatchName }}
-                    cardRef={cardRef}
-                  />
+          <>
+            {/* Full-size off-screen card — html2canvas captures this, no zoom distortion */}
+            <div aria-hidden="true" style={{ position: 'fixed', left: -9999, top: 0, pointerEvents: 'none' }}>
+              <HighlightsCard
+                props={{ date, opponent: match.opponent ?? null, goalsFor, goalsAgainst, gameAssessment, goalDetails, cleanSheetNames, yellowCardNames, redCardNames, matchType: match.matchType ?? '7-player', manOfMatchName, longRead: longRead || null }}
+                cardRef={cardRef}
+              />
+            </div>
+
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full space-y-5">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-bold text-gray-900 text-lg">Result saved!</h2>
+                  <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+                </div>
+                <p className="text-sm text-gray-500">Download the highlights card to share with your team.</p>
+                {/* Zoomed preview only — no capture ref */}
+                <div className="overflow-hidden rounded-xl flex justify-center bg-gray-900">
+                  <div style={{ zoom: 0.7 }}>
+                    <HighlightsCard
+                      props={{ date, opponent: match.opponent ?? null, goalsFor, goalsAgainst, gameAssessment, goalDetails, cleanSheetNames, yellowCardNames, redCardNames, matchType: match.matchType ?? '7-player', manOfMatchName, longRead: longRead || null }}
+                      cardRef={previewRef}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={downloadHighlights}
+                    disabled={downloading}
+                    className="flex-1 bg-brand-dark hover:bg-gray-800 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+                  >
+                    {downloading ? 'Generating…' : '⬇ Download PNG'}
+                  </button>
+                  <button
+                    onClick={() => navigate(-1)}
+                    className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Done →
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={downloadHighlights}
-                  disabled={downloading}
-                  className="flex-1 bg-brand-dark hover:bg-gray-800 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
-                >
-                  {downloading ? 'Generating…' : '⬇ Download PNG'}
-                </button>
-                <button
-                  onClick={() => navigate(-1)}
-                  className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Done →
-                </button>
-              </div>
             </div>
-          </div>
+          </>
         )}
       </main>
     </div>

@@ -179,6 +179,18 @@ router.post('/reset-password', async (req, res, next) => {
       return;
     }
 
+    // Ensure this token came from a password-recovery flow, not a regular session
+    const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString());
+    if (payload?.type !== 'recovery' && payload?.aal !== 'aal1') {
+      // Supabase recovery tokens set amr to [{"method":"otp"}] and token_type may differ
+      // Fall back to checking the amr claim for 'otp' which recovery tokens carry
+      const isRecovery = (payload?.amr ?? []).some((a: any) => a.method === 'otp');
+      if (!isRecovery) {
+        res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Invalid or expired reset link — please request a new one.' } });
+        return;
+      }
+    }
+
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword });
     if (updateError) throw updateError;
 

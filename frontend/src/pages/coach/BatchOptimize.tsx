@@ -1,3 +1,4 @@
+import AppNav from '../components/AppNav';
 import AppNav from '../../components/AppNav';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';

@@ -105,8 +105,7 @@ router.post('/batch', authenticate, requireRole('coach', 'admin'), async (req, r
     });
 
     if (!juliaRes.ok) {
-      const errBody = await juliaRes.text();
-      res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: errBody } });
+      res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: 'Optimization service error — please try again.' } });
       return;
     }
 

@@ -1,3 +1,4 @@
+import AppNav from '../components/AppNav';
 import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { meetingTime } from '../../utils';

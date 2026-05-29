@@ -1,0 +1,83 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import request from 'supertest';
+import app from '../src/app.js';
+import { createTestUser, deleteTestUser, type TestUser } from './helpers/users.js';
+import { createTestMatch, deleteTestMatch, signupPlayer } from './helpers/data.js';
+
+describe('Selections', () => {
+  let coach: TestUser;
+  let player: TestUser;
+  let matchId: string;
+
+  beforeAll(async () => {
+    [coach, player] = await Promise.all([
+      createTestUser('coach', '-sel'),
+      createTestUser('player', '-sel'),
+    ]);
+    const match = await createTestMatch();
+    matchId = match.match_id;
+    await signupPlayer(matchId, player.userId);
+  });
+
+  afterAll(async () => {
+    await deleteTestMatch(matchId);
+    await Promise.all([deleteTestUser(coach.userId), deleteTestUser(player.userId)]);
+  });
+
+  it('GET selections returns the player list with isSelected flag', async () => {
+    const res = await request(app)
+      .get(`/api/matches/${matchId}/selections`)
+      .set('Authorization', `Bearer ${coach.token}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.data.players)).toBe(true);
+    const entry = res.body.data.players.find((p: any) => p.player.userId === player.userId);
+    expect(entry).toBeTruthy();
+    expect(entry.isSelected).toBe(false);
+  });
+
+  it('PUT selections with valid signed-up player saves correctly', async () => {
+    const res = await request(app)
+      .put(`/api/matches/${matchId}/selections`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ selectedPlayerIds: [player.userId] });
+    expect(res.status).toBe(200);
+    expect(res.body.data.selectedCount).toBe(1);
+
+    // Verify isSelected is now true
+    const check = await request(app)
+      .get(`/api/matches/${matchId}/selections`)
+      .set('Authorization', `Bearer ${coach.token}`);
+    const entry = check.body.data.players.find((p: any) => p.player.userId === player.userId);
+    expect(entry.isSelected).toBe(true);
+  });
+
+  it('PUT selections rejects a player not signed up for this match (security fix)', async () => {
+    const notSignedUp = await createTestUser('player', '-sel-not');
+    try {
+      const res = await request(app)
+        .put(`/api/matches/${matchId}/selections`)
+        .set('Authorization', `Bearer ${coach.token}`)
+        .send({ selectedPlayerIds: [notSignedUp.userId] });
+      expect(res.status).toBe(422);
+    } finally {
+      await deleteTestUser(notSignedUp.userId);
+    }
+  });
+
+  it('PUT selections rejects a fabricated UUID', async () => {
+    const res = await request(app)
+      .put(`/api/matches/${matchId}/selections`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ selectedPlayerIds: ['00000000-0000-0000-0000-000000000000'] });
+    expect(res.status).toBe(422);
+  });
+
+  it('PUT selections with an empty array clears all selections', async () => {
+    const res = await request(app)
+      .put(`/api/matches/${matchId}/selections`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ selectedPlayerIds: [] });
+    expect(res.status).toBe(200);
+    expect(res.body.data.selectedCount).toBe(0);
+  });
+});

@@ -34,7 +34,11 @@ router.get('/users', async (req, res, next) => {
     let query = supabaseAdmin.from('users').select('*', { count: 'exact' });
     if (role) query = query.eq('role', role);
     if (isActive !== undefined) query = query.eq('is_active', isActive === 'true');
-    if (search) query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+    if (search) {
+      // Strip characters that could inject extra PostgREST filter clauses
+      const safeSearch = String(search).replace(/[(),]/g, '');
+      query = query.or(`name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
+    }
 
     const { data, count, error } = await query
       .order('name')

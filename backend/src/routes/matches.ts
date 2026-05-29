@@ -446,7 +446,7 @@ router.post('/:matchId/release', authenticate, async (req, res, next) => {
             recipients as { name: string; email: string }[],
             playerProfile?.name ?? 'A player',
             { matchDate: match.match_date, matchTime: match.match_time, location: match.location, opponent: match.opponent ?? null },
-            matchId,
+            String(matchId),
           ).catch(err => console.error('Failed to send release notification:', err));
         }
       });

@@ -108,6 +108,22 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
 
     await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
 
+    // Validate all supplied IDs are active signups for this match
+    if (selectedPlayerIds.length > 0) {
+      const { data: validSignups } = await supabaseAdmin
+        .from('signups')
+        .select('player_id')
+        .eq('match_id', matchId)
+        .eq('is_active', true)
+        .in('player_id', selectedPlayerIds);
+      const validIds = new Set((validSignups ?? []).map((s: any) => s.player_id));
+      const invalid = selectedPlayerIds.filter(id => !validIds.has(id));
+      if (invalid.length > 0) {
+        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'One or more player IDs are not active signups for this match.' } });
+        return;
+      }
+    }
+
     const rows = selectedPlayerIds.map(playerId => ({
       match_id: matchId,
       player_id: playerId,
@@ -199,8 +215,7 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
     });
 
     if (!juliaRes.ok) {
-      const errBody = await juliaRes.text();
-      res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: errBody } });
+      res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: 'Optimization service error — please try again.' } });
       return;
     }
 

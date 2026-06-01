@@ -3,23 +3,28 @@ import { supabaseAdmin } from './users.js';
 const FUTURE_DATE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   .toISOString().split('T')[0];
 
-// Lazily-created system coach used as default created_by for test matches.
-// Created once per test run; not cleaned up (the whole DB is ephemeral in CI).
-let _systemCoachId: string | null = null;
-async function systemCoachId(): Promise<string> {
-  if (_systemCoachId) return _systemCoachId;
-  const email = `system-coach-${Date.now()}@bocatest.internal`;
-  const { data, error } = await supabaseAdmin.auth.admin.createUser({
-    email, password: 'Test123!', email_confirm: true,
-  });
-  if (error) throw new Error(`Failed to create system coach: ${error.message}`);
-  await supabaseAdmin.from('users').insert({
-    user_id: data.user!.id, email,
-    name: 'System Coach', role: 'coach',
-    is_active: true, preferred_positions: [],
-  });
-  _systemCoachId = data.user!.id;
-  return _systemCoachId;
+// Singleton promise ensures only one system coach is created even under concurrent calls.
+// process.env persists across module re-evaluations within the same Vitest process.
+let _systemCoachPromise: Promise<string> | null = null;
+
+function systemCoachId(): Promise<string> {
+  if (process.env.TEST_SYSTEM_COACH_ID) return Promise.resolve(process.env.TEST_SYSTEM_COACH_ID);
+  if (_systemCoachPromise) return _systemCoachPromise;
+  _systemCoachPromise = (async () => {
+    const email = `system-coach-${Date.now()}-${Math.random().toString(36).slice(2)}@bocatest.internal`;
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email, password: 'Test123!', email_confirm: true,
+    });
+    if (error) throw new Error(`Failed to create system coach: ${error.message}`);
+    await supabaseAdmin.from('users').insert({
+      user_id: data.user!.id, email,
+      name: 'System Coach', role: 'coach',
+      is_active: true, preferred_positions: [],
+    });
+    process.env.TEST_SYSTEM_COACH_ID = data.user!.id;
+    return data.user!.id;
+  })();
+  return _systemCoachPromise;
 }
 
 export async function createTestMatch(overrides: Record<string, unknown> = {}) {
@@ -60,11 +65,13 @@ export async function signupPlayer(matchId: string, playerId: string) {
 }
 
 export async function selectPlayer(matchId: string, playerId: string) {
+  const selected_by = await systemCoachId();
   const { data, error } = await supabaseAdmin.from('selections').insert({
     match_id:                 matchId,
     player_id:                playerId,
     selected_by_optimization: false,
     manually_adjusted:        true,
+    selected_by,
   }).select().single();
   if (error) throw error;
   return data;

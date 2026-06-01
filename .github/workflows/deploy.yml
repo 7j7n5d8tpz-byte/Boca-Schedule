@@ -169,12 +169,25 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [test-e2e]
-    defaults:
-      run:
-        working-directory: optimization-service
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to Fly.io registry
+        run: flyctl auth docker
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      # Build on GitHub's native x86_64 Linux — PackageCompiler works here,
+      # unlike cross-compilation from Apple Silicon where QEMU causes segfaults.
+      - name: Build and push Julia sysimage image
+        uses: docker/build-push-action@v5
+        with:
+          context: optimization-service
+          push: true
+          tags: registry.fly.io/boca-julia:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Deploy from pre-built image
+        run: flyctl deploy --image registry.fly.io/boca-julia:latest --app boca-julia
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

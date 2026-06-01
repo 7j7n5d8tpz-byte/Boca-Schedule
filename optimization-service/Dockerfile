@@ -2,16 +2,28 @@ FROM julia:1.10-bookworm
 
 WORKDIR /app
 
+# PackageCompiler requires gcc to link the sysimage shared library
+RUN apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
+
 COPY Project.toml ./
 COPY server.jl ./
 
-# Pre-resolve and precompile into the depot at build time.
-# At runtime the compiled cache is stored in a Fly volume at /julia_depot
-# so subsequent restarts load in ~30s instead of ~5min.
-RUN julia --project=. -e "using Pkg; Pkg.instantiate(); Pkg.precompile()"
+# Build a sysimage with all packages baked in.
+# Reduces cold-start from ~5 min to ~5 sec.
+# Must be built on native x86_64 (GitHub Actions) — QEMU on Apple Silicon
+# causes a segfault during HTTP.jl precompilation.
+RUN julia --project=. -e " \
+  import Pkg; \
+  Pkg.instantiate(); \
+  Pkg.add(\"PackageCompiler\"); \
+  using PackageCompiler; \
+  create_sysimage( \
+    [:HTTP, :JSON3, :JuMP, :HiGHS, :MathOptInterface], \
+    sysimage_path=\"/app/boca.so\", \
+    project=\".\", \
+  )"
 
 ENV JULIA_PORT=3002
-ENV JULIA_DEPOT_PATH=/julia_depot:/root/.julia:/usr/local/julia/local/share/julia:/usr/local/julia/share/julia
 EXPOSE 3002
 
-CMD ["julia", "--project=.", "server.jl"]
+CMD ["julia", "--project=.", "--sysimage=/app/boca.so", "server.jl"]

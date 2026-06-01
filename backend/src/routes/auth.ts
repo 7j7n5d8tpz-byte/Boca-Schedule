@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, supabaseAnon } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { sendAdminRegistrationNotification } from '../lib/mailer.js';
 
@@ -79,7 +79,8 @@ router.post('/login', async (req, res, next) => {
 
     const { email, password } = body.data;
 
-    const { data, error } = await supabaseAdmin.auth.signInWithPassword({ email, password });
+    // Password grant must use the anon/publishable key — GoTrue forbids it with the service_role key.
+    const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
     if (error || !data.session) {
       res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' } });
       return;

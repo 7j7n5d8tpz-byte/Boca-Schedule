@@ -41,15 +41,11 @@ jobs:
       - name: Write test .env
         run: |
           STATUS=$(supabase status 2>&1 || true)
-          echo "--- supabase status raw output ---"
-          echo "$STATUS"
-          echo "---"
-          API_URL=$(echo "$STATUS"  | awk '/API URL/{print $NF}')
-          SERVICE_KEY=$(echo "$STATUS" | awk '/service_role key/{print $NF}')
-          ANON_KEY=$(echo "$STATUS"    | awk '/anon key/{print $NF}')
-          echo "API_URL:      $API_URL"
-          echo "SERVICE_KEY:  ${SERVICE_KEY:0:20}..."
-          echo "ANON_KEY:     ${ANON_KEY:0:20}..."
+          # New Supabase CLI table format: "│ Project URL │ http://... │"
+          # and "│ Publishable │ sb_publishable_... │" / "│ Secret │ sb_secret_... │"
+          API_URL=$(echo "$STATUS"    | grep "Project URL" | sed 's/.*│ Project URL *│ *//;s/ *│.*//')
+          SERVICE_KEY=$(echo "$STATUS" | grep "│ Secret "   | sed 's/.*│ Secret *│ *//;s/ *│.*//')
+          ANON_KEY=$(echo "$STATUS"    | grep "Publishable" | sed 's/.*│ Publishable *│ *//;s/ *│.*//')
           {
             echo "SUPABASE_URL=${API_URL:-http://127.0.0.1:54321}"
             echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_KEY}"
@@ -88,8 +84,9 @@ jobs:
 
       - name: Extract Supabase credentials
         run: |
-          echo "SUPABASE_URL=$(supabase status | awk '/API URL/{print $NF}')" >> $GITHUB_ENV
-          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status | awk '/service_role key/{print $NF}')" >> $GITHUB_ENV
+          STATUS=$(supabase status 2>&1 || true)
+          echo "SUPABASE_URL=$(echo "$STATUS"    | grep "Project URL" | sed 's/.*│ Project URL *│ *//;s/ *│.*//')" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(echo "$STATUS" | grep "│ Secret "   | sed 's/.*│ Secret *│ *//;s/ *│.*//')" >> $GITHUB_ENV
 
       - run: npm ci
 

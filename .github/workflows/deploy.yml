@@ -36,7 +36,7 @@ jobs:
         with: { version: latest }
 
       - name: Start local Supabase
-        run: supabase start
+        run: supabase start --exclude edge-runtime,studio,imgproxy,inbucket
 
       - name: Write test .env
         run: |
@@ -77,7 +77,7 @@ jobs:
         with: { version: latest }
 
       - name: Start Supabase
-        run: supabase start
+        run: supabase start --exclude edge-runtime,studio,imgproxy,inbucket
 
       - name: Extract Supabase credentials
         run: |

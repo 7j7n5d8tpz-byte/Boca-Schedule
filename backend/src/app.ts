@@ -23,8 +23,9 @@ app.use(cors({
 
 app.use(express.json());
 
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 100 });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });
+const isTest = process.env.NODE_ENV === 'test';
+const limiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: isTest ? 10_000 : 100 });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: isTest ? 10_000 : 5 });
 
 app.use(limiter);
 

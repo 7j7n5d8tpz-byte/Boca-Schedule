@@ -21,8 +21,9 @@ describe('Signups', () => {
     const [match, closed, published] = await Promise.all([
       createTestMatch({ status: 'signup_open' }),
       createTestMatch({
-        status:            'signup_open',
-        signup_close_date: '2000-01-01', // already closed
+        status:           'signup_open',
+        signup_open_date:  '2000-01-01',
+        signup_close_date: '2000-01-02', // window in the past — deadline passed
       }),
       createTestMatch({ status: 'published' }),
     ]);

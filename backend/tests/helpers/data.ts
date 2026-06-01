@@ -51,9 +51,8 @@ export async function deleteTestMatch(matchId: string) {
 
 export async function signupPlayer(matchId: string, playerId: string) {
   const { data, error } = await supabaseAdmin.from('signups').insert({
-    match_id:   matchId,
-    player_id:  playerId,
-    is_active:  true,
+    match_id:    matchId,
+    player_id:   playerId,
     is_priority: false,
   }).select().single();
   if (error) throw error;

@@ -41,9 +41,15 @@ jobs:
       - name: Write test .env
         run: |
           STATUS=$(supabase status 2>&1 || true)
-          API_URL=$(echo "$STATUS" | awk '/API URL/{print $NF}')
+          echo "--- supabase status raw output ---"
+          echo "$STATUS"
+          echo "---"
+          API_URL=$(echo "$STATUS"  | awk '/API URL/{print $NF}')
           SERVICE_KEY=$(echo "$STATUS" | awk '/service_role key/{print $NF}')
-          ANON_KEY=$(echo "$STATUS" | awk '/anon key/{print $NF}')
+          ANON_KEY=$(echo "$STATUS"    | awk '/anon key/{print $NF}')
+          echo "API_URL:      $API_URL"
+          echo "SERVICE_KEY:  ${SERVICE_KEY:0:20}..."
+          echo "ANON_KEY:     ${ANON_KEY:0:20}..."
           {
             echo "SUPABASE_URL=${API_URL:-http://127.0.0.1:54321}"
             echo "SUPABASE_SERVICE_ROLE_KEY=${SERVICE_KEY}"

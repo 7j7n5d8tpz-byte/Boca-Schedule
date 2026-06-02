@@ -24,10 +24,14 @@ test.describe('Player flow', () => {
     // The upcoming-matches section always renders one of: a sign-up button
     // (open match the player hasn't joined), a "Signed up" badge (already
     // joined), or the empty state — never a crash.
-    const signupBtn = page.getByRole('button', { name: /sign up/i }).first();
-    const signedUp = page.getByText(/signed up/i).first();
-    const noMatches = page.getByText(/no open matches/i);
-    await expect(signupBtn.or(signedUp).or(noMatches)).toBeVisible({ timeout: 8_000 });
+    // .first() on the whole chain: the page may show several of these at once
+    // (e.g. one open match and one already joined), so just assert at least one.
+    const matchState = page
+      .getByRole('button', { name: /sign up/i })
+      .or(page.getByText(/signed up/i))
+      .or(page.getByText(/no open matches/i))
+      .first();
+    await expect(matchState).toBeVisible({ timeout: 8_000 });
   });
 
   test('profile page loads', async ({ page }) => {

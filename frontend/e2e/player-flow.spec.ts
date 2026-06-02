@@ -21,18 +21,20 @@ test.describe('Player flow', () => {
   test('sign-up button is visible on an open match', async ({ page }) => {
     await loginAs(page, 'player');
     await page.goto('/dashboard');
-    // If any open match exists, the sign-up button should be present
+    // The upcoming-matches section always renders one of: a sign-up button
+    // (open match the player hasn't joined), a "Signed up" badge (already
+    // joined), or the empty state — never a crash.
     const signupBtn = page.getByRole('button', { name: /sign up/i }).first();
-    const noMatches = page.getByText(/no upcoming matches/i);
-    // Either a sign-up button or the empty state is shown — never a crash
-    await expect(signupBtn.or(noMatches)).toBeVisible({ timeout: 8_000 });
+    const signedUp = page.getByText(/signed up/i).first();
+    const noMatches = page.getByText(/no open matches/i);
+    await expect(signupBtn.or(signedUp).or(noMatches)).toBeVisible({ timeout: 8_000 });
   });
 
   test('profile page loads', async ({ page }) => {
     await loginAs(page, 'player');
     await page.getByRole('button', { name: /open menu/i }).click();
     // Click user name (links to profile)
-    await page.getByRole('link', { name: /e2e-player|test player/i }).first().click();
+    await page.getByRole('link', { name: /e2e[ -]?player/i }).first().click();
     await expect(page).toHaveURL(/profile/);
     await expect(page.getByRole('heading', { name: /profile/i })).toBeVisible();
   });

@@ -50,8 +50,8 @@ test.describe('Admin flow', () => {
     await search.fill(pendingName);
     await page.waitForTimeout(500);
 
-    // Click the activate button on that row
-    await page.getByRole('button', { name: /activate/i }).first().click();
+    // The status cell is a toggle button labelled "Inactive" — click it to activate
+    await page.getByRole('button', { name: /^inactive$/i }).first().click();
 
     // The row should update — either the button disappears or an "active" indicator appears
     await expect(

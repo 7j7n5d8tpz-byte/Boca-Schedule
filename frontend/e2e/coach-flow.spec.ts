@@ -29,6 +29,8 @@ test.describe('Coach flow', () => {
     await page.getByLabel(/venue/i).selectOption('__add_new__');
     await page.getByPlaceholder(/new venue name/i).fill('Test Pitch E2E');
     await page.getByRole('button', { name: /^add$/i }).click();
+    // Adding a venue POSTs to the backend; wait until it's selected before submitting
+    await expect(page.getByLabel(/venue/i)).toHaveValue('Test Pitch E2E');
 
     await page.getByRole('button', { name: /create|save|submit/i }).click();
 

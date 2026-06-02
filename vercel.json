@@ -2,5 +2,8 @@
   "installCommand": "npm ci",
   "buildCommand": "npm run build --workspace=frontend",
   "outputDirectory": "frontend/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://boca-backend.fly.dev/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

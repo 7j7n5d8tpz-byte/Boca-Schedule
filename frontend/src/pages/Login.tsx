@@ -61,8 +61,9 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
+                id="email"
                 type="email"
                 required
                 value={email}
@@ -73,10 +74,11 @@ export default function Login() {
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
                 <Link to="/forgot-password" className="text-xs text-brand-green hover:underline">Forgot password?</Link>
               </div>
               <input
+                id="password"
                 type="password"
                 required
                 value={password}

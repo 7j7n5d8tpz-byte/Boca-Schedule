@@ -24,9 +24,10 @@ test.describe('Coach flow', () => {
     await page.getByLabel(/date/i).fill('2030-08-01');
     await page.getByLabel(/time|kick.?off/i).fill('18:00');
 
-    // Location picker — type to find an option or fill direct
-    const locationInput = page.getByLabel(/location/i).first();
-    await locationInput.fill('Test Pitch E2E');
+    // Location picker is a dropdown — add a new venue via the "+ Add location…" flow
+    await page.getByLabel(/venue/i).selectOption('__add_new__');
+    await page.getByPlaceholder(/new venue name/i).fill('Test Pitch E2E');
+    await page.getByRole('button', { name: /^add$/i }).click();
 
     await page.getByRole('button', { name: /create|save|submit/i }).click();
 
@@ -46,7 +47,7 @@ test.describe('Coach flow', () => {
     await loginAs(page, 'coach');
     const coachToken = await page.evaluate(() => localStorage.getItem('accessToken'));
 
-    const base = process.env.VITE_API_URL || 'http://localhost:3001';
+    const base = process.env.VITE_API_URL || 'http://127.0.0.1:3001';
 
     // Create a match with minPlayers=1 so we can publish after selecting one player
     const matchRes = await page.request.post(`${base}/api/matches`, {

@@ -96,6 +96,7 @@ export default function LocationPicker({ venue, court, onVenueChange, onCourtCha
       <div className="flex gap-2">
         <div className="flex-1 min-w-0">
           <select
+            aria-label="Venue"
             required={required}
             value={addingNew ? ADD_SENTINEL : venue}
             onChange={e => handleSelectChange(e.target.value)}

@@ -68,8 +68,9 @@ export default function NewMatch() {
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Match date</label>
+              <label htmlFor="matchDate" className="block text-sm font-medium text-gray-700 mb-1">Match date</label>
               <input
+                id="matchDate"
                 type="date"
                 required
                 value={matchDate}
@@ -78,8 +79,9 @@ export default function NewMatch() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Kick-off time</label>
+              <label htmlFor="matchTime" className="block text-sm font-medium text-gray-700 mb-1">Kick-off time</label>
               <input
+                id="matchTime"
                 type="time"
                 required
                 value={matchTime}

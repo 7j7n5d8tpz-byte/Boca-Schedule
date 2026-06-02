@@ -33,7 +33,7 @@ test.describe('Admin flow', () => {
   });
 
   test('activate a pending user - row updates', async ({ page }) => {
-    const base = process.env.VITE_API_URL || 'http://localhost:3001';
+    const base = process.env.VITE_API_URL || 'http://127.0.0.1:3001';
 
     // Register a new user — they start as is_active: false, pending admin approval
     const pendingName = `E2E Pending ${Date.now()}`;

@@ -87,6 +87,7 @@ jobs:
           STATUS=$(supabase status 2>&1 || true)
           echo "SUPABASE_URL=$(echo "$STATUS"    | grep "Project URL" | sed 's/.*│ Project URL *│ *//;s/ *│.*//')" >> $GITHUB_ENV
           echo "SUPABASE_SERVICE_ROLE_KEY=$(echo "$STATUS" | grep "│ Secret "   | sed 's/.*│ Secret *│ *//;s/ *│.*//')" >> $GITHUB_ENV
+          echo "SUPABASE_ANON_KEY=$(echo "$STATUS" | grep "│ Publishable " | sed 's/.*│ Publishable *│ *//;s/ *│.*//')" >> $GITHUB_ENV
 
       - run: npm ci
 
@@ -96,9 +97,12 @@ jobs:
           npm run build
           npm start &
           for i in {1..20}; do curl -sf http://localhost:3001/health && break; sleep 1; done
+          # Fail the step (instead of silently continuing) if the backend never came up
+          curl -sf http://localhost:3001/health
         env:
           SUPABASE_URL: ${{ env.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
           JWT_SECRET: test-secret
           FRONTEND_URL: http://localhost:5173
           JULIA_URL: http://localhost:3002

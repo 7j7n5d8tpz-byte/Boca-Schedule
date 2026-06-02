@@ -104,6 +104,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
           JWT_SECRET: test-secret
+          NODE_ENV: test
           FRONTEND_URL: http://localhost:5173
           JULIA_URL: http://localhost:3002
           PORT: 3001

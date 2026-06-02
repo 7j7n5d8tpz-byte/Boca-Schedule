@@ -16,7 +16,7 @@ export default function Login() {
     setLoading(true);
     try {
       const role = await login(email, password);
-      navigate(role === 'coach' || role === 'admin' ? '/coach' : '/dashboard');
+      navigate(role === 'admin' ? '/admin' : role === 'coach' ? '/coach' : '/dashboard');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message ?? '';
       if (msg.toLowerCase().includes('too many requests') || err?.response?.status === 429) {

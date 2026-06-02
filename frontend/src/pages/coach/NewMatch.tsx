@@ -177,8 +177,9 @@ export default function NewMatch() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Signup deadline</label>
+              <label htmlFor="signupClose" className="block text-sm font-medium text-gray-700 mb-1">Signup deadline</label>
               <input
+                id="signupClose"
                 type="date"
                 required
                 value={signupCloseDate}

@@ -21,8 +21,9 @@ test.describe('Coach flow', () => {
     await page.goto('/coach/matches/new');
 
     // Fill the form
-    await page.getByLabel(/date/i).fill('2030-08-01');
+    await page.getByLabel(/match date/i).fill('2030-08-01');
     await page.getByLabel(/time|kick.?off/i).fill('18:00');
+    await page.getByLabel(/signup deadline/i).fill('2030-07-01');
 
     // Location picker is a dropdown — add a new venue via the "+ Add location…" flow
     await page.getByLabel(/venue/i).selectOption('__add_new__');

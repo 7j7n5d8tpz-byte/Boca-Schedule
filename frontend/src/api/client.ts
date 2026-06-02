@@ -1,6 +1,13 @@
 import axios from 'axios';
 
-export const api = axios.create({ baseURL: '/api' });
+// In dev/prod the app is served behind a proxy that forwards /api to the
+// backend, so a relative base works. When VITE_API_URL is set (e.g. the E2E
+// build, where the static server has no proxy) call the backend directly.
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
+
+export const api = axios.create({ baseURL: API_BASE });
 
 // Attach access token from localStorage on every request
 api.interceptors.request.use((config) => {
@@ -19,7 +26,7 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
         try {
-          const { data } = await axios.post('/api/auth/refresh', { refreshToken });
+          const { data } = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
           localStorage.setItem('accessToken', data.data.accessToken);
           original.headers.Authorization = `Bearer ${data.data.accessToken}`;
           return api(original);

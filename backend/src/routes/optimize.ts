@@ -76,6 +76,7 @@ router.get('/selections', authenticate, async (req, res, next) => {
           status: match.status,
           minPlayers: match.min_players,
           maxPlayers: match.max_players,
+          optimizationResult: match.optimization_result ?? null,
         },
         players,
         summary: {
@@ -242,7 +243,19 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
     const { error: insertErr } = await supabaseAdmin.from('selections').insert(rows);
     if (insertErr) throw insertErr;
 
-    await supabaseAdmin.from('matches').update({ status: 'optimized' }).eq('match_id', matchId);
+    const optimizationResult = {
+      formation: result.formation ?? null,
+      deficit: result.deficit ?? 0,
+      objective: result.objective ?? null,
+      fairnessWeight: fairness_weight,
+      selectedCount: result.selected_ids.length,
+      solveTimeMs: result.solve_time_ms ?? null,
+      optimizedAt: new Date().toISOString(),
+    };
+
+    await supabaseAdmin.from('matches')
+      .update({ status: 'optimized', optimization_result: optimizationResult })
+      .eq('match_id', matchId);
 
     res.json({
       success: true,

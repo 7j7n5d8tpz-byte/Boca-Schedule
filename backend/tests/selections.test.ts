@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../src/app.js';
-import { createTestUser, deleteTestUser, type TestUser } from './helpers/users.js';
+import { createTestUser, deleteTestUser, supabaseAdmin, type TestUser } from './helpers/users.js';
 import { createTestMatch, deleteTestMatch, signupPlayer } from './helpers/data.js';
 
 describe('Selections', () => {
@@ -79,5 +79,23 @@ describe('Selections', () => {
       .send({ selectedPlayerIds: [] });
     expect(res.status).toBe(200);
     expect(res.body.data.selectedCount).toBe(0);
+  });
+
+  it('GET selections surfaces the persisted optimizationResult', async () => {
+    // No Julia in tests — write the run summary directly, as the optimizer would.
+    const optimizationResult = {
+      formation: { GK: { covered: true, required: 1, filled: 1 } },
+      deficit: 0, objective: -3.2, fairnessWeight: 0.5,
+      selectedCount: 1, solveTimeMs: 12.3, optimizedAt: new Date().toISOString(),
+    };
+    await supabaseAdmin.from('matches').update({ optimization_result: optimizationResult }).eq('match_id', matchId);
+
+    const res = await request(app)
+      .get(`/api/matches/${matchId}/selections`)
+      .set('Authorization', `Bearer ${coach.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.match.optimizationResult).toBeTruthy();
+    expect(res.body.data.match.optimizationResult.deficit).toBe(0);
+    expect(res.body.data.match.optimizationResult.formation.GK.filled).toBe(1);
   });
 });

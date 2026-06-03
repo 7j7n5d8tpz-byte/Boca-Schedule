@@ -119,7 +119,7 @@ router.post('/batch', authenticate, requireRole('coach', 'admin'), async (req, r
     // Save selections for every match and advance status to 'optimized'
     await Promise.all(
       (batchResult.matches as any[]).map(async (matchResult: any) => {
-        const { matchId, signups } = matchDataResults.find(m => m.matchId === matchResult.match_id)!;
+        const { matchId, signups, fairnessWeight } = matchDataResults.find(m => m.matchId === matchResult.match_id)!;
 
         await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
 
@@ -137,7 +137,19 @@ router.post('/batch', authenticate, requireRole('coach', 'admin'), async (req, r
           if (error) throw error;
         }
 
-        await supabaseAdmin.from('matches').update({ status: 'optimized' }).eq('match_id', matchId);
+        const optimizationResult = {
+          formation: matchResult.formation ?? null,
+          deficit: matchResult.deficit ?? 0,
+          objective: batchResult.objective ?? null,
+          fairnessWeight,
+          selectedCount: (matchResult.selected_ids as string[]).length,
+          solveTimeMs: batchResult.solve_time_ms ?? null,
+          optimizedAt: new Date().toISOString(),
+        };
+
+        await supabaseAdmin.from('matches')
+          .update({ status: 'optimized', optimization_result: optimizationResult })
+          .eq('match_id', matchId);
       })
     );
 

@@ -458,6 +458,52 @@ router.post('/:matchId/release', authenticate, async (req, res, next) => {
 });
 
 // GET /api/matches/:matchId/guests
+// GET /api/matches/:matchId/squad — the confirmed squad, visible to any player.
+// Only exposed once the match is published (or completed), so players can't peek
+// at selections before the coach publishes them.
+router.get('/:matchId/squad', authenticate, async (req, res, next) => {
+  try {
+    const { matchId } = req.params;
+
+    const { data: match } = await supabaseAdmin
+      .from('matches')
+      .select('status')
+      .eq('match_id', matchId)
+      .single();
+
+    if (!match) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
+      return;
+    }
+    if (match.status !== 'published' && match.status !== 'completed') {
+      res.status(403).json({ success: false, error: { code: 'NOT_PUBLISHED', message: 'Squad is not published yet' } });
+      return;
+    }
+
+    const [{ data: selections }, { data: guests }] = await Promise.all([
+      supabaseAdmin.from('selections').select('player_id').eq('match_id', matchId),
+      supabaseAdmin.from('guest_players').select('name, position').eq('match_id', matchId).order('created_at'),
+    ]);
+
+    const playerIds = (selections ?? []).map((s: any) => s.player_id);
+    const { data: players } = playerIds.length > 0
+      ? await supabaseAdmin.from('users').select('user_id, name, preferred_positions').in('user_id', playerIds)
+      : { data: [] };
+
+    const selected = (players ?? [])
+      .map((p: any) => ({ userId: p.user_id, name: p.name, preferredPositions: p.preferred_positions ?? [] }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const guestList = (guests ?? []).map((g: any) => ({ name: g.name, position: g.position ?? null }));
+
+    res.json({
+      success: true,
+      data: { selected, guests: guestList, count: selected.length + guestList.length },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:matchId/guests', authenticate, async (req, res, next) => {
   try {
     const { data, error } = await supabaseAdmin

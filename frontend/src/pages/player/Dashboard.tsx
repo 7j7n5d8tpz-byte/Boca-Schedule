@@ -43,6 +43,14 @@ interface Player {
   preferredPositions: string[];
 }
 
+const POS_COLOR: Record<string, string> = {
+  GK:  'bg-yellow-100 text-yellow-700',
+  DEF: 'bg-blue-100 text-blue-700',
+  WIN: 'bg-green-100 text-green-700',
+  MID: 'bg-purple-100 text-purple-700',
+  STR: 'bg-red-100 text-red-700',
+};
+
 // ─── Swap modal ───────────────────────────────────────────────────────────────
 
 function SwapModal({
@@ -177,6 +185,13 @@ function MatchCard({ match }: { match: Match }) {
   const qc = useQueryClient();
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showCantAttend, setShowCantAttend] = useState(false);
+  const [showSquad, setShowSquad] = useState(false);
+
+  const { data: squad } = useQuery<{ selected: Player[]; guests: { name: string; position: string | null }[]; count: number }>({
+    queryKey: ['squad', match.matchId],
+    queryFn: () => api.get(`/matches/${match.matchId}/squad`).then(r => r.data.data),
+    enabled: showSquad && match.status === 'published',
+  });
 
   const signupMutation = useMutation({
     mutationFn: () => api.post('/signups', { matchId: match.matchId }),
@@ -306,6 +321,41 @@ function MatchCard({ match }: { match: Match }) {
             <p className="text-xs text-gray-400 text-center w-full py-1">Signup closed</p>
           )}
         </div>
+
+        {/* Confirmed squad (published matches) */}
+        {match.status === 'published' && (
+          <div className="pt-1 border-t border-gray-100">
+            <button
+              onClick={() => setShowSquad(v => !v)}
+              className="text-xs text-gray-400 hover:text-gray-600 transition-colors mt-2"
+            >
+              {showSquad ? 'Hide squad' : `View squad${squad ? ` (${squad.count})` : ''}`}
+            </button>
+            {showSquad && squad && (
+              <div className="mt-2 space-y-1.5">
+                {squad.selected.map(p => (
+                  <div key={p.userId} className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-700 flex-1 truncate">{p.name}</span>
+                    <span className="flex gap-1 shrink-0">
+                      {p.preferredPositions.map(pos => (
+                        <span key={pos} className={`text-xs font-medium px-1.5 py-0.5 rounded ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+                {squad.guests.map((g, i) => (
+                  <div key={`g${i}`} className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-700 flex-1 truncate">{g.name}</span>
+                    <span className="flex gap-1 shrink-0">
+                      <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">guest{g.position ? ` · ${g.position}` : ''}</span>
+                    </span>
+                  </div>
+                ))}
+                {squad.count === 0 && <p className="text-xs text-gray-400">No players selected.</p>}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );

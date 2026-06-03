@@ -4,6 +4,14 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { sendSelectionNotifications, sendCancellationNotifications, sendReleaseNotification } from '../lib/mailer.js';
+import { createNotifications } from '../lib/notifications.js';
+
+// Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
+function matchLabel(m: { match_date: string; match_time?: string; opponent?: string | null }): string {
+  const d = new Date(`${m.match_date}T${m.match_time ?? '00:00'}`);
+  const date = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  return m.opponent ? `${date} vs ${m.opponent}` : date;
+}
 
 const router = Router();
 
@@ -252,12 +260,11 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
     if (d.status === 'cancelled' && existing && existing.status !== 'cancelled') {
       supabaseAdmin
         .from('selections')
-        .select('users!selections_player_id_fkey(name, email)')
+        .select('users!selections_player_id_fkey(user_id, name, email)')
         .eq('match_id', matchId)
         .then(({ data: sel }) => {
-          const players = (sel ?? [])
-            .map((s: any) => ({ name: s.users.name as string, email: s.users.email as string }))
-            .filter(p => p.email);
+          const rows = (sel ?? []).map((s: any) => s.users);
+          const players = rows.filter((u: any) => u.email).map((u: any) => ({ name: u.name, email: u.email }));
           if (players.length > 0) {
             sendCancellationNotifications(players, {
               matchDate: existing.match_date,
@@ -266,6 +273,13 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
               opponent: existing.opponent ?? null,
             }).catch(err => console.error('Failed to send cancellation notifications:', err));
           }
+          createNotifications(rows.map((u: any) => u.user_id), {
+            type: 'match_cancelled',
+            title: 'Match cancelled',
+            body: matchLabel({ match_date: existing.match_date, match_time: existing.match_time, opponent: existing.opponent }),
+            link: '/dashboard',
+            matchId: String(matchId),
+          });
         });
     }
 
@@ -378,12 +392,11 @@ router.post('/:matchId/publish', authenticate, requireRole('coach', 'admin'), as
     // Fetch selected players' emails and notify them — fire-and-forget
     supabaseAdmin
       .from('selections')
-      .select('users!selections_player_id_fkey(name, email)')
+      .select('users!selections_player_id_fkey(user_id, name, email)')
       .eq('match_id', matchId)
       .then(({ data: sel }) => {
-        const players = (sel ?? [])
-          .map((s: any) => ({ name: s.users.name as string, email: s.users.email as string }))
-          .filter(p => p.email);
+        const rows = (sel ?? []).map((s: any) => s.users);
+        const players = rows.filter((u: any) => u.email).map((u: any) => ({ name: u.name, email: u.email }));
         if (players.length > 0) {
           sendSelectionNotifications(players, {
             matchDate: match.match_date,
@@ -392,6 +405,13 @@ router.post('/:matchId/publish', authenticate, requireRole('coach', 'admin'), as
             opponent: match.opponent ?? null,
           }).catch(err => console.error('Failed to send selection notifications:', err));
         }
+        createNotifications(rows.map((u: any) => u.user_id), {
+          type: 'selected',
+          title: "You're selected",
+          body: matchLabel(match),
+          link: '/dashboard',
+          matchId: String(matchId),
+        });
       });
 
     res.json({ success: true, data: { matchId: data.match_id, status: 'published', publishedAt: data.published_at, emailsSent: selectionCount } });
@@ -436,7 +456,7 @@ router.post('/:matchId/release', authenticate, async (req, res, next) => {
     // Notify all coaches and admins — fire-and-forget
     supabaseAdmin
       .from('users')
-      .select('name, email')
+      .select('user_id, name, email')
       .in('role', ['coach', 'admin'])
       .eq('is_active', true)
       .then(({ data: coaches }) => {
@@ -449,6 +469,13 @@ router.post('/:matchId/release', authenticate, async (req, res, next) => {
             String(matchId),
           ).catch(err => console.error('Failed to send release notification:', err));
         }
+        createNotifications((coaches ?? []).map((c: any) => c.user_id), {
+          type: 'spot_released',
+          title: 'Spot released',
+          body: `${playerProfile?.name ?? 'A player'} — ${matchLabel({ match_date: match.match_date, match_time: match.match_time, opponent: match.opponent })}`,
+          link: `/coach/matches/${matchId}/selections`,
+          matchId: String(matchId),
+        });
       });
 
     res.json({ success: true });

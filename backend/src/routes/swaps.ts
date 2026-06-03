@@ -6,6 +6,12 @@ import {
   sendSwapResponseNotification,
   sendReleaseNotification,
 } from '../lib/mailer.js';
+import { createNotifications } from '../lib/notifications.js';
+
+function swapMatchLabel(m: { match_date: string; match_time?: string }): string {
+  return new Date(`${m.match_date}T${m.match_time ?? '00:00'}`)
+    .toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
 
 const router = Router();
 
@@ -77,6 +83,14 @@ router.post('/matches/:matchId/swaps', authenticate, async (req, res, next) => {
             { matchDate: match.match_date, matchTime: match.match_time, location: match.location, opponent: match.opponent ?? null },
           ).catch(err => console.error('Failed to send swap request notification:', err));
         }
+        createNotifications([targetPlayerId], {
+          type: 'swap_request',
+          title: 'Can you cover a spot?',
+          body: `${requester?.name ?? 'A teammate'} asked you to cover ${swapMatchLabel(match)}`,
+          link: '/dashboard',
+          matchId: String(matchId),
+          refId: data.swap_id,
+        });
       });
 
     res.status(201).json({ success: true, data: { swapId: data.swap_id, status: data.status } });
@@ -193,6 +207,13 @@ router.put('/swaps/:swapId/respond', authenticate, async (req, res, next) => {
           matchInfo,
         ).catch(err => console.error('Failed to send swap response notification:', err));
       }
+      createNotifications([swap.requester_id], {
+        type: accept ? 'swap_accepted' : 'swap_declined',
+        title: accept ? 'Swap accepted' : 'Swap declined',
+        body: `${target?.name ?? 'A teammate'} ${accept ? 'accepted' : 'declined'} your swap for ${swapMatchLabel(match)}`,
+        link: '/dashboard',
+        matchId: swap.match_id,
+      });
 
       if (accept) {
         supabaseAdmin.from('users')

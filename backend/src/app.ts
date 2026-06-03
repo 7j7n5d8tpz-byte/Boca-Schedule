@@ -16,6 +16,7 @@ import batchOptimizeRoutes from './routes/batch-optimize.js';
 import cronRoutes from './routes/cron.js';
 import calendarRoutes from './routes/calendar.js';
 import announcementRoutes from './routes/announcements.js';
+import notificationRoutes from './routes/notifications.js';
 
 const app = express();
 
@@ -48,6 +49,7 @@ app.use('/api/optimize', batchOptimizeRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use(errorHandler);
 

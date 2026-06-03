@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import RavenIcon from './RavenIcon';
+import NotificationBell from './NotificationBell';
 
 interface AppNavProps {
   backHref?: string;
@@ -62,6 +63,9 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
 
       {/* ── Spacer ── */}
       <div className="flex-1" />
+
+      {/* ── Notification bell ── */}
+      <NotificationBell />
 
       {/* ── Hamburger menu (top-right) ── */}
       <div className="relative shrink-0" ref={menuRef}>

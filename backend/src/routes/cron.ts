@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { sendSignupReminder } from '../lib/mailer.js';
+import { createNotifications } from '../lib/notifications.js';
 
 const router = Router();
 
@@ -66,9 +67,8 @@ router.post('/signup-reminders', async (req, res, next) => {
       const signedUp = new Set(
         (m.signups ?? []).filter((s: any) => s.is_active).map((s: any) => s.player_id),
       );
-      const recipients = (activeUsers ?? [])
-        .filter((u: any) => !signedUp.has(u.user_id) && u.email)
-        .map((u: any) => ({ name: u.name, email: u.email }));
+      const recipientUsers = (activeUsers ?? []).filter((u: any) => !signedUp.has(u.user_id) && u.email);
+      const recipients = recipientUsers.map((u: any) => ({ name: u.name, email: u.email }));
 
       if (recipients.length > 0) {
         await sendSignupReminder(recipients, {
@@ -78,6 +78,13 @@ router.post('/signup-reminders', async (req, res, next) => {
           opponent: m.opponent ?? null,
           signupCloseDate: m.signup_close_date,
         }).catch(err => console.error('Failed to send signup reminders:', err));
+        await createNotifications(recipientUsers.map((u: any) => u.user_id), {
+          type: 'signup_reminder',
+          title: 'Signup closing soon',
+          body: `${new Date(`${m.match_date}T${m.match_time}`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}${m.opponent ? ` vs ${m.opponent}` : ''}`,
+          link: '/dashboard',
+          matchId: m.match_id,
+        });
         remindersSent += recipients.length;
       }
 

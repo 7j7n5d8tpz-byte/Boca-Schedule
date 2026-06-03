@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { createNotifications } from '../lib/notifications.js';
 
 const router = Router();
 
@@ -59,6 +60,17 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
       created_by: req.user!.userId,
     }).select('announcement_id, body, created_at, match_id').single();
     if (error) throw error;
+
+    // In-app notification to every active user (no email — by design).
+    supabaseAdmin.from('users').select('user_id').eq('is_active', true)
+      .then(({ data: users }) => {
+        createNotifications((users ?? []).map((u: any) => u.user_id), {
+          type: 'announcement',
+          title: '📣 New announcement',
+          body: body.length > 120 ? `${body.slice(0, 117)}…` : body,
+          link: '/dashboard',
+        });
+      });
 
     res.status(201).json({
       success: true,

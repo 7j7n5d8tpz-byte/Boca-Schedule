@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 
-const FROM = process.env.EMAIL_FROM || '"Boca Boldisch" <no-reply@bocaboldisch.dk>';
+const FROM = process.env.EMAIL_FROM || '"Boca Boldisch" <boca_admin@bocaboldisch.dk>';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Use Resend in production (RESEND_API_KEY set), fall back to local Mailpit in dev

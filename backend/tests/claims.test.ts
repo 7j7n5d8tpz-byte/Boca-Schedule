@@ -125,7 +125,7 @@ describe('Open-spot claims', () => {
   });
 
   it('blocks a claim when the squad is full', async () => {
-    const full = await createTestMatch({ status: 'published', max_players: 1 });
+    const full = await createTestMatch({ status: 'published', min_players: 1, max_players: 1 });
     const filler = await createTestUser('player', '-claim-fill');
     try {
       await signupPlayer(full.match_id, filler.userId);

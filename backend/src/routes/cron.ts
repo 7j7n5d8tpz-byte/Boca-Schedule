@@ -96,6 +96,10 @@ router.post('/signup-reminders', async (req, res, next) => {
       matchesReminded += 1;
     }
 
+    // Prune read notifications older than 60 days to keep the table lean.
+    const cutoff = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    await supabaseAdmin.from('notifications').delete().not('read_at', 'is', null).lt('created_at', cutoff);
+
     res.json({ success: true, data: { matchesReminded, remindersSent } });
   } catch (err) {
     next(err);

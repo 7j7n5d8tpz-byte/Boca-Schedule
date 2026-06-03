@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin, supabaseAnon } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { sendAdminRegistrationNotification } from '../lib/mailer.js';
+import { createNotifications } from '../lib/notifications.js';
 
 const router = Router();
 
@@ -54,6 +55,15 @@ router.post('/register', async (req, res, next) => {
         sendAdminRegistrationNotification(name, email).catch(err =>
           console.error('Failed to send admin registration notification:', err)
         );
+        supabaseAdmin.from('users').select('user_id').eq('role', 'admin').eq('is_active', true)
+          .then(({ data: admins }) => {
+            createNotifications((admins ?? []).map((a: any) => a.user_id), {
+              type: 'registration',
+              title: 'New registration',
+              body: `${name} is awaiting approval`,
+              link: '/admin',
+            });
+          });
       }
     }
     // If authError (e.g. email already registered), we intentionally fall through

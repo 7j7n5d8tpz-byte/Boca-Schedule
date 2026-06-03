@@ -248,10 +248,9 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
     if (d.signupOpenDate !== undefined) updates.signup_open_date = d.signupOpenDate;
     if (d.signupCloseDate !== undefined) updates.signup_close_date = d.signupCloseDate;
 
-    // Fetch current status before update so we can detect a new cancellation
-    const { data: existing } = d.status === 'cancelled'
-      ? await supabaseAdmin.from('matches').select('status, match_date, match_time, location, opponent').eq('match_id', matchId).single()
-      : { data: null };
+    // Fetch the prior row so we can detect a new cancellation or a moved match.
+    const { data: existing } = await supabaseAdmin
+      .from('matches').select('status, match_date, match_time, location, opponent').eq('match_id', matchId).single();
 
     const { data, error } = await supabaseAdmin.from('matches').update(updates).eq('match_id', matchId).select().single();
     if (error) throw error;
@@ -281,6 +280,33 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
             matchId: String(matchId),
           });
         });
+    }
+
+    // Notify squad + signed-up players when a visible match is moved/changed
+    // (date, time or location). Skip drafts (not visible) and cancellations
+    // (handled above).
+    const dateChanged = d.matchDate !== undefined && d.matchDate !== existing?.match_date;
+    const timeChanged = d.matchTime !== undefined && d.matchTime !== existing?.match_time;
+    const locChanged  = d.location  !== undefined && d.location  !== existing?.location;
+    if ((dateChanged || timeChanged || locChanged)
+        && existing && existing.status !== 'draft' && existing.status !== 'cancelled'
+        && d.status !== 'cancelled') {
+      Promise.all([
+        supabaseAdmin.from('selections').select('player_id').eq('match_id', matchId),
+        supabaseAdmin.from('signups').select('player_id').eq('match_id', matchId).eq('is_active', true),
+      ]).then(([{ data: sel }, { data: su }]) => {
+        const ids = [
+          ...(sel ?? []).map((s: any) => s.player_id),
+          ...(su ?? []).map((s: any) => s.player_id),
+        ];
+        createNotifications(ids, {
+          type: 'match_moved',
+          title: 'Match details changed',
+          body: `Now ${matchLabel({ match_date: data.match_date, match_time: data.match_time, opponent: data.opponent })} · ${data.location}`,
+          link: '/dashboard',
+          matchId: String(matchId),
+        });
+      });
     }
 
     res.json({ success: true, data: { matchId: data.match_id, ...updates, updatedAt: data.updated_at } });

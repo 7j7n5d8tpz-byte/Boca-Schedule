@@ -1,8 +1,18 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../src/app.js';
-import { createTestUser, deleteTestUser, type TestUser } from './helpers/users.js';
+import { createTestUser, deleteTestUser, supabaseAdmin, type TestUser } from './helpers/users.js';
 import { createTestMatch, deleteTestMatch, signupPlayer, selectPlayer } from './helpers/data.js';
+
+// Poll for a fire-and-forget side effect (notifications are written async).
+async function eventually<T>(fn: () => Promise<T>, predicate: (v: T) => boolean, tries = 20): Promise<T> {
+  let last = await fn();
+  for (let i = 0; i < tries && !predicate(last); i++) {
+    await new Promise(r => setTimeout(r, 50));
+    last = await fn();
+  }
+  return last;
+}
 
 describe('Matches', () => {
   let coach: TestUser;
@@ -164,5 +174,54 @@ describe('Matches', () => {
       .set('Authorization', `Bearer ${coach.token}`)
       .send({ name: 'Ghost', position: 'INVALID' });
     expect(res.status).toBe(422);
+  });
+
+  // ── Match-moved notification ──────────────────────────────────────────────────
+
+  it('notifies the squad when a published match is moved', async () => {
+    const match = await createTestMatch({ status: 'published' });
+    createdMatchIds.push(match.match_id);
+    await signupPlayer(match.match_id, player.userId);
+    await selectPlayer(match.match_id, player.userId);
+
+    const res = await request(app)
+      .put(`/api/matches/${match.match_id}`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ matchTime: '20:30' });
+    expect(res.status).toBe(200);
+
+    const rows = await eventually(
+      () => supabaseAdmin
+        .from('notifications')
+        .select('type')
+        .eq('user_id', player.userId)
+        .eq('match_id', match.match_id)
+        .eq('type', 'match_moved')
+        .then(r => r.data ?? []),
+      r => r.length > 0,
+    );
+    expect(rows.length).toBeGreaterThan(0);
+  });
+
+  it('does not notify when a draft match is edited', async () => {
+    const match = await createTestMatch({ status: 'draft' });
+    createdMatchIds.push(match.match_id);
+    await signupPlayer(match.match_id, player.userId);
+    await selectPlayer(match.match_id, player.userId);
+
+    await request(app)
+      .put(`/api/matches/${match.match_id}`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ matchTime: '21:00' });
+
+    // Give any (incorrect) async write a chance to land, then assert none exist.
+    await new Promise(r => setTimeout(r, 300));
+    const { data } = await supabaseAdmin
+      .from('notifications')
+      .select('notification_id')
+      .eq('user_id', player.userId)
+      .eq('match_id', match.match_id)
+      .eq('type', 'match_moved');
+    expect((data ?? []).length).toBe(0);
   });
 });

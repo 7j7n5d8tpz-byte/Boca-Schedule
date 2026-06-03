@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { createNotifications } from '../lib/notifications.js';
 
 const router = Router();
 
@@ -176,6 +177,19 @@ router.post('/result-permissions/request', authenticate, async (req, res, next) 
     }).select().single();
 
     if (error) throw error;
+
+    // Notify coaches/admins of the pending request — fire-and-forget
+    Promise.all([
+      supabaseAdmin.from('users').select('name').eq('user_id', userId).single(),
+      supabaseAdmin.from('users').select('user_id').in('role', ['coach', 'admin']).eq('is_active', true),
+    ]).then(([{ data: player }, { data: staff }]) => {
+      createNotifications((staff ?? []).map((s: any) => s.user_id), {
+        type: 'result_permission_request',
+        title: 'Result access requested',
+        body: `${player?.name ?? 'A player'} wants permission to record match results`,
+        link: '/coach',
+      });
+    });
 
     res.status(201).json({ success: true, data: { requestId: data.request_id, status: 'pending' } });
   } catch (err) {

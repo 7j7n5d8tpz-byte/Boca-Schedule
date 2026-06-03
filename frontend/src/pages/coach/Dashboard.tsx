@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { formatLocation } from '../../components/LocationPicker';
-import { meetingTime } from '../../utils';
+import { meetingTime, mapsUrl } from '../../utils';
 
 interface Match {
   matchId: string;
@@ -56,7 +56,9 @@ function MatchRow({ match }: { match: Match }) {
             {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)})
           </p>
           <p className="text-sm text-gray-500 mt-0.5 truncate">
-            {formatLocation(match.location, match.matchType)}
+            <a href={mapsUrl(match.location)} target="_blank" rel="noopener noreferrer" className="hover:text-brand-green hover:underline" title="Open in Maps">
+              {formatLocation(match.location, match.matchType)}
+            </a>
             <span className={`ml-2 text-xs font-medium px-1.5 py-0.5 rounded ${match.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
               {match.matchType}
             </span>

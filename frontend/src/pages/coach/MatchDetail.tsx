@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import LocationPicker, { encodeLocation, decodeLocation, formatLocation } from '../../components/LocationPicker';
-import { meetingTime } from '../../utils';
+import { meetingTime, mapsUrl } from '../../utils';
 
 interface SignupPlayer {
   signupId: string;
@@ -170,7 +170,10 @@ export default function MatchDetail() {
               {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
             </h1>
             <p className="text-gray-500 mt-1">
-              {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) · {formatLocation(match.location, match.matchType)}
+              {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) ·{' '}
+              <a href={mapsUrl(match.location)} target="_blank" rel="noopener noreferrer" className="hover:text-brand-green hover:underline" title="Open in Maps">
+                {formatLocation(match.location, match.matchType)}
+              </a>
               {match.opponent && <span className="text-gray-700 font-medium"> vs {match.opponent}</span>}
               {' '}· {summary.totalSignups} signed up
               {summary.prioritySignups > 0 && (

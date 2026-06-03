@@ -72,6 +72,14 @@ export default function PlayerProfile() {
     },
   } as any);
 
+  const { data: calendar } = useQuery<{ token: string; path: string }>({
+    queryKey: ['calendar-me'],
+    queryFn: () => api.get('/calendar/me').then(r => r.data.data),
+    enabled: !!user,
+  });
+  const [copied, setCopied] = useState(false);
+  const feedUrl = calendar ? `${window.location.origin}${calendar.path}` : '';
+
   const saveMutation = useMutation({
     mutationFn: () =>
       api.put(`/players/${user!.userId}/profile`, {
@@ -284,6 +292,40 @@ export default function PlayerProfile() {
                 </>
               )}
             </div>
+          )}
+        </div>
+
+        {/* Calendar subscription */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Subscribe to my matches</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Add this feed to your calendar app to keep your upcoming Boca matches in sync automatically.
+            </p>
+          </div>
+          {feedUrl && (
+            <>
+              <div className="flex gap-2">
+                <input
+                  readOnly
+                  value={feedUrl}
+                  onFocus={e => e.currentTarget.select()}
+                  className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono text-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+                <button
+                  onClick={async () => { await navigator.clipboard.writeText(feedUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+                  className="shrink-0 text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors"
+                >
+                  {copied ? 'Copied ✓' : 'Copy'}
+                </button>
+              </div>
+              <a
+                href={feedUrl.replace(/^https?:/, 'webcal:')}
+                className="inline-block text-xs font-medium text-brand-green hover:underline"
+              >
+                Add to calendar app →
+              </a>
+            </>
           )}
         </div>
 

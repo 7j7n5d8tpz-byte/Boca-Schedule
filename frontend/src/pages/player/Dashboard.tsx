@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { formatLocation } from '../../components/LocationPicker';
-import { meetingTime } from '../../utils';
+import { meetingTime, mapsUrl, buildMatchIcs, downloadIcs } from '../../utils';
 
 interface Match {
   matchId: string;
@@ -208,6 +208,15 @@ function MatchCard({ match }: { match: Match }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['matches'] }),
   });
 
+  function addToCalendar() {
+    const ics = buildMatchIcs({
+      matchId: match.matchId, matchDate: match.matchDate, matchTime: match.matchTime,
+      location: match.location, opponent: match.opponent,
+    });
+    const dateLabel = new Date(match.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).replace(' ', '-');
+    downloadIcs(`boca-${dateLabel}.ics`, ics);
+  }
+
   const deadline = new Date(match.signupCloseDate);
   const canWithdraw =
     match.userSignedUp &&
@@ -239,7 +248,15 @@ function MatchCard({ match }: { match: Match }) {
               {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)})
             </p>
             <p className="text-sm text-gray-500">
-              {formatLocation(match.location, match.matchType)}
+              <a
+                href={mapsUrl(match.location)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-brand-green hover:underline"
+                title="Open in Maps"
+              >
+                {formatLocation(match.location, match.matchType)}
+              </a>
               <span className={`ml-2 text-xs font-medium px-1.5 py-0.5 rounded ${match.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
                 {match.matchType}
               </span>
@@ -322,16 +339,32 @@ function MatchCard({ match }: { match: Match }) {
           )}
         </div>
 
+        {/* Footer: calendar + squad */}
+        {(match.userSignedUp || match.isSelected || match.status === 'published') && (
+          <div className="pt-1 border-t border-gray-100 flex items-center gap-4 mt-2">
+            {(match.userSignedUp || match.isSelected) && (
+              <button
+                onClick={addToCalendar}
+                className="text-xs text-gray-400 hover:text-brand-green transition-colors"
+              >
+                📅 Add to calendar
+              </button>
+            )}
+            {match.status === 'published' && (
+              <button
+                onClick={() => setShowSquad(v => !v)}
+                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {showSquad ? 'Hide squad' : `View squad${squad ? ` (${squad.count})` : ''}`}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Confirmed squad (published matches) */}
-        {match.status === 'published' && (
-          <div className="pt-1 border-t border-gray-100">
-            <button
-              onClick={() => setShowSquad(v => !v)}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors mt-2"
-            >
-              {showSquad ? 'Hide squad' : `View squad${squad ? ` (${squad.count})` : ''}`}
-            </button>
-            {showSquad && squad && (
+        {match.status === 'published' && showSquad && (
+          <div>
+            {squad && (
               <div className="mt-2 space-y-1.5">
                 {squad.selected.map(p => (
                   <div key={p.userId} className="flex items-center gap-2 text-sm">

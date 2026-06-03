@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
+import {
+  sendSwapRequestNotification,
+  sendSwapResponseNotification,
+  sendReleaseNotification,
+} from '../lib/mailer.js';
 
 const router = Router();
 
@@ -20,7 +25,9 @@ router.post('/matches/:matchId/swaps', authenticate, async (req, res, next) => {
       return;
     }
 
-    const { data: match } = await supabaseAdmin.from('matches').select('status').eq('match_id', matchId).single();
+    const { data: match } = await supabaseAdmin.from('matches')
+      .select('status, match_date, match_time, location, opponent')
+      .eq('match_id', matchId).single();
     if (!match) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
       return;
@@ -55,6 +62,22 @@ router.post('/matches/:matchId/swaps', authenticate, async (req, res, next) => {
     }).select().single();
 
     if (error) throw error;
+
+    // Notify the target player — fire-and-forget
+    supabaseAdmin.from('users')
+      .select('user_id, name, email')
+      .in('user_id', [targetPlayerId, requesterId])
+      .then(({ data: people }) => {
+        const target    = (people ?? []).find((p: any) => p.user_id === targetPlayerId);
+        const requester = (people ?? []).find((p: any) => p.user_id === requesterId);
+        if (target?.email) {
+          sendSwapRequestNotification(
+            { name: target.name, email: target.email },
+            requester?.name ?? 'A teammate',
+            { matchDate: match.match_date, matchTime: match.match_time, location: match.location, opponent: match.opponent ?? null },
+          ).catch(err => console.error('Failed to send swap request notification:', err));
+        }
+      });
 
     res.status(201).json({ success: true, data: { swapId: data.swap_id, status: data.status } });
   } catch (err) {
@@ -148,6 +171,47 @@ router.put('/swaps/:swapId/respond', authenticate, async (req, res, next) => {
       status: accept ? 'accepted' : 'declined',
       resolved_at: new Date().toISOString(),
     }).eq('swap_id', swapId);
+
+    // Notify the requester of the outcome (and coaches when the squad changed) — fire-and-forget
+    Promise.all([
+      supabaseAdmin.from('matches')
+        .select('match_date, match_time, location, opponent')
+        .eq('match_id', swap.match_id).single(),
+      supabaseAdmin.from('users').select('user_id, name, email')
+        .in('user_id', [swap.requester_id, userId]),
+    ]).then(([{ data: match }, { data: people }]) => {
+      if (!match) return;
+      const requester = (people ?? []).find((p: any) => p.user_id === swap.requester_id);
+      const target    = (people ?? []).find((p: any) => p.user_id === userId);
+      const matchInfo = { matchDate: match.match_date, matchTime: match.match_time, location: match.location, opponent: match.opponent ?? null };
+
+      if (requester?.email) {
+        sendSwapResponseNotification(
+          { name: requester.name, email: requester.email },
+          target?.name ?? 'A teammate',
+          accept,
+          matchInfo,
+        ).catch(err => console.error('Failed to send swap response notification:', err));
+      }
+
+      if (accept) {
+        supabaseAdmin.from('users')
+          .select('name, email')
+          .in('role', ['coach', 'admin'])
+          .eq('is_active', true)
+          .then(({ data: coaches }) => {
+            const recipients = (coaches ?? []).filter((c: any) => c.email);
+            if (recipients.length > 0) {
+              sendReleaseNotification(
+                recipients as { name: string; email: string }[],
+                `${requester?.name ?? 'A player'} (covered by ${target?.name ?? 'a teammate'})`,
+                matchInfo,
+                String(swap.match_id),
+              ).catch(err => console.error('Failed to notify coaches of swap:', err));
+            }
+          });
+      }
+    });
 
     res.json({ success: true, data: { swapId, status: accept ? 'accepted' : 'declined' } });
   } catch (err) {

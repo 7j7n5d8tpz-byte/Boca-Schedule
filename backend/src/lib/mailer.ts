@@ -102,6 +102,67 @@ export async function sendReleaseNotification(
   )));
 }
 
+// ─── Swap requested ───────────────────────────────────────────────────────────
+
+export async function sendSwapRequestNotification(
+  target: { name: string; email: string },
+  requesterName: string,
+  match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
+) {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const timeStr = match.matchTime.slice(0, 5);
+  const opponent = match.opponent ? ` vs ${match.opponent}` : '';
+
+  await send(
+    target.email,
+    `Can you cover a spot? — ${dateStr}`,
+    `<p>Hi <strong>${target.name}</strong>,</p>
+     <p><strong>${requesterName}</strong> can't attend and asked if you can take their spot.</p>
+     <table style="border-collapse:collapse;margin:16px 0">
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+     </table>
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Accept or decline →</a>`,
+    `Hi ${target.name},\n\n${requesterName} can't attend and asked if you can take their spot.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+  );
+}
+
+// ─── Swap responded ───────────────────────────────────────────────────────────
+
+export async function sendSwapResponseNotification(
+  requester: { name: string; email: string },
+  targetName: string,
+  accepted: boolean,
+  match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
+) {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const timeStr = match.matchTime.slice(0, 5);
+  const opponent = match.opponent ? ` vs ${match.opponent}` : '';
+  const verb = accepted ? 'accepted' : 'declined';
+
+  await send(
+    requester.email,
+    `Swap ${verb} — ${dateStr}`,
+    `<p>Hi <strong>${requester.name}</strong>,</p>
+     <p><strong>${targetName}</strong> has <strong>${verb}</strong> your request to cover the match on ${dateStr}.</p>
+     <table style="border-collapse:collapse;margin:16px 0">
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+     </table>
+     ${accepted
+       ? `<p style="font-size:14px;color:#6b7280">You're no longer in the squad for this match.</p>`
+       : `<p style="font-size:14px;color:#6b7280">You're still in the squad — try asking another teammate.</p>`}
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">View on dashboard →</a>`,
+    `Hi ${requester.name},\n\n${targetName} has ${verb} your request to cover the match on ${dateStr}.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+  );
+}
+
 // ─── New registration ─────────────────────────────────────────────────────────
 
 export async function sendAdminRegistrationNotification(playerName: string, playerEmail: string) {

@@ -300,6 +300,12 @@ export default function CoachDashboard() {
               </Link>
             )}
             <Link
+              to="/coach/historical"
+              className="border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Record past match
+            </Link>
+            <Link
               to="/coach/matches/new"
               className="bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >

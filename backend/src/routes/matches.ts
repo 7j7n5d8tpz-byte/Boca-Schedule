@@ -186,6 +186,83 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
   }
 });
 
+const HistoricalMatchSchema = z.object({
+  matchDate: z.string().date(),
+  matchTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
+  opponent: z.string().max(100).optional(),
+  matchType: z.enum(['futsal', '7-player', '11-player']),
+  matchCategory: z.enum(['serie', 'pokal']).default('serie'),
+  serieLetter: z.string().max(2).optional(),
+  participantIds: z.array(z.string().uuid()).default([]),
+});
+
+const TYPE_MIN_PLAYERS: Record<string, number> = { futsal: 5, '7-player': 7, '11-player': 11 };
+
+// POST /api/matches/historical — coach/admin backfill a past, already-played match.
+// Creates a completed match plus a signup + selection for each known participant
+// (so games-played and attendance stay consistent), then the caller records the
+// result through the normal /matches/:matchId/results wizard.
+router.post('/historical', authenticate, requireRole('coach', 'admin'), async (req, res, next) => {
+  try {
+    const body = HistoricalMatchSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid input', details: body.error.issues } });
+      return;
+    }
+    const d = body.data;
+
+    const matchTime = d.matchTime ? (d.matchTime.length === 5 ? `${d.matchTime}:00` : d.matchTime) : '18:00:00';
+    const minPlayers = TYPE_MIN_PLAYERS[d.matchType];
+    const maxPlayers = Math.max(minPlayers, d.participantIds.length || minPlayers);
+
+    // Placeholder signup window before the match date (satisfies NOT NULL + close>open).
+    const matchMs = new Date(`${d.matchDate}T00:00:00Z`).getTime();
+    const signupOpen  = new Date(matchMs - 7 * 86_400_000).toISOString();
+    const signupClose = new Date(matchMs - 1 * 86_400_000).toISOString();
+
+    const { data: match, error } = await supabaseAdmin.from('matches').insert({
+      match_date: d.matchDate,
+      match_time: matchTime,
+      location: 'Historical',
+      match_type: d.matchType,
+      opponent: d.opponent ?? null,
+      match_category: d.matchCategory,
+      serie_letter: d.matchCategory === 'serie' ? (d.serieLetter ?? 'A') : null,
+      signup_open_date: signupOpen,
+      signup_close_date: signupClose,
+      min_players: minPlayers,
+      max_players: maxPlayers,
+      priority_enabled: false,
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      created_by: req.user!.userId,
+    }).select().single();
+    if (error) throw error;
+
+    // Seed a signup + selection for each known participant.
+    const participantIds = [...new Set(d.participantIds)];
+    if (participantIds.length > 0) {
+      await supabaseAdmin.from('signups').insert(
+        participantIds.map(pid => ({ match_id: match.match_id, player_id: pid })),
+      );
+      await supabaseAdmin.from('selections').insert(
+        participantIds.map(pid => ({
+          match_id: match.match_id,
+          player_id: pid,
+          selected_by_optimization: false,
+          manually_adjusted: true,
+          is_priority_selection: false,
+          selected_by: req.user!.userId,
+        })),
+      );
+    }
+
+    res.status(201).json({ success: true, data: { matchId: match.match_id } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 const UpdateMatchSchema = z.object({
   matchDate: z.string().date().optional(),
   matchTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),

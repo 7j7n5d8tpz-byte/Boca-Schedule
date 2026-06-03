@@ -15,6 +15,7 @@ import Statistics from './pages/player/Statistics';
 import MatchResults from './pages/MatchResults';
 import AdminDashboard from './pages/admin/Dashboard';
 import BatchOptimize from './pages/coach/BatchOptimize';
+import HistoricalMatch from './pages/coach/HistoricalMatch';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -46,6 +47,7 @@ export default function App() {
             <Route path="/matches/:matchId/results" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><MatchResults /></ProtectedRoute>} />
             <Route path="/coach" element={<ProtectedRoute roles={['coach', 'admin']}><CoachDashboard /></ProtectedRoute>} />
             <Route path="/coach/matches/new" element={<ProtectedRoute roles={['coach', 'admin']}><NewMatch /></ProtectedRoute>} />
+            <Route path="/coach/historical" element={<ProtectedRoute roles={['coach', 'admin']}><HistoricalMatch /></ProtectedRoute>} />
             <Route path="/coach/matches/:matchId" element={<ProtectedRoute roles={['coach', 'admin']}><MatchDetail /></ProtectedRoute>} />
             <Route path="/coach/matches/:matchId/selections" element={<ProtectedRoute roles={['coach', 'admin']}><Selections /></ProtectedRoute>} />
             <Route path="/coach/optimize" element={<ProtectedRoute roles={['coach', 'admin']}><BatchOptimize /></ProtectedRoute>} />

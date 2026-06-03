@@ -44,6 +44,14 @@ interface Player {
   preferredPositions: string[];
 }
 
+interface Announcement {
+  announcementId: string;
+  body: string;
+  createdAt: string;
+  author: string;
+  match: { matchId: string; matchDate: string; opponent: string | null } | null;
+}
+
 const POS_COLOR: Record<string, string> = {
   GK:  'bg-yellow-100 text-yellow-700',
   DEF: 'bg-blue-100 text-blue-700',
@@ -471,6 +479,11 @@ export default function PlayerDashboard() {
     queryFn: () => api.get('/matches/upcoming').then(r => r.data.data),
   });
 
+  const { data: announcements } = useQuery<Announcement[]>({
+    queryKey: ['announcements'],
+    queryFn: () => api.get('/announcements').then(r => r.data.data),
+  });
+
   const { data: statsData } = useQuery({
     queryKey: ['stats', user?.userId],
     queryFn: () => api.get(`/players/${user!.userId}/statistics`).then(r => r.data.data),
@@ -523,6 +536,21 @@ export default function PlayerDashboard() {
           <h1 className="text-2xl font-bold text-gray-900">Welcome back, {user?.name?.split(' ')[0]}!</h1>
           <p className="text-gray-500 text-sm mt-1">Here's what's coming up.</p>
         </div>
+
+        {/* Announcements */}
+        {(announcements ?? []).length > 0 && (
+          <div className="space-y-2">
+            {announcements!.map(a => (
+              <div key={a.announcementId} className="bg-brand-green-50 border border-brand-green/30 rounded-xl px-4 py-3">
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">📣 {a.body}</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {a.author}
+                  {a.match && ` · for ${new Date(a.match.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${a.match.opponent ? ` vs ${a.match.opponent}` : ''}`}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Stats */}
         {stats && (() => {

@@ -21,6 +21,14 @@ interface Match {
   signupDeadlinePassed: boolean;
 }
 
+interface Announcement {
+  announcementId: string;
+  body: string;
+  createdAt: string;
+  author: string;
+  match: { matchId: string; matchDate: string; opponent: string | null } | null;
+}
+
 const STATUS_STYLE: Record<string, string> = {
   draft:         'bg-gray-100 text-gray-600',
   signup_open:   'bg-green-100 text-green-700',
@@ -127,6 +135,27 @@ export default function CoachDashboard() {
 
   const [showRecordedResults, setShowRecordedResults] = useState(false);
 
+  // ── Announcements ──
+  const { data: announcements } = useQuery<Announcement[]>({
+    queryKey: ['announcements'],
+    queryFn: () => api.get('/announcements').then(r => r.data.data),
+  });
+  const [announceBody, setAnnounceBody] = useState('');
+  const [announceMatchId, setAnnounceMatchId] = useState('');
+
+  const postAnnouncement = useMutation({
+    mutationFn: () => api.post('/announcements', { body: announceBody.trim(), matchId: announceMatchId || null }),
+    onSuccess: () => {
+      setAnnounceBody(''); setAnnounceMatchId('');
+      qc.invalidateQueries({ queryKey: ['announcements'] });
+    },
+  });
+
+  const deleteAnnouncement = useMutation({
+    mutationFn: (id: string) => api.delete(`/announcements/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['announcements'] }),
+  });
+
   const STATUS_ORDER: Record<string, number> = {
     signup_open:   0,
     signup_closed: 1,
@@ -184,6 +213,67 @@ export default function CoachDashboard() {
             ))}
           </div>
         )}
+
+        {/* Announcements */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+          <h2 className="font-semibold text-gray-900">Announcements</h2>
+          <p className="text-xs text-gray-400 -mt-1">Shown to all players on their dashboard. Tie one to a match to auto-hide it once that match has passed.</p>
+
+          <textarea
+            value={announceBody}
+            onChange={e => setAnnounceBody(e.target.value)}
+            placeholder="e.g. Bring white shirts on Saturday"
+            rows={2}
+            maxLength={500}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green resize-none"
+          />
+          <div className="flex gap-2">
+            <select
+              value={announceMatchId}
+              onChange={e => setAnnounceMatchId(e.target.value)}
+              className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-green"
+            >
+              <option value="">No match (stays until removed)</option>
+              {matches.filter(m => m.status !== 'completed').map(m => (
+                <option key={m.matchId} value={m.matchId}>
+                  {new Date(m.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                  {m.opponent ? ` vs ${m.opponent}` : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => postAnnouncement.mutate()}
+              disabled={!announceBody.trim() || postAnnouncement.isPending}
+              className="shrink-0 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              {postAnnouncement.isPending ? 'Posting…' : 'Post'}
+            </button>
+          </div>
+
+          {(announcements ?? []).length > 0 && (
+            <div className="space-y-2 pt-1">
+              {announcements!.map(a => (
+                <div key={a.announcementId} className="bg-brand-green-50 border border-brand-green/30 rounded-lg px-3 py-2 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{a.body}</p>
+                    {a.match && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        for {new Date(a.match.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{a.match.opponent ? ` vs ${a.match.opponent}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => deleteAnnouncement.mutate(a.announcementId)}
+                    disabled={deleteAnnouncement.isPending}
+                    className="shrink-0 text-xs text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Header */}
         <div className="flex items-center justify-between">

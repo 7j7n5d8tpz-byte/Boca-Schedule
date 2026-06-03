@@ -34,8 +34,12 @@ export default function NewMatch() {
       matchType,
       matchCategory,
       serieLetter: matchCategory === 'serie' ? serieLetter : undefined,
-      signupOpenDate: signupOpenDate + 'T00:00:00Z',
-      signupCloseDate: signupCloseDate + 'T20:00:00Z',
+      // Interpret the picked dates in the coach's local timezone (00:00 open,
+      // 20:00 deadline), then send the absolute UTC instant. Sending a bare
+      // "…T20:00:00Z" treated the deadline as UTC, putting it an hour or two
+      // off for CET/CEST users.
+      signupOpenDate: new Date(signupOpenDate + 'T00:00:00').toISOString(),
+      signupCloseDate: new Date(signupCloseDate + 'T20:00:00').toISOString(),
       minPlayers,
       maxPlayers,
       priorityEnabled: true,
@@ -186,6 +190,7 @@ export default function NewMatch() {
                 onChange={e => setSignupCloseDate(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               />
+              <p className="text-xs text-gray-400 mt-1">Closes 20:00 (8 PM) local time</p>
             </div>
           </div>
 

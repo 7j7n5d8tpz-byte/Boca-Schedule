@@ -77,8 +77,11 @@ export default function MatchDetail() {
         opponent: fields.opponent.trim() || null,
         matchCategory: fields.matchCategory,
         serieLetter: fields.matchCategory === 'serie' ? fields.serieLetter : null,
-        signupOpenDate: fields.signupOpenDate + 'T00:00:00Z',
-        signupCloseDate: fields.signupCloseDate + 'T20:00:00Z',
+        // Local-time interpretation (00:00 open, 20:00 deadline) → UTC instant,
+        // matching NewMatch. A bare "…Z" treated these as UTC, an hour or two
+        // off for CET/CEST users.
+        signupOpenDate: new Date(fields.signupOpenDate + 'T00:00:00').toISOString(),
+        signupCloseDate: new Date(fields.signupCloseDate + 'T20:00:00').toISOString(),
         minPlayers: fields.minPlayers,
         maxPlayers: fields.maxPlayers,
       }),

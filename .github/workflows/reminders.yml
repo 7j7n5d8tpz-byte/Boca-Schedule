@@ -1,0 +1,22 @@
+name: Signup reminders
+
+# Sends signup-deadline reminders by calling the backend cron endpoint.
+# Runs hourly; the endpoint itself decides which matches are due (and only
+# reminds each match once), so the coarse schedule is fine.
+on:
+  schedule:
+    - cron: '0 * * * *' # every hour, on the hour (UTC)
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  signup-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger signup reminders
+        run: |
+          code=$(curl -s -o /tmp/body -w '%{http_code}' -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            https://boca-backend.fly.dev/api/cron/signup-reminders)
+          echo "HTTP $code"; cat /tmp/body; echo
+          # Fail the run on server/auth errors so problems are visible in Actions.
+          if [ "$code" -ge 400 ]; then exit 1; fi

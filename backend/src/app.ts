@@ -13,6 +13,7 @@ import swapRoutes from './routes/swaps.js';
 import resultRoutes from './routes/results.js';
 import locationRoutes from './routes/locations.js';
 import batchOptimizeRoutes from './routes/batch-optimize.js';
+import cronRoutes from './routes/cron.js';
 
 const app = express();
 
@@ -42,6 +43,7 @@ app.use('/api', swapRoutes);
 app.use('/api', resultRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/optimize', batchOptimizeRoutes);
+app.use('/api/cron', cronRoutes);
 
 app.use(errorHandler);
 

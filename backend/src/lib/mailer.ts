@@ -163,6 +163,37 @@ export async function sendSwapResponseNotification(
   );
 }
 
+// ─── Signup deadline reminder ─────────────────────────────────────────────────
+
+export async function sendSignupReminder(
+  players: { name: string; email: string }[],
+  match: { matchDate: string; matchTime: string; location: string; opponent: string | null; signupCloseDate: string },
+) {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const timeStr = match.matchTime.slice(0, 5);
+  const opponent = match.opponent ? ` vs ${match.opponent}` : '';
+  const deadlineStr = new Date(match.signupCloseDate).toLocaleString('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
+
+  await Promise.allSettled(players.map(p => send(
+    p.email,
+    `Signup closing soon — ${dateStr}`,
+    `<p>Hi <strong>${p.name}</strong>,</p>
+     <p>Signups for the upcoming match close <strong>${deadlineStr}</strong> and you haven't signed up yet.</p>
+     <table style="border-collapse:collapse;margin:16px 0">
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Signup closes</td><td style="font-size:14px">${deadlineStr}</td></tr>
+     </table>
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Sign up now →</a>`,
+    `Hi ${p.name},\n\nSignups for the upcoming match close ${deadlineStr} and you haven't signed up yet.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\nSignup closes: ${deadlineStr}\n\n${FRONTEND_URL}/dashboard`,
+  )));
+}
+
 // ─── New registration ─────────────────────────────────────────────────────────
 
 export async function sendAdminRegistrationNotification(playerName: string, playerEmail: string) {

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { formatLocation } from '../../components/LocationPicker';
 import { meetingTime, mapsUrl } from '../../utils';
+import { CardListSkeleton } from '../../components/Skeleton';
 
 interface Match {
   matchId: string;
@@ -276,7 +277,7 @@ export default function CoachDashboard() {
         )}
 
         {/* Match list */}
-        {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
+        {isLoading && <CardListSkeleton />}
         {!isLoading && matches.length === 0 && (
           <p className="text-sm text-gray-400">No matches yet. Create one to get started.</p>
         )}

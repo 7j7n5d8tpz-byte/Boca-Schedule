@@ -6,6 +6,7 @@ import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { formatLocation } from '../../components/LocationPicker';
 import { meetingTime, mapsUrl, buildMatchIcs, downloadIcs } from '../../utils';
+import { CardListSkeleton } from '../../components/Skeleton';
 
 interface Match {
   matchId: string;
@@ -649,7 +650,7 @@ export default function PlayerDashboard() {
         {/* Upcoming matches */}
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Matches</h2>
-          {isLoading && <p className="text-sm text-gray-400">Loading...</p>}
+          {isLoading && <CardListSkeleton />}
           {!isLoading && !data?.matches?.length && (
             <p className="text-sm text-gray-400">No open matches right now.</p>
           )}

@@ -19,6 +19,7 @@ function RadarTooltip({ active, payload }: any) {
 }
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { Skeleton } from '../../components/Skeleton';
 
 interface PlayerStat {
   userId: string;
@@ -366,13 +367,13 @@ export default function Statistics() {
         </div>
 
         {/* Sidebar + content layout */}
-        <div className="flex gap-6 items-start">
+        <div className="flex flex-col sm:flex-row gap-6 items-start">
 
-          {/* Sidebar */}
-          <nav className="w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-2 space-y-1 sticky top-4">
+          {/* Sidebar — horizontal tab bar on mobile, sidebar on sm+ */}
+          <nav className="w-full sm:w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-2 flex sm:flex-col gap-1 sm:sticky sm:top-4">
             <button
               onClick={() => setView('team')}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 view === 'team' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -380,7 +381,7 @@ export default function Statistics() {
             </button>
             <button
               onClick={() => setView('highlights')}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 view === 'highlights' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -395,7 +396,11 @@ export default function Statistics() {
         {view === 'highlights' && (
           <div className="space-y-4">
             {highlightsLoading && (
-              <div className="text-center text-gray-400 py-16">Loading highlights…</div>
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-40 w-full rounded-xl" />
+                ))}
+              </div>
             )}
             {!highlightsLoading && (highlightsData?.highlights ?? []).length === 0 && (
               <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
@@ -532,7 +537,18 @@ export default function Statistics() {
         )}
 
         {view === 'team' && isLoading && (
-          <div className="text-center text-gray-400 py-16">Loading statistics…</div>
+          <div className="space-y-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+                  <Skeleton className="h-7 w-12" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="h-52 w-full rounded-xl" />
+            <Skeleton className="h-64 w-full rounded-xl" />
+          </div>
         )}
 
         {view === 'team' && !isLoading && !selectedPlayer && overview && (

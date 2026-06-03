@@ -10,7 +10,12 @@ const POSITIONS_FUTSAL = ["GK", "WIN", "MID", "STR"]
 const FORMATION_FUTSAL = Dict("GK" => 1, "WIN" => 2, "MID" => 1, "STR" => 1)
 
 # Objective weights
-const W_FAIRNESS  = 0.9    # played vs signed-up fairness
+const W_FAIRNESS  = 0.8    # fairness blend: games played vs sign-ups, weighted 4:1.
+                           # Selection cost = (0.8·played − 0.2·signed_up)/total, so
+                           # games actually played dominate, while regular sign-ups
+                           # earn a meaningful secondary reward (the loyal-but-benched
+                           # get picked sooner). Raise toward 1.0 to equalise pure game
+                           # counts; lower toward 0.5 to weight attendance more.
 const W_DEFICIT   = 15.0   # penalty per missing player below target
 const W_POSITION  = -1.0   # reward per covered formation slot
 const W_WINGER    = -0.5   # extra reward for covering both winger slots

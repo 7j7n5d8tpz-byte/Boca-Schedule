@@ -19,12 +19,13 @@ const TYPE_ICON: Record<string, string> = {
   selected: '✅',
   match_cancelled: '❌',
   match_moved: '✏️',
-  swap_request: '🔁',
-  swap_accepted: '🔁',
-  swap_declined: '🔁',
   signup_reminder: '⏰',
   announcement: '📣',
   spot_released: '↩️',
+  spot_open: '🆓',
+  spot_claim: '🙋',
+  claim_accepted: '✅',
+  claim_rejected: '↩️',
   result_permission_request: '🔑',
   registration: '🙋',
 };
@@ -44,7 +45,6 @@ export default function NotificationBell() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [acted, setActed] = useState<Record<string, 'accepted' | 'declined'>>({});
   const ref = useRef<HTMLDivElement>(null);
 
   const { data: countData } = useQuery<{ unreadCount: number }>({
@@ -63,17 +63,6 @@ export default function NotificationBell() {
   const markAll = useMutation({
     mutationFn: () => api.put('/notifications/read'),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notif-count'] }),
-  });
-
-  const respond = useMutation({
-    mutationFn: ({ swapId, accept }: { swapId: string; accept: boolean }) =>
-      api.put(`/swaps/${swapId}/respond`, { accept }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['matches'] });
-      qc.invalidateQueries({ queryKey: ['swaps-incoming'] });
-      qc.invalidateQueries({ queryKey: ['notifications'] });
-      qc.invalidateQueries({ queryKey: ['notif-count'] });
-    },
   });
 
   // Close on outside click
@@ -124,50 +113,22 @@ export default function NotificationBell() {
             {notifications.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-8">You're all caught up.</p>
             )}
-            {notifications.map(n => {
-              const isSwapAction = n.type === 'swap_request' && n.refId && !acted[n.notificationId];
-              const actedState = acted[n.notificationId];
-              return (
-                <div
-                  key={n.notificationId}
-                  className={`px-4 py-3 ${n.readAt ? '' : 'bg-brand-green-50/40'} ${n.link && !isSwapAction ? 'cursor-pointer hover:bg-gray-50' : ''}`}
-                  onClick={() => !isSwapAction && handleClick(n)}
-                >
-                  <div className="flex gap-2.5">
-                    <span className="text-base leading-none mt-0.5 shrink-0">{TYPE_ICON[n.type] ?? '•'}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900">{n.title}</p>
-                      {n.body && <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>}
-                      <p className="text-[11px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
-
-                      {isSwapAction && (
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={e => { e.stopPropagation(); setActed(a => ({ ...a, [n.notificationId]: 'accepted' })); respond.mutate({ swapId: n.refId!, accept: true }); }}
-                            disabled={respond.isPending}
-                            className="flex-1 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-xs font-medium py-1.5 rounded-lg transition-colors"
-                          >
-                            Accept
-                          </button>
-                          <button
-                            onClick={e => { e.stopPropagation(); setActed(a => ({ ...a, [n.notificationId]: 'declined' })); respond.mutate({ swapId: n.refId!, accept: false }); }}
-                            disabled={respond.isPending}
-                            className="flex-1 border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-xs font-medium py-1.5 rounded-lg transition-colors"
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      )}
-                      {actedState && (
-                        <p className={`text-xs font-medium mt-2 ${actedState === 'accepted' ? 'text-brand-green' : 'text-gray-400'}`}>
-                          {actedState === 'accepted' ? 'Accepted ✓' : 'Declined'}
-                        </p>
-                      )}
-                    </div>
+            {notifications.map(n => (
+              <div
+                key={n.notificationId}
+                className={`px-4 py-3 ${n.readAt ? '' : 'bg-brand-green-50/40'} ${n.link ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                onClick={() => handleClick(n)}
+              >
+                <div className="flex gap-2.5">
+                  <span className="text-base leading-none mt-0.5 shrink-0">{TYPE_ICON[n.type] ?? '•'}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900">{n.title}</p>
+                    {n.body && <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>}
+                    <p className="text-[11px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </div>
       )}

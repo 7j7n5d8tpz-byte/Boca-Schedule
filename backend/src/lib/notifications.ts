@@ -4,12 +4,13 @@ export type NotificationType =
   | 'selected'
   | 'match_cancelled'
   | 'match_moved'
-  | 'swap_request'
-  | 'swap_accepted'
-  | 'swap_declined'
   | 'signup_reminder'
   | 'announcement'
   | 'spot_released'
+  | 'spot_open'
+  | 'spot_claim'
+  | 'claim_accepted'
+  | 'claim_rejected'
   | 'result_permission_request'
   | 'registration';
 

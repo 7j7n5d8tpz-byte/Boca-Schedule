@@ -105,6 +105,14 @@ interface SelectionsResponse {
   summary: { totalSignups: number; totalSelected: number };
 }
 
+interface SpotClaim {
+  claimId: string;
+  claimantId: string;
+  claimantName: string;
+  preferredPositions: string[];
+  createdAt: string;
+}
+
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function Selections() {
@@ -127,6 +135,21 @@ export default function Selections() {
   const { data: guests = [] } = useQuery<Guest[]>({
     queryKey: ['match-guests', matchId],
     queryFn: () => api.get(`/matches/${matchId}/guests`).then(r => r.data.data),
+  });
+
+  const { data: claims = [] } = useQuery<SpotClaim[]>({
+    queryKey: ['match-claims', matchId],
+    queryFn: () => api.get(`/matches/${matchId}/claims`).then(r => r.data.data),
+  });
+
+  const resolveClaimMutation = useMutation({
+    mutationFn: ({ claimId, accept }: { claimId: string; accept: boolean }) =>
+      api.put(`/claims/${claimId}/resolve`, { accept }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['match-claims', matchId] });
+      qc.invalidateQueries({ queryKey: ['match-selections', matchId] });
+      qc.invalidateQueries({ queryKey: ['matches'] });
+    },
   });
 
   const addGuestMutation = useMutation({
@@ -225,6 +248,50 @@ export default function Selections() {
           {publishError && <p className="text-sm text-red-500">{publishError}</p>}
           {isDirty && <p className="text-xs text-amber-600">Unsaved changes — save before publishing.</p>}
         </div>
+
+        {/* Spot claimants — players asking to take an open spot */}
+        {claims.length > 0 && (
+          <div className="bg-white rounded-xl border border-brand-green/40 p-5 space-y-3">
+            <div>
+              <h2 className="font-semibold text-gray-900">Spot claimants</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {claims.length === 1
+                  ? 'A player wants to take an open spot. Confirm to add them to the squad.'
+                  : `${claims.length} players want an open spot. Confirm one to add them; the rest are declined.`}
+              </p>
+            </div>
+            {claims.map(c => (
+              <div key={c.claimId} className="flex items-center gap-3 border-t border-gray-100 pt-3 first:border-0 first:pt-0">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900 text-sm truncate">{c.claimantName}</p>
+                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    {c.preferredPositions.map(pos => (
+                      <span key={pos} className={`text-xs font-medium px-2 py-0.5 rounded-full ${POS_TAG[pos] ?? 'bg-gray-100 text-gray-500'}`}>
+                        {pos}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => resolveClaimMutation.mutate({ claimId: c.claimId, accept: true })}
+                    disabled={resolveClaimMutation.isPending}
+                    className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => resolveClaimMutation.mutate({ claimId: c.claimId, accept: false })}
+                    disabled={resolveClaimMutation.isPending}
+                    className="border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Why this squad */}
         {match.optimizationResult && <WhySquad opt={match.optimizationResult} minPlayers={match.minPlayers} />}

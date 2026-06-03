@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
-import { sendSelectionNotifications, sendCancellationNotifications, sendReleaseNotification } from '../lib/mailer.js';
+import { sendSelectionNotifications, sendCancellationNotifications, sendReleaseNotification, sendSpotOpenNotification } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
 
 // Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
@@ -89,22 +89,24 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     if (error) throw error;
 
     const matchIds = (matches ?? []).map((m: any) => m.match_id);
-    const { data: outgoingSwaps } = matchIds.length > 0
+    const { data: myClaims } = matchIds.length > 0
       ? await supabaseAdmin
-          .from('swap_requests')
-          .select('swap_id, match_id, status, target:users!swap_requests_target_id_fkey(user_id, name)')
-          .eq('requester_id', req.user!.userId)
+          .from('spot_claims')
+          .select('claim_id, match_id, status')
+          .eq('claimant_id', req.user!.userId)
           .eq('status', 'pending')
           .in('match_id', matchIds)
       : { data: [] };
 
-    const swapByMatch = new Map((outgoingSwaps ?? []).map((s: any) => [s.match_id, s]));
+    const claimByMatch = new Map((myClaims ?? []).map((c: any) => [c.match_id, c]));
 
     const enriched = (matches ?? []).map((m: any) => {
       const signups = (m.signups ?? []).filter((s: any) => s.is_active);
       const mySignup = signups.find((s: any) => s.player_id === req.user!.userId);
       const isSelected = (m.selections ?? []).some((s: any) => s.player_id === req.user!.userId);
-      const pendingSwap = swapByMatch.get(m.match_id);
+      const myClaim = claimByMatch.get(m.match_id);
+      // An open spot = a published match whose squad is below capacity.
+      const openSpot = m.status === 'published' && (m.selections ?? []).length < m.max_players;
       return {
         matchId: m.match_id,
         matchDate: m.match_date,
@@ -123,9 +125,8 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
         signupId: mySignup?.signup_id ?? null,
         signupDeadlinePassed: new Date(m.signup_close_date) < new Date(),
         isSelected,
-        pendingSwap: pendingSwap
-          ? { swapId: pendingSwap.swap_id, targetName: pendingSwap.target.name, targetId: pendingSwap.target.user_id }
-          : null,
+        openSpot,
+        myClaim: myClaim ? { claimId: myClaim.claim_id, status: myClaim.status } : null,
       };
     });
 
@@ -580,6 +581,33 @@ router.post('/:matchId/release', authenticate, async (req, res, next) => {
           matchId: String(matchId),
         });
       });
+
+    // Announce the now-open spot to every active player not currently selected
+    // for this match (the releasing player is already removed from selections) —
+    // fire-and-forget.
+    Promise.all([
+      supabaseAdmin.from('users').select('user_id, name, email').eq('is_active', true),
+      supabaseAdmin.from('selections').select('player_id').eq('match_id', matchId),
+    ]).then(([{ data: allPlayers }, { data: selected }]) => {
+      const selectedIds = new Set((selected ?? []).map((s: any) => s.player_id));
+      const eligible = (allPlayers ?? []).filter((p: any) => !selectedIds.has(p.user_id) && p.user_id !== playerId);
+      if (eligible.length === 0) return;
+
+      const withEmail = eligible.filter((p: any) => p.email);
+      if (withEmail.length > 0) {
+        sendSpotOpenNotification(
+          withEmail as { name: string; email: string }[],
+          { matchDate: match.match_date, matchTime: match.match_time, location: match.location, opponent: match.opponent ?? null },
+        ).catch(err => console.error('Failed to send spot-open notifications:', err));
+      }
+      createNotifications(eligible.map((p: any) => p.user_id), {
+        type: 'spot_open',
+        title: 'A spot opened up',
+        body: `Claim the open spot for ${matchLabel({ match_date: match.match_date, match_time: match.match_time, opponent: match.opponent })}`,
+        link: '/dashboard',
+        matchId: String(matchId),
+      });
+    });
 
     res.json({ success: true });
   } catch (err) {

@@ -24,18 +24,8 @@ interface Match {
   signupId: string | null;
   signupDeadlinePassed: boolean;
   isSelected: boolean;
-  pendingSwap: { swapId: string; targetName: string; targetId: string } | null;
-}
-
-interface IncomingSwap {
-  swapId: string;
-  matchId: string;
-  matchDate: string;
-  matchTime: string;
-  location: string;
-  requesterName: string;
-  requesterId: string;
-  createdAt: string;
+  openSpot: boolean;
+  myClaim: { claimId: string; status: string } | null;
 }
 
 interface Player {
@@ -60,89 +50,13 @@ const POS_COLOR: Record<string, string> = {
   STR: 'bg-red-100 text-red-700',
 };
 
-// ─── Swap modal ───────────────────────────────────────────────────────────────
-
-function SwapModal({
-  matchId,
-  onClose,
-}: {
-  matchId: string;
-  onClose: () => void;
-}) {
-  const qc = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [error, setError] = useState('');
-
-  const { data: players, isLoading } = useQuery<Player[]>({
-    queryKey: ['all-players'],
-    queryFn: () => api.get('/players').then(r => r.data.data),
-  });
-
-  const swapMutation = useMutation({
-    mutationFn: (targetPlayerId: string) =>
-      api.post(`/matches/${matchId}/swaps`, { targetPlayerId }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['matches'] });
-      onClose();
-    },
-    onError: (err: any) => setError(err.response?.data?.error?.message ?? 'Failed to request swap'),
-  });
-
-  const filtered = (players ?? []).filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Choose a replacement</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
-        </div>
-        <p className="text-sm text-gray-500">Select a teammate to take your spot. They will need to accept.</p>
-
-        <input
-          type="text"
-          placeholder="Search players…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-          autoFocus
-        />
-
-        <div className="max-h-56 overflow-y-auto space-y-1">
-          {isLoading && <p className="text-sm text-gray-400 text-center py-4">Loading…</p>}
-          {!isLoading && filtered.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-4">No players found</p>
-          )}
-          {filtered.map(p => (
-            <button
-              key={p.userId}
-              onClick={() => { setError(''); swapMutation.mutate(p.userId); }}
-              disabled={swapMutation.isPending}
-              className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-brand-green-50 transition-colors disabled:opacity-50"
-            >
-              <p className="text-sm font-medium text-gray-900">{p.name}</p>
-              <p className="text-xs text-gray-400">{p.preferredPositions.join(', ')}</p>
-            </button>
-          ))}
-        </div>
-
-        {error && <p className="text-sm text-red-500">{error}</p>}
-      </div>
-    </div>
-  );
-}
-
 // ─── Match card ───────────────────────────────────────────────────────────────
 
 function CantAttendDialog({
   match,
-  onSwap,
   onClose,
 }: {
   match: Match;
-  onSwap: () => void;
   onClose: () => void;
 }) {
   const qc = useQueryClient();
@@ -166,21 +80,18 @@ function CantAttendDialog({
           {' — '}{match.matchTime.slice(0, 5)}
         </p>
 
+        <p className="text-sm text-gray-500">
+          Release your spot and the coach plus any available teammates will be notified, so someone can claim it.
+        </p>
+
         <div className="space-y-2">
-          <button
-            onClick={onSwap}
-            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-brand-green hover:bg-brand-green-50 transition-colors"
-          >
-            <p className="font-medium text-gray-900 text-sm">Find a replacement</p>
-            <p className="text-xs text-gray-400 mt-0.5">Request a teammate to take your spot</p>
-          </button>
           <button
             onClick={() => { setReleaseError(''); releaseMutation.mutate(); }}
             disabled={releaseMutation.isPending}
             className="w-full text-left px-4 py-3 rounded-xl border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
           >
             <p className="font-medium text-red-600 text-sm">{releaseMutation.isPending ? 'Releasing…' : 'Release my spot'}</p>
-            <p className="text-xs text-gray-400 mt-0.5">No replacement — the coach will be notified</p>
+            <p className="text-xs text-gray-400 mt-0.5">The coach and available teammates will be notified</p>
           </button>
         </div>
 
@@ -192,9 +103,9 @@ function CantAttendDialog({
 
 function MatchCard({ match }: { match: Match }) {
   const qc = useQueryClient();
-  const [showSwapModal, setShowSwapModal] = useState(false);
   const [showCantAttend, setShowCantAttend] = useState(false);
   const [showSquad, setShowSquad] = useState(false);
+  const [claimError, setClaimError] = useState('');
 
   const { data: squad } = useQuery<{ selected: Player[]; guests: { name: string; position: string | null }[]; count: number }>({
     queryKey: ['squad', match.matchId],
@@ -212,8 +123,14 @@ function MatchCard({ match }: { match: Match }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['matches'] }),
   });
 
-  const cancelSwapMutation = useMutation({
-    mutationFn: () => api.delete(`/swaps/${match.pendingSwap!.swapId}`),
+  const claimMutation = useMutation({
+    mutationFn: () => api.post(`/matches/${match.matchId}/claims`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['matches'] }),
+    onError: (err: any) => setClaimError(err.response?.data?.error?.message ?? 'Failed to claim spot'),
+  });
+
+  const cancelClaimMutation = useMutation({
+    mutationFn: () => api.delete(`/claims/${match.myClaim!.claimId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['matches'] }),
   });
 
@@ -235,13 +152,9 @@ function MatchCard({ match }: { match: Match }) {
 
   return (
     <>
-      {showSwapModal && (
-        <SwapModal matchId={match.matchId} onClose={() => setShowSwapModal(false)} />
-      )}
       {showCantAttend && (
         <CantAttendDialog
           match={match}
-          onSwap={() => { setShowCantAttend(false); setShowSwapModal(true); }}
           onClose={() => setShowCantAttend(false)}
         />
       )}
@@ -296,15 +209,32 @@ function MatchCard({ match }: { match: Match }) {
           />
         </div>
 
-        {/* Pending outgoing swap notice */}
-        {match.pendingSwap && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
-            <p className="text-xs text-amber-700">
-              Swap request sent to <span className="font-medium">{match.pendingSwap.targetName}</span> — waiting for response
+        {/* Open spot available — claimable by players not in the squad */}
+        {match.status === 'published' && !match.isSelected && match.openSpot && !match.myClaim && (
+          <div className="bg-brand-green-50 border border-brand-green/30 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+            <p className="text-xs text-gray-700">
+              🆓 A spot is open — claim it and the coach will confirm.
             </p>
             <button
-              onClick={() => cancelSwapMutation.mutate()}
-              disabled={cancelSwapMutation.isPending}
+              onClick={() => { setClaimError(''); claimMutation.mutate(); }}
+              disabled={claimMutation.isPending}
+              className="text-xs bg-brand-green hover:bg-brand-green-700 text-white font-medium px-3 py-1.5 rounded-lg shrink-0 disabled:opacity-50 transition-colors"
+            >
+              {claimMutation.isPending ? 'Claiming…' : 'Claim spot'}
+            </button>
+          </div>
+        )}
+        {claimError && <p className="text-xs text-red-500">{claimError}</p>}
+
+        {/* Pending claim notice */}
+        {match.myClaim && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
+            <p className="text-xs text-amber-700">
+              Spot claimed — waiting for the coach to confirm
+            </p>
+            <button
+              onClick={() => cancelClaimMutation.mutate()}
+              disabled={cancelClaimMutation.isPending}
               className="text-xs text-amber-600 hover:text-amber-800 font-medium shrink-0 disabled:opacity-50"
             >
               Cancel
@@ -334,7 +264,7 @@ function MatchCard({ match }: { match: Match }) {
             </button>
           )}
 
-          {match.isSelected && match.status === 'published' && !match.pendingSwap && (
+          {match.isSelected && match.status === 'published' && (
             <button
               onClick={() => setShowCantAttend(true)}
               className="flex-1 border border-orange-300 text-orange-600 hover:bg-orange-50 text-sm font-medium py-2 rounded-lg transition-colors"
@@ -510,21 +440,6 @@ export default function PlayerDashboard() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['my-permission'] }),
   });
 
-  const { data: incomingSwaps } = useQuery<IncomingSwap[]>({
-    queryKey: ['swaps-incoming'],
-    queryFn: () => api.get('/swaps/incoming').then(r => r.data.data),
-    refetchInterval: 30_000,
-  });
-
-  const respondMutation = useMutation({
-    mutationFn: ({ swapId, accept }: { swapId: string; accept: boolean }) =>
-      api.put(`/swaps/${swapId}/respond`, { accept }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['swaps-incoming'] });
-      qc.invalidateQueries({ queryKey: ['matches'] });
-    },
-  });
-
   const stats = statsData?.seasonStats;
 
   return (
@@ -633,47 +548,6 @@ export default function PlayerDashboard() {
             <ResultMatchesList pending={pending} recorded={recorded} />
           );
         })()}
-
-        {/* Incoming swap requests */}
-        {(incomingSwaps ?? []).length > 0 && (
-          <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900">Swap Requests</h2>
-            {incomingSwaps!.map(swap => {
-              const date = new Date(`${swap.matchDate}T${swap.matchTime}`);
-              return (
-                <div key={swap.swapId} className="bg-white rounded-xl border border-orange-200 p-4 space-y-3">
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      <span className="text-orange-600">{swap.requesterName}</span> can't attend
-                    </p>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                      {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} — {swap.matchTime.slice(0, 5)} · {swap.location}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      They're asking if you can cover their spot
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => respondMutation.mutate({ swapId: swap.swapId, accept: true })}
-                      disabled={respondMutation.isPending}
-                      className="flex-1 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      onClick={() => respondMutation.mutate({ swapId: swap.swapId, accept: false })}
-                      disabled={respondMutation.isPending}
-                      className="flex-1 border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium py-2 rounded-lg transition-colors"
-                    >
-                      Decline
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         {/* Upcoming matches */}
         <div>

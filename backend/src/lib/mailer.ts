@@ -73,7 +73,7 @@ export async function sendCancellationNotifications(
   )));
 }
 
-// ─── Spot released (swap) ─────────────────────────────────────────────────────
+// ─── Spot released ────────────────────────────────────────────────────────────
 
 export async function sendReleaseNotification(
   coaches: { name: string; email: string }[],
@@ -102,11 +102,10 @@ export async function sendReleaseNotification(
   )));
 }
 
-// ─── Swap requested ───────────────────────────────────────────────────────────
+// ─── Open spot available ──────────────────────────────────────────────────────
 
-export async function sendSwapRequestNotification(
-  target: { name: string; email: string },
-  requesterName: string,
+export async function sendSpotOpenNotification(
+  players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
 ) {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
@@ -115,26 +114,54 @@ export async function sendSwapRequestNotification(
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
-  await send(
-    target.email,
-    `Can you cover a spot? — ${dateStr}`,
-    `<p>Hi <strong>${target.name}</strong>,</p>
-     <p><strong>${requesterName}</strong> can't attend and asked if you can take their spot.</p>
+  await Promise.allSettled(players.map(p => send(
+    p.email,
+    `A spot opened up — ${dateStr}`,
+    `<p>Hi <strong>${p.name}</strong>,</p>
+     <p>A spot has opened up for the match on ${dateStr}. Want it? Claim it and the coach will confirm.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
-     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Accept or decline →</a>`,
-    `Hi ${target.name},\n\n${requesterName} can't attend and asked if you can take their spot.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
-  );
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Claim the spot →</a>`,
+    `Hi ${p.name},\n\nA spot has opened up for the match on ${dateStr}. Claim it and the coach will confirm.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+  )));
 }
 
-// ─── Swap responded ───────────────────────────────────────────────────────────
+// ─── Spot claimed (to coaches) ────────────────────────────────────────────────
 
-export async function sendSwapResponseNotification(
-  requester: { name: string; email: string },
-  targetName: string,
+export async function sendSpotClaimNotification(
+  coaches: { name: string; email: string }[],
+  claimantName: string,
+  match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
+  matchId: string,
+) {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const timeStr = match.matchTime.slice(0, 5);
+  const opponent = match.opponent ? ` vs ${match.opponent}` : '';
+
+  await Promise.allSettled(coaches.map(c => send(
+    c.email,
+    `Spot claimed — ${claimantName} · ${dateStr}`,
+    `<p>Hi <strong>${c.name}</strong>,</p>
+     <p><strong>${claimantName}</strong> wants to take an open spot for the match on ${dateStr}. Confirm them (or another claimant) in the squad.</p>
+     <table style="border-collapse:collapse;margin:16px 0">
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+     </table>
+     <a href="${FRONTEND_URL}/coach/matches/${matchId}/selections" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Review claimants →</a>`,
+    `Hi ${c.name},\n\n${claimantName} wants to take an open spot for the match on ${dateStr}.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
+  )));
+}
+
+// ─── Claim resolved (to claimant) ─────────────────────────────────────────────
+
+export async function sendClaimResolutionNotification(
+  claimant: { name: string; email: string },
   accepted: boolean,
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
 ) {
@@ -143,23 +170,21 @@ export async function sendSwapResponseNotification(
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
-  const verb = accepted ? 'accepted' : 'declined';
 
   await send(
-    requester.email,
-    `Swap ${verb} — ${dateStr}`,
-    `<p>Hi <strong>${requester.name}</strong>,</p>
-     <p><strong>${targetName}</strong> has <strong>${verb}</strong> your request to cover the match on ${dateStr}.</p>
+    claimant.email,
+    `Spot claim ${accepted ? 'confirmed' : 'not selected'} — ${dateStr}`,
+    `<p>Hi <strong>${claimant.name}</strong>,</p>
+     <p>${accepted
+        ? `You're in the squad for the match on ${dateStr}!`
+        : `The open spot for the match on ${dateStr} went to another player this time.`}</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
-     ${accepted
-       ? `<p style="font-size:14px;color:#6b7280">You're no longer in the squad for this match.</p>`
-       : `<p style="font-size:14px;color:#6b7280">You're still in the squad — try asking another teammate.</p>`}
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">View on dashboard →</a>`,
-    `Hi ${requester.name},\n\n${targetName} has ${verb} your request to cover the match on ${dateStr}.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+    `Hi ${claimant.name},\n\n${accepted ? `You're in the squad for the match on ${dateStr}!` : `The open spot for the match on ${dateStr} went to another player this time.`}\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
   );
 }
 

@@ -10,7 +10,7 @@ const UpdateProfileSchema = z.object({
   preferredPositions: z.array(z.enum(['GK', 'DEF', 'WIN', 'MID', 'STR'])).optional(),
 });
 
-// GET /api/players — all registered players except self (for swap target picker)
+// GET /api/players — all registered players except self
 router.get('/', authenticate, async (req, res, next) => {
   try {
     const { data, error } = await supabaseAdmin

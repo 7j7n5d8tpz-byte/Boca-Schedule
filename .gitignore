@@ -8,3 +8,7 @@ build/
 *.env
 .DS_Store
 .vercel
+
+# Generated test artifacts
+frontend/playwright-report/
+test-results/

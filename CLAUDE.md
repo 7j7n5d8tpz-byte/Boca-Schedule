@@ -70,3 +70,7 @@ on unattended migrations.
 
 - Generated test output (`frontend/playwright-report/`, `test-results/`) is gitignored —
   do not commit it.
+- Data tables must be mobile-responsive: stacked cards below Tailwind's `sm` breakpoint
+  (`sm:hidden`), the `<table>` above it (`hidden sm:block`, `overflow-x-auto`). Never wrap
+  a table in `overflow-hidden` — it clips columns on phones with no way to scroll. See
+  `frontend/src/pages/admin/Dashboard.tsx` and `frontend/src/pages/player/Statistics.tsx`.

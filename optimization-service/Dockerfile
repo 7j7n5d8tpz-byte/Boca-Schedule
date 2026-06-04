@@ -12,6 +12,11 @@ COPY server.jl ./
 # Reduces cold-start from ~5 min to ~5 sec.
 # Must be built on native x86_64 (GitHub Actions) — QEMU on Apple Silicon
 # causes a segfault during HTTP.jl precompilation.
+# cpu_target must be a portable multi-target string (same as Julia's official
+# x86_64 binaries), NOT the default `native`. Fly doesn't pin machines to a CPU
+# model, so a native sysimage built on e.g. a znver3 runner is rejected at load
+# ("Unable to find compatible target in cached code image") when the machine is
+# rescheduled onto a different host CPU, crash-looping until max restarts.
 RUN julia --project=. -e " \
   import Pkg; \
   Pkg.instantiate(); \
@@ -21,6 +26,7 @@ RUN julia --project=. -e " \
     [:HTTP, :JSON3, :JuMP, :HiGHS, :MathOptInterface], \
     sysimage_path=\"/app/boca.so\", \
     project=\".\", \
+    cpu_target=\"generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)\", \
   )"
 
 ENV JULIA_PORT=3002

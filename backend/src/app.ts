@@ -20,6 +20,13 @@ import notificationRoutes from './routes/notifications.js';
 
 const app = express();
 
+// Behind Fly.io's proxy, every request reaches us via one proxy hop. Trust it so
+// req.ip is the real client IP rather than the proxy's. Without this,
+// express-rate-limit keys every request by the same proxy IP — collapsing all
+// users into a single shared bucket (and logging ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+// on every request), which throttles legitimate traffic including login.
+app.set('trust proxy', 1);
+
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
@@ -28,14 +35,24 @@ app.use(cors({
 app.use(express.json());
 
 const isTest = process.env.NODE_ENV === 'test';
-const limiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: isTest ? 10_000 : 100 });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: isTest ? 10_000 : 5 });
+// General per-client limit. Generous enough for the app's background polling
+// (notification bell every 30s, admin/coach dashboards) now that each client
+// gets its own bucket.
+const limiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: isTest ? 10_000 : 300 });
+// Strict brute-force protection for credential endpoints only — scoped to the
+// sensitive routes below, NOT all of /api/auth, so token refresh and logout
+// (which the frontend calls automatically) don't consume the budget.
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: isTest ? 10_000 : 10 });
 
 app.use(limiter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-app.use('/api/auth', authLimiter, authRoutes);
+app.use(
+  ['/api/auth/login', '/api/auth/register', '/api/auth/forgot-password', '/api/auth/reset-password'],
+  authLimiter,
+);
+app.use('/api/auth', authRoutes);
 app.use('/api/matches', matchRoutes);
 app.use('/api/matches/:matchId', optimizeRoutes);
 app.use('/api/signups', signupRoutes);

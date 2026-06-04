@@ -195,14 +195,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      # Build on Fly's remote (Depot) builder, like the backend. It's native
-      # x86_64 so PackageCompiler works (the QEMU segfault only affects local
-      # Apple-Silicon builds), Depot persistently caches the sysimage layer
-      # across deploys, and flyctl manages registry auth + repo creation for
-      # the whole build. A direct `buildx` push instead failed once the ~10-min
-      # sysimage build outlived the `flyctl auth docker` token ("app repository
-      # not found" / "unauthenticated: Invalid token"). The positional dir sets
-      # both the working dir (fly.toml) and the build context.
-      - run: flyctl deploy optimization-service --remote-only
+      # Build with flyctl on the GitHub runner's Docker (`--local-only`), NOT on
+      # Fly's remote builder. The multi-target sysimage link is memory-heavy and
+      # OOM-kills (SIGKILL) the small Depot builder; the GitHub runner has ~16 GB
+      # and compiles it fine. It's native x86_64, so PackageCompiler works (the
+      # QEMU segfault only affects local Apple-Silicon builds). Letting flyctl do
+      # the build+push (rather than a raw `buildx` push) means flyctl manages
+      # registry auth + repo creation, avoiding the earlier "app repository not
+      # found" / token-expiry push failure. Positional dir = working dir + context.
+      - run: flyctl deploy optimization-service --local-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -57,9 +57,16 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
         </>
       )}
 
-      {/* ── Logo + name ── */}
-      <RavenIcon className="w-12 h-12 shrink-0" />
-      <span className="font-bold text-white text-lg leading-tight">Boca Boldisch</span>
+      {/* ── Logo + name → home ── */}
+      <Link
+        to="/"
+        onClick={() => setOpen(false)}
+        aria-label="Boca Boldisch home"
+        className="flex items-center gap-3 shrink-0 rounded-lg hover:opacity-80 transition-opacity"
+      >
+        <RavenIcon className="w-12 h-12 shrink-0" />
+        <span className="font-bold text-white text-lg leading-tight">Boca Boldisch</span>
+      </Link>
 
       {/* ── Spacer ── */}
       <div className="flex-1" />

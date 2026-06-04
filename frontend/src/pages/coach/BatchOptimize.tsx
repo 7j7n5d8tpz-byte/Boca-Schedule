@@ -586,16 +586,16 @@ function ReviewStep({
   const [reviewView, setReviewView] = useState<'selections' | 'balance'>('selections');
 
   return (
-    <div className="flex gap-8">
+    <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
 
-      {/* Left sidebar nav */}
-      <aside className="w-40 shrink-0">
-        <div className="sticky top-6 pt-1 space-y-1">
+      {/* Sidebar nav — horizontal tab bar on mobile, sidebar on sm+ */}
+      <aside className="w-full sm:w-40 shrink-0">
+        <div className="flex sm:flex-col gap-1 sm:sticky sm:top-6 sm:pt-1">
           {(['selections', 'balance'] as const).map(v => (
             <button
               key={v}
               onClick={() => setReviewView(v)}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 reviewView === v
                   ? 'bg-brand-green text-white'
                   : 'text-gray-600 hover:bg-gray-100'
@@ -604,10 +604,10 @@ function ReviewStep({
               {v === 'selections' ? 'Selections' : 'Player balance'}
             </button>
           ))}
-          <div className="pt-4 border-t border-gray-100">
+          <div className="sm:pt-4 sm:border-t sm:border-gray-100">
             <button
               onClick={onReoptimize}
-              className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              className="w-full text-center sm:text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
             >
               ← Re-optimize
             </button>
@@ -822,6 +822,43 @@ function RateBar({ played, signups }: { played: number; signups: number }) {
   );
 }
 
+// Projected play-rate bar after the batch, with an up/down trend marker.
+function ProjBar({ rate, played, signups, improved, worsened }: {
+  rate: number; played: number; signups: number; improved: boolean; worsened: boolean;
+}) {
+  return (
+    <div className="space-y-0.5">
+      <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${rateColor(rate)}`}
+          style={{ width: `${Math.min(100, Math.round(rate * 100))}%` }}
+        />
+      </div>
+      <p className={`text-[11px] tabular-nums font-medium ${rateTextColor(rate)}`}>
+        {played}/{signups}
+        {improved && <span className="ml-1 text-green-500">↑</span>}
+        {worsened && <span className="ml-1 text-red-400">↓</span>}
+      </p>
+    </div>
+  );
+}
+
+// A single per-match status dot used in both the mobile cards and the table.
+function Pip({ signedUp, selected }: { signedUp: boolean; selected: boolean }) {
+  return (
+    <div
+      title={!signedUp ? 'Not signed up' : selected ? 'Selected' : 'Signed up, not selected'}
+      className={`w-3 h-3 rounded-full transition-colors ${
+        !signedUp
+          ? 'bg-gray-100'
+          : selected
+            ? 'bg-brand-green'
+            : 'border-2 border-gray-300 bg-white'
+      }`}
+    />
+  );
+}
+
 function ImpactTable({
   impact,
   reviewSelections,
@@ -876,7 +913,47 @@ function ImpactTable({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Player list — cards on mobile, scrollable table on sm+ (never
+          overflow-hidden: the per-match pip column would be clipped on phones). */}
+
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {liveImpact.map(p => {
+          const improved = p.projRate > p.histRate + 0.03;
+          const worsened = p.projRate < p.histRate - 0.03;
+          return (
+            <div key={p.playerId} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+              <p className="font-medium text-gray-900 text-sm truncate">{p.name}</p>
+
+              <div className="flex gap-8">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Season so far</p>
+                  <RateBar played={p.historicalPlayed} signups={p.historicalSignups} />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">After batch</p>
+                  <ProjBar rate={p.projRate} played={p.projPlayed} signups={p.projSignups} improved={improved} worsened={worsened} />
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">This batch</p>
+                <div className="flex gap-3 flex-wrap">
+                  {p.pips.map((pip, i) => (
+                    <div key={i} className="flex flex-col items-center gap-1">
+                      <Pip signedUp={pip.signedUp} selected={pip.selected} />
+                      <span className="text-[9px] text-gray-400 leading-none text-center">{matchLabels[i]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Table sm+ */}
+      <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400">
@@ -910,37 +987,15 @@ function ImpactTable({
                   {/* Batch pip dots: one per match */}
                   <td className="px-3 py-3">
                     <div className="flex gap-2 justify-center">
-                      {p.pips.map(({ signedUp, selected }, i) => (
-                        <div
-                          key={i}
-                          title={!signedUp ? 'Not signed up' : selected ? 'Selected' : 'Signed up, not selected'}
-                          className={`w-3 h-3 rounded-full transition-colors ${
-                            !signedUp
-                              ? 'bg-gray-100'
-                              : selected
-                                ? 'bg-brand-green'
-                                : 'border-2 border-gray-300 bg-white'
-                          }`}
-                        />
+                      {p.pips.map((pip, i) => (
+                        <Pip key={i} signedUp={pip.signedUp} selected={pip.selected} />
                       ))}
                     </div>
                   </td>
 
                   {/* Projected rate bar after batch */}
                   <td className="px-3 py-3">
-                    <div className="space-y-0.5">
-                      <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${rateColor(p.projRate)}`}
-                          style={{ width: `${Math.min(100, Math.round(p.projRate * 100))}%` }}
-                        />
-                      </div>
-                      <p className={`text-[11px] tabular-nums font-medium ${rateTextColor(p.projRate)}`}>
-                        {p.projPlayed}/{p.projSignups}
-                        {improved && <span className="ml-1 text-green-500">↑</span>}
-                        {worsened && <span className="ml-1 text-red-400">↓</span>}
-                      </p>
-                    </div>
+                    <ProjBar rate={p.projRate} played={p.projPlayed} signups={p.projSignups} improved={improved} worsened={worsened} />
                   </td>
                 </tr>
               );

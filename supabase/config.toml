@@ -23,6 +23,12 @@ pop3_port = 54326
 [storage]
 file_size_limit = "50MiB"
 
+# Logflare/Vector analytics is unused. Recent Supabase CLI versions run an
+# "Updating vector buckets" step during `supabase start` that 409s
+# (FeatureNotEnabled) when this is on but unconfigured, breaking CI. Disable it.
+[analytics]
+enabled = false
+
 [auth]
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["https://localhost:5173"]

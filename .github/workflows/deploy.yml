@@ -195,14 +195,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      # Build with flyctl on the GitHub runner's Docker (`--local-only`), NOT on
-      # Fly's remote builder. The multi-target sysimage link is memory-heavy and
-      # OOM-kills (SIGKILL) the small Depot builder; the GitHub runner has ~16 GB
-      # and compiles it fine. It's native x86_64, so PackageCompiler works (the
-      # QEMU segfault only affects local Apple-Silicon builds). Letting flyctl do
-      # the build+push (rather than a raw `buildx` push) means flyctl manages
-      # registry auth + repo creation, avoiding the earlier "app repository not
-      # found" / token-expiry push failure. Positional dir = working dir + context.
-      - run: flyctl deploy optimization-service --local-only
+      - uses: docker/setup-buildx-action@v3
+      # Build the memory-heavy multi-target sysimage on the GitHub runner (~16 GB
+      # RAM): Fly's Depot remote builder OOM-kills it (SIGKILL), and `--local-only`
+      # rebuilds from scratch every run (~12-30 min). The gha cache makes repeat
+      # builds fast. `provenance: false` makes buildx emit a single image manifest
+      # instead of an attestation manifest *list*, which Fly's registry rejects
+      # ("app repository not found"). `load: true` keeps the image local so we can
+      # re-authenticate with a *fresh* token right before pushing — a long build
+      # would otherwise outlive the token issued at job start.
+      - name: Build Julia sysimage image
+        uses: docker/build-push-action@v6
+        with:
+          context: optimization-service
+          load: true
+          tags: registry.fly.io/boca-julia:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+      - name: Log in to Fly.io registry
+        run: flyctl auth docker
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      - name: Push image to Fly registry
+        run: docker push registry.fly.io/boca-julia:latest
+      - name: Deploy pre-built image
+        run: flyctl deploy --image registry.fly.io/boca-julia:latest --config optimization-service/fly.toml --app boca-julia
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

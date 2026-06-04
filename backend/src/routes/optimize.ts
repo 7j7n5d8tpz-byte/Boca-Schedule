@@ -5,7 +5,7 @@ import { requireRole } from '../middleware/requireRole.js';
 
 const router = Router({ mergeParams: true });
 
-const JULIA_URL = process.env.JULIA_SERVICE_URL || 'http://localhost:3002';
+const JULIA_URL = process.env.JULIA_URL || process.env.JULIA_SERVICE_URL || 'http://localhost:3002';
 
 // GET /api/matches/:matchId/selections
 // Accessible to coach/admin OR players with can_enter_results (for result entry page)

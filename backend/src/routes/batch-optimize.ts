@@ -5,7 +5,7 @@ import { requireRole } from '../middleware/requireRole.js';
 
 const router = Router();
 
-const JULIA_URL = process.env.JULIA_SERVICE_URL || 'http://localhost:3002';
+const JULIA_URL = process.env.JULIA_URL || process.env.JULIA_SERVICE_URL || 'http://localhost:3002';
 
 // POST /api/optimize/batch
 // Jointly optimizes multiple matches in one solver call.

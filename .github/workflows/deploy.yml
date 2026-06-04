@@ -195,22 +195,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - uses: docker/setup-buildx-action@v3
-      - name: Log in to Fly.io registry
-        run: flyctl auth docker
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-      # Build on GitHub's native x86_64 Linux — PackageCompiler works here,
-      # unlike cross-compilation from Apple Silicon where QEMU causes segfaults.
-      - name: Build and push Julia sysimage image
-        uses: docker/build-push-action@v5
-        with:
-          context: optimization-service
-          push: true
-          tags: registry.fly.io/boca-julia:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Deploy from pre-built image
-        run: flyctl deploy --image registry.fly.io/boca-julia:latest --app boca-julia
+      # Build on Fly's remote (Depot) builder, like the backend. It's native
+      # x86_64 so PackageCompiler works (the QEMU segfault only affects local
+      # Apple-Silicon builds), Depot persistently caches the sysimage layer
+      # across deploys, and flyctl manages registry auth + repo creation for
+      # the whole build. A direct `buildx` push instead failed once the ~10-min
+      # sysimage build outlived the `flyctl auth docker` token ("app repository
+      # not found" / "unauthenticated: Invalid token"). The positional dir sets
+      # both the working dir (fly.toml) and the build context.
+      - run: flyctl deploy optimization-service --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

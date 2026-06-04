@@ -241,7 +241,100 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
       {isLoading ? (
         <p className="text-sm text-gray-400">Loading…</p>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <>
+        {/* Mobile cards */}
+        <div className="sm:hidden space-y-3">
+          {users.length === 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-400 text-sm">No users found</div>
+          )}
+          {users.map(u => (
+            <div key={u.userId} className={`bg-white rounded-xl border border-gray-200 p-4 space-y-3 ${u.isActive ? '' : 'opacity-50'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-900 truncate">{u.name}</p>
+                  <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                </div>
+                {confirmDelete === u.userId ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-red-600 font-medium">Delete?</span>
+                    <button
+                      onClick={() => deleteMutation.mutate(u.userId)}
+                      disabled={deleteMutation.isPending}
+                      className="text-xs bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-2 py-1 rounded transition-colors"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(null)}
+                      className="text-xs border border-gray-300 text-gray-500 hover:bg-gray-50 font-medium px-2 py-1 rounded transition-colors"
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDelete(u.userId)}
+                    className="shrink-0 text-xs text-red-400 hover:text-red-600 transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Role</label>
+                  <select
+                    value={u.role}
+                    onChange={e => roleMutation.mutate({ userId: u.userId, role: e.target.value })}
+                    className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-green ${ROLE_COLORS[u.role]}`}
+                  >
+                    <option value="player">Player</option>
+                    <option value="coach">Coach</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Status</label>
+                  <button
+                    onClick={() => activeMutation.mutate({ userId: u.userId, isActive: !u.isActive })}
+                    className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg transition-colors ${
+                      u.isActive
+                        ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                  >
+                    {u.isActive ? 'Active' : 'Inactive'}
+                  </button>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Results</label>
+                  {u.role === 'coach' || u.role === 'admin' ? (
+                    <p className="text-xs text-gray-300 py-1.5">Always</p>
+                  ) : (
+                    <button
+                      onClick={() => resultsMutation.mutate({ userId: u.userId, canEnterResults: !u.canEnterResults })}
+                      disabled={resultsMutation.isPending}
+                      className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                        u.canEnterResults
+                          ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                      }`}
+                    >
+                      {u.canEnterResults ? 'Enabled' : 'Disabled'}
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Joined</label>
+                  <p className="text-xs text-gray-500 py-1.5">{fmtDate(u.createdAt)}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
@@ -335,6 +428,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );
@@ -407,7 +501,20 @@ function HealthTab() {
       {config && config.length > 0 && (
         <div className="space-y-2">
           <h2 className="font-semibold text-gray-900">System configuration</h2>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+
+          {/* Mobile cards */}
+          <div className="sm:hidden space-y-3">
+            {config.map(c => (
+              <div key={c.key} className="bg-white rounded-xl border border-gray-200 p-4 space-y-1">
+                <p className="font-mono text-xs text-gray-700 break-all">{c.key}</p>
+                <p className="font-mono text-xs text-gray-900 break-all">{JSON.stringify(c.value)}</p>
+                {c.description && <p className="text-xs text-gray-500">{c.description}</p>}
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-gray-100 bg-gray-50">
                 <tr>
@@ -479,7 +586,41 @@ function AuditLogTab() {
           No audit log entries yet
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <>
+        {/* Mobile cards */}
+        <div className="sm:hidden space-y-3">
+          {logs.map(l => (
+            <div key={l.logId} className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{l.actorName}</p>
+                  <p className="text-xs text-gray-400 truncate">{l.actorEmail}</p>
+                </div>
+                <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${ACTION_COLORS[l.action] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {l.action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400">{fmtDatetime(l.createdAt)}</p>
+              <p className="text-xs text-gray-500">
+                <span className="font-medium">{l.entityType}</span>
+                {l.entityId && <span className="text-gray-300 ml-1">{l.entityId.slice(0, 8)}…</span>}
+              </p>
+              {l.newValues && Object.entries(l.newValues as Record<string, unknown>).length > 0 && (
+                <div className="text-xs text-gray-500 border-t border-gray-50 pt-2">
+                  {Object.entries(l.newValues as Record<string, unknown>).map(([k, v]) => (
+                    <span key={k} className="block">
+                      <span className="text-gray-400">{k.replace(/_/g, ' ')}:</span>{' '}
+                      <span className="font-medium text-gray-700">{String(v)}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
@@ -520,6 +661,7 @@ function AuditLogTab() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {pageCount > 1 && (

@@ -23,6 +23,9 @@ develop locally  →  test locally  →  commit  →  push to main  →  CI gate
   Julia, backend, and frontend are fully isolated from production.
 - Start the stack with the `/start` skill; stop with `/stop`. Ports: Supabase API
   54321 / DB 54322 / Studio 54323, backend 3001, Julia 3002, frontend 5173.
+- Before manual testing or pushing, run the `/test` skill: it runs the same gates as CI
+  locally (typecheck → frontend unit → backend integration → E2E), cheapest-first and
+  stops at the first failure. Requires the stack up via `/start`; it does not auto-start.
 - For larger changes, branch off `main`, open a PR (CI runs on PRs), then merge.
   For small changes, committing straight to `main` is fine.
 

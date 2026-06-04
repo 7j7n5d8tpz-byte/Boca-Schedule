@@ -33,7 +33,10 @@ jobs:
         with: { node-version: '22', cache: 'npm', cache-dependency-path: package-lock.json }
 
       - uses: supabase/setup-cli@v1
-        with: { version: latest }
+        # Pinned, NOT `latest`: there's no staging, so a new CLI release can
+        # silently break CI/prod. v2.105.0's storage image runs an "Updating
+        # vector buckets" step that 409s on `supabase start`. Bump deliberately.
+        with: { version: 2.104.0 }
 
       - name: Start local Supabase
         run: supabase start --exclude edge-runtime,studio,imgproxy
@@ -77,7 +80,10 @@ jobs:
         with: { node-version: '22', cache: 'npm', cache-dependency-path: package-lock.json }
 
       - uses: supabase/setup-cli@v1
-        with: { version: latest }
+        # Pinned, NOT `latest`: there's no staging, so a new CLI release can
+        # silently break CI/prod. v2.105.0's storage image runs an "Updating
+        # vector buckets" step that 409s on `supabase start`. Bump deliberately.
+        with: { version: 2.104.0 }
 
       - name: Start Supabase
         run: supabase start --exclude edge-runtime,studio,imgproxy
@@ -156,7 +162,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
-        with: { version: latest }
+        # Pinned, NOT `latest`: there's no staging, so a new CLI release can
+        # silently break CI/prod. v2.105.0's storage image runs an "Updating
+        # vector buckets" step that 409s on `supabase start`. Bump deliberately.
+        with: { version: 2.104.0 }
       # `db push` no longer accepts --project-ref; link to the project first,
       # then push. Both read the DB password from SUPABASE_DB_PASSWORD.
       - run: |

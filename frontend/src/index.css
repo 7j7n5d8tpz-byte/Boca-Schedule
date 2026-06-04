@@ -6,6 +6,15 @@
   isolation: isolate;
 }
 
+/* The fixed watermark below intentionally bleeds past the right edge. On phones
+   that off-screen overflow makes the page horizontally scrollable, which shifts
+   the content left so cards look clipped. Clamp horizontal overflow at the root
+   on mobile only — the sidebar is `sm:sticky` (static below sm), so this can't
+   break sticky positioning, which lives at the >=640px breakpoint. */
+@media (max-width: 639px) {
+  html, body { overflow-x: hidden; }
+}
+
 .boca-page::after {
   content: '';
   position: fixed;

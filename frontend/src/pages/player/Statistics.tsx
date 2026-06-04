@@ -787,12 +787,63 @@ export default function Statistics() {
               </div>
             )}
 
-            {/* Player table */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
+            {/* Player list — cards on mobile, table on sm+ (never overflow-hidden:
+                it clips columns on phones with no way to scroll). */}
+            <div>
+              {/* Mobile cards */}
+              <div className="sm:hidden space-y-3">
                 <h2 className="text-sm font-semibold text-gray-700">All players</h2>
+                {players.map(p => {
+                  const isMe = p.userId === user?.userId;
+                  const rate = p.totalSignups > 0 ? p.attendanceRate : null;
+                  return (
+                    <div key={p.userId} onClick={() => setSelectedPlayer(p.userId)}
+                      className={`bg-white rounded-xl border p-4 space-y-3 cursor-pointer ${isMe ? 'border-brand-green ring-1 ring-brand-green/30 bg-brand-green-50' : 'border-gray-200'}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
+                          {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
+                        </span>
+                        {p.preferredPositions.map(pos => (
+                          <span key={pos} className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 text-center">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{p.totalPlayed}</p>
+                          <p className="text-[11px] text-gray-400">Games</p>
+                        </div>
+                        <div>
+                          <p className={`text-sm font-semibold ${rate === null ? 'text-gray-300' : rate >= 75 ? 'text-green-600' : rate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
+                            {rate === null ? '—' : `${rate.toFixed(0)}%`}
+                          </p>
+                          <p className="text-[11px] text-gray-400">Attendance</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{p.totalGoals}</p>
+                          <p className="text-[11px] text-gray-400">Goals</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{p.totalAssists}</p>
+                          <p className="text-[11px] text-gray-400">Assists</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500 border-t border-gray-50 pt-2">
+                        {isCoach && <span>Signed up: <span className="font-medium text-gray-700">{p.totalSignups}</span></span>}
+                        <span>Clean sheets: <span className="font-medium text-gray-700">{p.totalCleanSheets}</span></span>
+                        {p.totalYellowCards > 0 && <span className="text-amber-600 font-medium">🟨 {p.totalYellowCards}</span>}
+                        {p.totalRedCards > 0 && <span className="text-red-600 font-medium">🟥 {p.totalRedCards}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+                <p className="text-xs text-gray-400">Tap a player to view details</p>
               </div>
-              <div className="overflow-x-auto">
+
+              {/* Desktop table */}
+              <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <h2 className="text-sm font-semibold text-gray-700">All players</h2>
+                </div>
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
@@ -855,8 +906,8 @@ export default function Statistics() {
                     })}
                   </tbody>
                 </table>
+                <p className="text-xs text-gray-400 px-5 py-3">Click a row to view player details</p>
               </div>
-              <p className="text-xs text-gray-400 px-5 py-3">Click a row to view player details</p>
             </div>
           </>
         )}

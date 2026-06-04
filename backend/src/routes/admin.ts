@@ -192,12 +192,32 @@ router.put('/users/:userId/results-permission', async (req, res, next) => {
 router.get('/system/health', async (_req, res, next) => {
   try {
     const { error: dbError } = await supabaseAdmin.from('users').select('user_id', { head: true, count: 'exact' });
+
+    // Actually probe the Julia optimizer rather than reporting a hardcoded value.
+    //   not_configured = no URL set; unhealthy = set but unreachable (e.g. a Fly
+    //   cold start); healthy = reachable. Tolerant of Julia's absence.
+    const juliaUrl = process.env.JULIA_URL || process.env.JULIA_SERVICE_URL;
+    let optimizationService: { status: 'healthy' | 'unhealthy' | 'not_configured' };
+    if (!juliaUrl) {
+      optimizationService = { status: 'not_configured' };
+    } else {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const juliaRes = await fetch(`${juliaUrl}/health`, { signal: controller.signal });
+        clearTimeout(timeout);
+        optimizationService = { status: juliaRes.ok ? 'healthy' : 'unhealthy' };
+      } catch {
+        optimizationService = { status: 'unhealthy' };
+      }
+    }
+
     res.json({
       success: true,
       data: {
         database: { status: dbError ? 'unhealthy' : 'healthy', message: dbError?.message ?? null },
         api: { uptime: process.uptime(), uptimeHuman: formatUptime(process.uptime()) },
-        optimizationService: { status: 'not_configured' },
+        optimizationService,
       },
     });
   } catch (err) {

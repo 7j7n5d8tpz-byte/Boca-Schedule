@@ -490,8 +490,8 @@ function HealthTab() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Optimizer</p>
             <p className="text-sm font-medium text-gray-900 flex items-center">
-              {statusDot(data.optimizationService.status === 'healthy' ? 'healthy' : 'unknown')}
-              {data.optimizationService.status === 'healthy' ? 'Online' : 'Not configured'}
+              {statusDot(data.optimizationService.status === 'healthy' ? 'healthy' : data.optimizationService.status === 'unhealthy' ? 'unhealthy' : 'unknown')}
+              {data.optimizationService.status === 'healthy' ? 'Online' : data.optimizationService.status === 'unhealthy' ? 'Offline' : 'Not configured'}
             </p>
           </div>
         </div>

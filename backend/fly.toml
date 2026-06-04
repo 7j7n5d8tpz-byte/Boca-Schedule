@@ -11,6 +11,10 @@ primary_region = 'ams'
 
 [env]
   PORT = '3001'
+  # Public URL of the Julia optimizer (boca-julia app). Non-secret; set here so
+  # prod optimization always resolves even without a Fly secret. A secret of the
+  # same name, if set, overrides this.
+  JULIA_URL = 'https://boca-julia.fly.dev'
 
 [http_service]
   internal_port = 3001

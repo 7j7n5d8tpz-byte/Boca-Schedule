@@ -84,7 +84,9 @@ describe('Open-spot claims', () => {
     const list = await request(app)
       .get(`/api/matches/${matchId}/claims`)
       .set('Authorization', `Bearer ${coach.token}`);
+    expect(list.status).toBe(200);
     const p1Claim = list.body.data.find((c: any) => c.claimantId === p1.userId);
+    expect(p1Claim, 'coach claims list should include p1’s pending claim').toBeDefined();
 
     const res = await request(app)
       .put(`/api/claims/${p1Claim.claimId}/resolve`)
@@ -161,6 +163,7 @@ describe('Open-spot claims', () => {
       const claimRes = await request(app)
         .post(`/api/matches/${openMatch.match_id}/claims`)
         .set('Authorization', `Bearer ${p2.token}`);
+      expect(claimRes.status).toBe(201);
       const claimId = claimRes.body.data.claimId;
 
       // Another player cannot cancel it
@@ -188,6 +191,7 @@ describe('Open-spot claims', () => {
       const claimRes = await request(app)
         .post(`/api/matches/${openMatch.match_id}/claims`)
         .set('Authorization', `Bearer ${p2.token}`);
+      expect(claimRes.status).toBe(201);
       const res = await request(app)
         .put(`/api/claims/${claimRes.body.data.claimId}/resolve`)
         .set('Authorization', `Bearer ${p1.token}`)

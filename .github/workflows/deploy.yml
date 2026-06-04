@@ -219,7 +219,10 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
       - name: Push image to Fly registry
         run: docker push registry.fly.io/boca-julia:latest
+      # --ha=false: keep a single machine (the optimizer is stateless and the
+      # backend tolerates its absence, so the HA second machine isn't worth the
+      # cost). Without it, a fresh launch from 0 machines recreates 2.
       - name: Deploy pre-built image
-        run: flyctl deploy --image registry.fly.io/boca-julia:latest --config optimization-service/fly.toml --app boca-julia
+        run: flyctl deploy --image registry.fly.io/boca-julia:latest --config optimization-service/fly.toml --app boca-julia --ha=false
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

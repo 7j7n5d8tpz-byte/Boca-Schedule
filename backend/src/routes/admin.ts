@@ -203,7 +203,7 @@ router.get('/system/health', async (_req, res, next) => {
     } else {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3000);
+        const timeout = setTimeout(() => controller.abort(), 8000);
         const juliaRes = await fetch(`${juliaUrl}/health`, { signal: controller.signal });
         clearTimeout(timeout);
         optimizationService = { status: juliaRes.ok ? 'healthy' : 'unhealthy' };

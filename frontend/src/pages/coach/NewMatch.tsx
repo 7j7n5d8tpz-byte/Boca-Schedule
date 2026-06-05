@@ -70,7 +70,7 @@ export default function NewMatch() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">New match</h1>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="matchDate" className="block text-sm font-medium text-gray-700 mb-1">Match date</label>
               <input
@@ -169,7 +169,7 @@ export default function NewMatch() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Signup opens</label>
               <input

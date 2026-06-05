@@ -66,7 +66,7 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
       .then(({ data: users }) => {
         createNotifications((users ?? []).map((u: any) => u.user_id), {
           type: 'announcement',
-          title: '📣 New announcement',
+          title: 'New announcement',
           body: body.length > 120 ? `${body.slice(0, 117)}…` : body,
           link: '/dashboard',
         });

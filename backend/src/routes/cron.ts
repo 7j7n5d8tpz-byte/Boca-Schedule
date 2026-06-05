@@ -1,9 +1,40 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
-import { sendSignupReminder } from '../lib/mailer.js';
+import { sendSignupReminder, sendMatchdayReminder, sendSelectionReminder, sendResultReminder } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
 
 const router = Router();
+
+// The club's wall-clock timezone — the daily reminders all send at 18:00 here.
+const CLUB_TZ = 'Europe/Copenhagen';
+
+function clubHour(d: Date): number {
+  const h = new Intl.DateTimeFormat('en-GB', { timeZone: CLUB_TZ, hour: '2-digit', hour12: false })
+    .formatToParts(d).find(p => p.type === 'hour')?.value ?? '0';
+  return Number(h) % 24;
+}
+function clubDate(d: Date): string {
+  // en-CA renders as YYYY-MM-DD
+  return new Intl.DateTimeFormat('en-CA', { timeZone: CLUB_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+function shiftDate(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function cronAuthorized(req: Request, res: Response): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    res.status(503).json({ success: false, error: { code: 'CRON_DISABLED', message: 'CRON_SECRET is not configured' } });
+    return false;
+  }
+  if (req.header('x-cron-secret') !== secret) {
+    res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid cron secret' } });
+    return false;
+  }
+  return true;
+}
 
 // POST /api/cron/signup-reminders
 //
@@ -128,5 +159,170 @@ router.post('/signup-reminders', async (req, res) => {
     res.status(500).json({ success: false, error: { code: 'CRON_ERROR', message: detail } });
   }
 });
+
+// POST /api/cron/daily-reminders
+//
+// Invoked hourly by the same workflow as signup-reminders, but only does work at
+// the 18:00 hour in Europe/Copenhagen — all three reminders below send at 18:00
+// local. Each is stamped once per match so a match is never re-reminded.
+//   • match-day   → selected players, the evening before kick-off
+//   • selection   → coaches, the day after sign-ups closed if no squad published
+//   • result      → result-enterers, the day after a played match with no result
+router.post('/daily-reminders', async (req, res) => {
+  try {
+    if (!cronAuthorized(req, res)) return;
+
+    const now = new Date();
+    // `?force=true` bypasses the time gate for manual/ops triggers (still secret-gated).
+    const force = req.query.force === 'true';
+    if (!force && clubHour(now) !== 18) {
+      res.json({ success: true, data: { skipped: true, reason: 'only runs at 18:00 Europe/Copenhagen' } });
+      return;
+    }
+
+    const today = clubDate(now);
+    const tomorrow = shiftDate(today, 1);
+
+    const data: Record<string, unknown> = {};
+    data.matchday  = await runMatchdayReminders(tomorrow).catch(e => ({ error: String(e) }));
+    data.selection = await runSelectionReminders(today, now).catch(e => ({ error: String(e) }));
+    data.result    = await runResultReminders(today).catch(e => ({ error: String(e) }));
+
+    res.json({ success: true, data });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('daily-reminders failed:', err);
+    res.status(500).json({ success: false, error: { code: 'CRON_ERROR', message: detail } });
+  }
+});
+
+// Match-day: remind every selected player the evening before kick-off.
+async function runMatchdayReminders(matchDate: string) {
+  const { data: matches, error } = await supabaseAdmin
+    .from('matches')
+    .select('match_id, match_date, match_time, location, opponent, selections(player_id)')
+    .eq('status', 'published')
+    .eq('match_date', matchDate)
+    .is('matchday_reminder_sent_at', null);
+  if (error) throw error;
+  if (!matches || matches.length === 0) return { matches: 0, recipients: 0 };
+
+  // Resolve selected players' contact details in one batch.
+  const playerIds = [...new Set((matches as any[]).flatMap(m => (m.selections ?? []).map((s: any) => s.player_id)))];
+  const usersById = new Map<string, { name: string; email: string }>();
+  if (playerIds.length > 0) {
+    const { data: users } = await supabaseAdmin
+      .from('users').select('user_id, name, email')
+      .in('user_id', playerIds).eq('is_active', true).not('email', 'is', null);
+    (users ?? []).forEach((u: any) => usersById.set(u.user_id, { name: u.name, email: u.email }));
+  }
+
+  let recipients = 0;
+  for (const m of matches as any[]) {
+    try {
+      const ids = (m.selections ?? []).map((s: any) => s.player_id).filter((id: string) => usersById.has(id));
+      if (ids.length > 0) {
+        const mr = { matchDate: m.match_date, matchTime: m.match_time, location: m.location, opponent: m.opponent ?? null };
+        await sendMatchdayReminder(ids.map((id: string) => usersById.get(id)!), mr)
+          .catch(err => console.error('matchday email failed:', err));
+        const dateStr = new Date(`${m.match_date}T${m.match_time}`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+        await createNotifications(ids, {
+          type: 'matchday_reminder',
+          title: 'Match tomorrow',
+          body: `${dateStr}${m.opponent ? ` vs ${m.opponent}` : ''} · ${m.match_time.slice(0, 5)} · ${m.location}`,
+          link: '/dashboard',
+          matchId: m.match_id,
+        });
+        recipients += ids.length;
+      }
+      // Stamp regardless so the match isn't re-scanned next run.
+      await supabaseAdmin.from('matches').update({ matchday_reminder_sent_at: new Date().toISOString() }).eq('match_id', m.match_id);
+    } catch (e) {
+      console.error(`matchday reminder: match ${m.match_id} failed:`, e);
+    }
+  }
+  return { matches: matches.length, recipients };
+}
+
+// Pick-your-squad: one batched email per coach for matches whose sign-up has
+// closed (deadlines are 20:00 local, so "deadline passed" at the 18:00 run means
+// the day after) but whose squad isn't published yet.
+async function runSelectionReminders(today: string, now: Date) {
+  const { data: matches, error } = await supabaseAdmin
+    .from('matches')
+    .select('match_id, match_date, match_time, location, opponent')
+    .is('published_at', null)
+    .neq('status', 'cancelled')
+    .lt('signup_close_date', now.toISOString())
+    .gte('match_date', today)                       // don't nag about matches already in the past
+    .is('selection_reminder_sent_at', null);
+  if (error) throw error;
+  if (!matches || matches.length === 0) return { matches: 0, coaches: 0 };
+
+  const reminderMatches = (matches as any[]).map(m => ({ matchDate: m.match_date, matchTime: m.match_time, location: m.location, opponent: m.opponent ?? null }));
+
+  const { data: coaches } = await supabaseAdmin
+    .from('users').select('user_id, name, email')
+    .in('role', ['coach', 'admin']).eq('is_active', true).not('email', 'is', null);
+
+  for (const c of (coaches ?? []) as any[]) {
+    await sendSelectionReminder({ name: c.name, email: c.email }, reminderMatches)
+      .catch(err => console.error('selection reminder email failed:', err));
+  }
+  const n = matches.length;
+  await createNotifications((coaches ?? []).map((c: any) => c.user_id), {
+    type: 'selection_reminder',
+    title: n === 1 ? 'A squad needs picking' : `${n} squads need picking`,
+    body: "Sign-ups have closed — publish the squad.",
+    link: '/coach',
+  });
+
+  // Stamp every included match so it isn't re-reminded.
+  await supabaseAdmin.from('matches')
+    .update({ selection_reminder_sent_at: new Date().toISOString() })
+    .in('match_id', (matches as any[]).map(m => m.match_id));
+
+  return { matches: n, coaches: (coaches ?? []).length };
+}
+
+// Record-the-result: one batched email per result-enterer for matches that were
+// played (before today) but have no result recorded yet.
+async function runResultReminders(today: string) {
+  const { data: matches, error } = await supabaseAdmin
+    .from('matches')
+    .select('match_id, match_date, match_time, location, opponent, match_results(result_id)')
+    .neq('status', 'cancelled')
+    .lt('match_date', today)
+    .is('result_reminder_sent_at', null);
+  if (error) throw error;
+
+  const pending = (matches ?? []).filter((m: any) => !m.match_results || m.match_results.length === 0);
+  if (pending.length === 0) return { matches: 0, recipients: 0 };
+
+  const reminderMatches = pending.map((m: any) => ({ matchDate: m.match_date, matchTime: m.match_time, location: m.location, opponent: m.opponent ?? null }));
+
+  const { data: recipients } = await supabaseAdmin
+    .from('users').select('user_id, name, email')
+    .or('role.in.(coach,admin),can_enter_results.eq.true')
+    .eq('is_active', true).not('email', 'is', null);
+
+  for (const r of (recipients ?? []) as any[]) {
+    await sendResultReminder({ name: r.name, email: r.email }, reminderMatches)
+      .catch(err => console.error('result reminder email failed:', err));
+  }
+  const n = pending.length;
+  await createNotifications((recipients ?? []).map((r: any) => r.user_id), {
+    type: 'result_reminder',
+    title: n === 1 ? 'Record the result' : `Record ${n} results`,
+    body: "Played, but the result isn't recorded yet.",
+    link: '/coach',
+  });
+
+  await supabaseAdmin.from('matches')
+    .update({ result_reminder_sent_at: new Date().toISOString() })
+    .in('match_id', pending.map((m: any) => m.match_id));
+
+  return { matches: n, recipients: (recipients ?? []).length };
+}
 
 export default router;

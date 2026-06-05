@@ -41,6 +41,12 @@ function iconFor(type: string): { tone: keyof typeof TONE; paths: ReactNode } {
       return { tone: 'gray',   paths: <><circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6M9 9l6 6" /></> };
     case 'signup_reminder':            // "Signup closing soon"
       return { tone: 'amber',  paths: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 1.5" /></> };
+    case 'matchday_reminder':          // "Match tomorrow"
+      return { tone: 'green',  paths: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 9.5h16" /><path d="M9 14.5l2 2 4-4" /></> };
+    case 'selection_reminder':         // "N squads need picking" (coach)
+      return { tone: 'amber',  paths: <><circle cx="9" cy="8" r="3" /><path d="M15 5.5a3 3 0 0 1 0 5" /><path d="M3.5 20a5.5 5.5 0 0 1 11 0" /><path d="M16.5 14.6A5.5 5.5 0 0 1 20.5 20" /></> };
+    case 'result_reminder':            // "Record the result" (coach)
+      return { tone: 'amber',  paths: <><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M14 6l4 4" /></> };
     case 'match_moved':                // "Match details changed"
       return { tone: 'amber',  paths: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 9.5h16" /></> };
     case 'spot_claim':                 // "Spot claimed" (coach)

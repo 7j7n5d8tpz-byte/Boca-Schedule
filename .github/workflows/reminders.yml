@@ -1,8 +1,9 @@
-name: Signup reminders
+name: Reminders
 
-# Sends signup-deadline reminders by calling the backend cron endpoint.
-# Runs hourly; the endpoint itself decides which matches are due (and only
-# reminds each match once), so the coarse schedule is fine.
+# Sends reminder emails/notifications by calling the backend cron endpoints.
+# Runs hourly; each endpoint itself decides which matches are due (and only
+# reminds each once), so the coarse schedule is fine. signup-reminders works
+# off a rolling window; daily-reminders only acts at 18:00 Europe/Copenhagen.
 on:
   schedule:
     - cron: '0 * * * *' # every hour, on the hour (UTC)
@@ -19,4 +20,12 @@ jobs:
             https://boca-backend.fly.dev/api/cron/signup-reminders)
           echo "HTTP $code"; cat /tmp/body; echo
           # Fail the run on server/auth errors so problems are visible in Actions.
+          if [ "$code" -ge 400 ]; then exit 1; fi
+
+      - name: Trigger daily reminders (match-day / pick-squad / record-result)
+        run: |
+          code=$(curl -s -o /tmp/body -w '%{http_code}' -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            https://boca-backend.fly.dev/api/cron/daily-reminders)
+          echo "HTTP $code"; cat /tmp/body; echo
           if [ "$code" -ge 400 ]; then exit 1; fi

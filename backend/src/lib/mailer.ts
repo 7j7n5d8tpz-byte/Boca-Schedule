@@ -235,3 +235,94 @@ export async function sendAdminRegistrationNotification(playerName: string, play
     `A new player has registered and is waiting for approval.\n\nName: ${playerName}\nEmail: ${playerEmail}\n\n${FRONTEND_URL}/admin`,
   );
 }
+
+// ─── Daily reminders (sent at 18:00 Europe/Copenhagen by the cron) ──────────────
+
+interface ReminderMatch {
+  matchDate: string;
+  matchTime: string;
+  location: string;
+  opponent: string | null;
+}
+
+function matchLines(matches: ReminderMatch[]): { html: string; text: string } {
+  const rows = matches.map(m => {
+    const dateStr = new Date(`${m.matchDate}T${m.matchTime}`).toLocaleDateString('en-GB', {
+      weekday: 'short', day: 'numeric', month: 'short',
+    });
+    const opponent = m.opponent ? ` vs ${m.opponent}` : '';
+    return {
+      html: `<li style="margin:4px 0;font-size:14px"><strong>${dateStr}</strong> · ${m.matchTime.slice(0, 5)} · ${m.location}${opponent}</li>`,
+      text: `- ${dateStr} · ${m.matchTime.slice(0, 5)} · ${m.location}${opponent}`,
+    };
+  });
+  return {
+    html: `<ul style="padding-left:18px;margin:12px 0">${rows.map(r => r.html).join('')}</ul>`,
+    text: rows.map(r => r.text).join('\n'),
+  };
+}
+
+// Match-day reminder to the selected players, the evening before kick-off.
+export async function sendMatchdayReminder(
+  players: { name: string; email: string }[],
+  match: ReminderMatch,
+) {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const timeStr = match.matchTime.slice(0, 5);
+  const opponent = match.opponent ? ` vs ${match.opponent}` : '';
+
+  await Promise.allSettled(players.map(p => send(
+    p.email,
+    `Match tomorrow — ${dateStr}`,
+    `<p>Hi <strong>${p.name}</strong>,</p>
+     <p>Reminder: you're in the squad for tomorrow's match.</p>
+     <table style="border-collapse:collapse;margin:16px 0">
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+     </table>
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">View on dashboard →</a>`,
+    `Hi ${p.name},\n\nReminder: you're in the squad for tomorrow's match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+  )));
+}
+
+// Pick-your-squad reminder to one coach — batched across every match whose
+// sign-up has closed but whose squad isn't published yet (so the coach gets a
+// single email even when several deadlines fall on the same day).
+export async function sendSelectionReminder(
+  coach: { name: string; email: string },
+  matches: ReminderMatch[],
+) {
+  const n = matches.length;
+  const { html, text } = matchLines(matches);
+  await send(
+    coach.email,
+    n === 1 ? 'A squad still needs picking' : `${n} squads still need picking`,
+    `<p>Hi <strong>${coach.name}</strong>,</p>
+     <p>Sign-ups have closed for ${n === 1 ? 'this match' : 'these matches'} and the squad isn't published yet:</p>
+     ${html}
+     <a href="${FRONTEND_URL}/coach" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Pick the squad →</a>`,
+    `Hi ${coach.name},\n\nSign-ups have closed and the squad isn't published yet for:\n${text}\n\n${FRONTEND_URL}/coach`,
+  );
+}
+
+// Record-the-result reminder to one result-enterer — batched across every
+// played-but-unrecorded match, so no email-per-match spam.
+export async function sendResultReminder(
+  recipient: { name: string; email: string },
+  matches: ReminderMatch[],
+) {
+  const n = matches.length;
+  const { html, text } = matchLines(matches);
+  await send(
+    recipient.email,
+    n === 1 ? "Record yesterday's result" : `Record ${n} match results`,
+    `<p>Hi <strong>${recipient.name}</strong>,</p>
+     <p>${n === 1 ? 'This match has' : 'These matches have'} been played but the result isn't recorded yet:</p>
+     ${html}
+     <a href="${FRONTEND_URL}/coach" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Record the result →</a>`,
+    `Hi ${recipient.name},\n\n${n === 1 ? 'This match has' : 'These matches have'} been played but the result isn't recorded yet:\n${text}\n\n${FRONTEND_URL}/coach`,
+  );
+}

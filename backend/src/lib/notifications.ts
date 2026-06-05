@@ -12,7 +12,10 @@ export type NotificationType =
   | 'claim_accepted'
   | 'claim_rejected'
   | 'result_permission_request'
-  | 'registration';
+  | 'registration'
+  | 'matchday_reminder'
+  | 'selection_reminder'
+  | 'result_reminder';
 
 interface NewNotification {
   type: NotificationType;

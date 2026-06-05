@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* iOS Safari renders native date/time controls as gray, centre-aligned pills
+   that ignore our field styling and size to their own intrinsic width (looks
+   broken next to the white text inputs/selects). Normalise them to match the
+   rest of the form — white, bordered via the existing classes, left-aligned —
+   while still opening the native picker on tap. */
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #fff;
+  text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 .boca-page {
   isolation: isolate;
 }

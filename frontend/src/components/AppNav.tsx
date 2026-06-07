@@ -18,6 +18,7 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
 
   const isCoach = user?.role === 'coach' || user?.role === 'admin';
   const isAdmin  = user?.role === 'admin';
+  const isFineAdmin = isAdmin || !!user?.isFineAdmin;
 
   const navLink = (to: string, label: string, color = 'text-white/75') => {
     const active = pathname === to || pathname.startsWith(to + '/');
@@ -114,6 +115,8 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
                 : navLink('/dashboard', 'Dashboard')
               }
               {navLink('/statistics', 'Team stats')}
+              {navLink('/fines', 'Fines')}
+              {isFineAdmin && navLink('/fines/manage', 'Manage fines')}
               {isCoach && navLink('/coach', 'Coach view')}
               {isAdmin && navLink('/admin', 'Admin panel', 'text-purple-300')}
             </div>

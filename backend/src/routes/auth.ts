@@ -116,6 +116,7 @@ router.post('/login', async (req, res, next) => {
           name: profile?.name,
           role: profile?.role,
           preferredPositions: profile?.preferred_positions,
+          isFineAdmin: profile?.role === 'admin' || (profile?.is_fine_admin ?? false),
         },
         tokens: {
           accessToken: data.session.access_token,
@@ -138,7 +139,11 @@ router.post('/refresh', async (req, res, next) => {
       return;
     }
 
-    const { data, error } = await supabaseAdmin.auth.refreshSession({ refresh_token: refreshToken });
+    // Use the anon client: refreshSession mutates the client's session, and the
+    // shared supabaseAdmin must stay on service_role (RLS bypass) for every other
+    // query — otherwise a refresh poisons it and all later profile reads return 0
+    // rows under RLS. See lib/supabase.ts.
+    const { data, error } = await supabaseAnon.auth.refreshSession({ refresh_token: refreshToken });
     if (error || !data.session) {
       res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid refresh token' } });
       return;
@@ -232,7 +237,9 @@ router.put('/change-password', authenticate, async (req, res, next) => {
       return;
     }
 
-    const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({ email: profile.email, password: currentPassword });
+    // Verify on the anon client — signInWithPassword mutates the client's session,
+    // which must never happen to the shared service_role supabaseAdmin.
+    const { error: verifyError } = await supabaseAnon.auth.signInWithPassword({ email: profile.email, password: currentPassword });
     if (verifyError) {
       res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Current password is incorrect' } });
       return;

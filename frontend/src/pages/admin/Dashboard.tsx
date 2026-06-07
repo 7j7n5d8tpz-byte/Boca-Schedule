@@ -12,6 +12,7 @@ interface AdminUser {
   role: 'player' | 'coach' | 'admin';
   isActive: boolean;
   canEnterResults: boolean;
+  isFineAdmin: boolean;
   createdAt: string;
   lastLogin: string | null;
 }
@@ -98,6 +99,12 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
   const resultsMutation = useMutation({
     mutationFn: ({ userId, canEnterResults }: { userId: string; canEnterResults: boolean }) =>
       api.put(`/admin/users/${userId}/results-permission`, { canEnterResults }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  });
+
+  const fineAdminMutation = useMutation({
+    mutationFn: ({ userId, isFineAdmin }: { userId: string; isFineAdmin: boolean }) =>
+      api.put(`/admin/users/${userId}/fine-admin`, { isFineAdmin }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   });
 
@@ -325,6 +332,24 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                   )}
                 </div>
                 <div>
+                  <label className="block text-xs text-gray-400 mb-1">Fine admin</label>
+                  {u.role === 'admin' ? (
+                    <p className="text-xs text-gray-300 py-1.5">Always</p>
+                  ) : (
+                    <button
+                      onClick={() => fineAdminMutation.mutate({ userId: u.userId, isFineAdmin: !u.isFineAdmin })}
+                      disabled={fineAdminMutation.isPending}
+                      className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                        u.isFineAdmin
+                          ? 'bg-brand-green-50 text-brand-green hover:opacity-80'
+                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                      }`}
+                    >
+                      {u.isFineAdmin ? 'Enabled' : 'Disabled'}
+                    </button>
+                  )}
+                </div>
+                <div>
                   <label className="block text-xs text-gray-400 mb-1">Joined</label>
                   <p className="text-xs text-gray-500 py-1.5">{fmtDate(u.createdAt)}</p>
                 </div>
@@ -343,13 +368,14 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Results</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fine admin</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Joined</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {users.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No users found</td></tr>
+                <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">No users found</td></tr>
               )}
               {users.map(u => (
                 <tr key={u.userId} className={u.isActive ? '' : 'opacity-50'}>
@@ -392,6 +418,23 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                         }`}
                       >
                         {u.canEnterResults ? 'Enabled' : 'Disabled'}
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {u.role === 'admin' ? (
+                      <span className="text-xs text-gray-300">Always</span>
+                    ) : (
+                      <button
+                        onClick={() => fineAdminMutation.mutate({ userId: u.userId, isFineAdmin: !u.isFineAdmin })}
+                        disabled={fineAdminMutation.isPending}
+                        className={`text-xs font-medium px-2 py-1 rounded-full transition-colors disabled:opacity-50 ${
+                          u.isFineAdmin
+                            ? 'bg-brand-green-50 text-brand-green hover:opacity-80'
+                            : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                        }`}
+                      >
+                        {u.isFineAdmin ? 'Enabled' : 'Disabled'}
                       </button>
                     )}
                   </td>

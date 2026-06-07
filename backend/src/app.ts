@@ -17,6 +17,7 @@ import cronRoutes from './routes/cron.js';
 import calendarRoutes from './routes/calendar.js';
 import announcementRoutes from './routes/announcements.js';
 import notificationRoutes from './routes/notifications.js';
+import fineRoutes from './routes/fines.js';
 
 const app = express();
 
@@ -67,6 +68,7 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api', fineRoutes);
 
 app.use(errorHandler);
 

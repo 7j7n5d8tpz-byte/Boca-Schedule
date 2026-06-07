@@ -12,6 +12,8 @@ import Selections from './pages/coach/Selections';
 import NewMatch from './pages/coach/NewMatch';
 import PlayerProfile from './pages/player/Profile';
 import Statistics from './pages/player/Statistics';
+import FinesPage from './pages/player/Fines';
+import ManageFinesPage from './pages/player/ManageFines';
 import MatchResults from './pages/MatchResults';
 import AdminDashboard from './pages/admin/Dashboard';
 import BatchOptimize from './pages/coach/BatchOptimize';
@@ -44,6 +46,8 @@ export default function App() {
             <Route path="/dashboard" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerDashboard /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerProfile /></ProtectedRoute>} />
             <Route path="/statistics" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><Statistics /></ProtectedRoute>} />
+            <Route path="/fines" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><FinesPage /></ProtectedRoute>} />
+            <Route path="/fines/manage" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><ManageFinesPage /></ProtectedRoute>} />
             <Route path="/matches/:matchId/results" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><MatchResults /></ProtectedRoute>} />
             <Route path="/coach" element={<ProtectedRoute roles={['coach', 'admin']}><CoachDashboard /></ProtectedRoute>} />
             <Route path="/coach/matches/new" element={<ProtectedRoute roles={['coach', 'admin']}><NewMatch /></ProtectedRoute>} />

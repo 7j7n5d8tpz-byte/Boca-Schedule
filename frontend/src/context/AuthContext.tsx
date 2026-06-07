@@ -22,6 +22,7 @@ interface User {
   name: string;
   role: 'player' | 'coach' | 'admin';
   preferredPositions: string[];
+  isFineAdmin?: boolean;
 }
 
 interface AuthContextValue {

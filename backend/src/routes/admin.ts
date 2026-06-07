@@ -55,6 +55,7 @@ router.get('/users', async (req, res, next) => {
           role: u.role,
           isActive: u.is_active,
           canEnterResults: u.can_enter_results ?? false,
+          isFineAdmin: u.is_fine_admin ?? false,
           createdAt: u.created_at,
           lastLogin: u.last_login,
         })),
@@ -183,6 +184,24 @@ router.put('/users/:userId/results-permission', async (req, res, next) => {
     await writeAudit(req.user!.userId, 'results_permission_changed', 'user', userId, { canEnterResults: current?.can_enter_results }, { canEnterResults });
 
     res.json({ success: true, data: { userId, canEnterResults, updatedAt: data.updated_at } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/admin/users/:userId/fine-admin — toggle fine-admin powers
+router.put('/users/:userId/fine-admin', async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { isFineAdmin } = req.body as { isFineAdmin: boolean };
+
+    const { data: current } = await supabaseAdmin.from('users').select('is_fine_admin').eq('user_id', userId).single();
+    const { data, error } = await supabaseAdmin.from('users').update({ is_fine_admin: isFineAdmin }).eq('user_id', userId).select().single();
+    if (error) throw error;
+
+    await writeAudit(req.user!.userId, 'fine_admin_changed', 'user', userId, { isFineAdmin: current?.is_fine_admin }, { isFineAdmin });
+
+    res.json({ success: true, data: { userId, isFineAdmin, updatedAt: data.updated_at } });
   } catch (err) {
     next(err);
   }

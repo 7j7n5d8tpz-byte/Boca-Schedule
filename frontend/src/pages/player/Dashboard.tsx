@@ -426,6 +426,12 @@ export default function PlayerDashboard() {
     enabled: !!user,
   });
 
+  const { data: finesSummary } = useQuery<{ totals: { outstandingDkk: number; claimedDkk: number; paidDkk: number } }>({
+    queryKey: ['fines-summary'],
+    queryFn: () => api.get('/fines/my').then(r => r.data.data),
+    enabled: !!user,
+  });
+
   const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
   const canEnterResults = isCoachOrAdmin || myPermission?.canEnterResults;
 
@@ -512,6 +518,33 @@ export default function PlayerDashboard() {
                 </Link>
               </div>
             </div>
+          );
+        })()}
+
+        {/* Fines */}
+        {finesSummary && (() => {
+          const t = finesSummary.totals;
+          const due = t.outstandingDkk;
+          const awaiting = t.claimedDkk;
+          return (
+            <Link
+              to="/fines"
+              className={`block rounded-xl border p-4 flex items-center justify-between gap-3 transition-colors group ${
+                due > 0 ? 'bg-amber-50 border-amber-300 hover:border-amber-400' : 'bg-white border-gray-200 hover:border-brand-green'
+              }`}
+            >
+              <div>
+                <p className="text-sm font-semibold text-gray-900">My Fines</p>
+                <p className="text-xs mt-0.5 text-gray-500">
+                  {due > 0
+                    ? <span className="text-amber-700 font-medium">{due.toLocaleString('da-DK')} kr outstanding — tap to pay</span>
+                    : awaiting > 0
+                      ? <span className="text-blue-600">{awaiting.toLocaleString('da-DK')} kr awaiting confirmation</span>
+                      : 'All settled — nice 🎉'}
+                </p>
+              </div>
+              <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
+            </Link>
           );
         })()}
 

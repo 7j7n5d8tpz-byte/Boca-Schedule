@@ -15,7 +15,13 @@ export type NotificationType =
   | 'registration'
   | 'matchday_reminder'
   | 'selection_reminder'
-  | 'result_reminder';
+  | 'result_reminder'
+  | 'fine_issued'
+  | 'fine_pending_approval'
+  | 'fine_payment_claimed'
+  | 'fine_payment_confirmed'
+  | 'fine_claim_rejected'
+  | 'fine_voided';
 
 interface NewNotification {
   type: NotificationType;

@@ -59,6 +59,17 @@ function iconFor(type: string): { tone: keyof typeof TONE; paths: ReactNode } {
       return { tone: 'blue',   paths: <><circle cx="10" cy="8" r="3.5" /><path d="M4 20c0-3.3 2.7-6 6-6s6 2.7 6 6" /><path d="M18 8h4M20 6v4" /></> };
     case 'result_permission_request':  // "Result access requested"
       return { tone: 'purple', paths: <><circle cx="7" cy="17" r="3" /><path d="M9 15 19 5M16 6l2 2M14 8l2 2" /></> };
+    case 'fine_issued':                // "You received a fine"
+    case 'fine_pending_approval':      // "Fine awaiting approval" (admin)
+      return { tone: 'amber',  paths: <><rect x="3" y="6" width="18" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /></> };
+    case 'fine_payment_claimed':       // "Fine payment claimed" (admin)
+      return { tone: 'blue',   paths: <><rect x="3" y="6" width="18" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /></> };
+    case 'fine_payment_confirmed':     // "Fine payment confirmed"
+      return { tone: 'green',  paths: <><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.5 2.5 4.5-5" /></> };
+    case 'fine_claim_rejected':        // "Payment not received"
+      return { tone: 'red',    paths: <><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M15 10l-6 4M9 10l6 4" /></> };
+    case 'fine_voided':                // "A fine was cancelled"
+      return { tone: 'gray',   paths: <><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 17 17 7" /></> };
     default:
       return { tone: 'gray',   paths: <><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></> };
   }
@@ -91,12 +102,6 @@ export default function NotificationBell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'new' | 'all'>('new');
-  // IDs that were unread the moment the panel was opened. We auto-mark
-  // everything read on open (clears the badge), but keep highlighting this
-  // snapshot as "New" for the rest of the viewing so just-arrived items stay
-  // distinguishable from older history.
-  const [newIds, setNewIds] = useState<Set<string>>(new Set());
-  const didSnapshot = useRef(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const { data: countData } = useQuery<{ unreadCount: number }>({
@@ -112,12 +117,20 @@ export default function NotificationBell() {
     enabled: open,
   });
 
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['notif-count'] });
+    qc.invalidateQueries({ queryKey: ['notifications'] });
+  };
+
   const markAll = useMutation({
     mutationFn: () => api.put('/notifications/read'),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['notif-count'] });
-      qc.invalidateQueries({ queryKey: ['notifications'] });
-    },
+    onSuccess: invalidate,
+  });
+
+  // Mark a single notification read (on click). Only the one you open is read.
+  const markOne = useMutation({
+    mutationFn: (id: string) => api.put(`/notifications/${id}/read`),
+    onSuccess: invalidate,
   });
 
   // Close on outside click
@@ -130,24 +143,18 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  // On open: land on "New", snapshot the unread set, then auto-mark all read.
+  // On open: land on the "New" tab. Nothing is marked read until you click it.
   useEffect(() => {
-    if (!open) { didSnapshot.current = false; return; }
-    setTab('new');
-    if (didSnapshot.current || !listData) return;
-    didSnapshot.current = true;
-    const ids = new Set(listData.notifications.filter(n => !n.readAt).map(n => n.notificationId));
-    setNewIds(ids);
-    if (ids.size > 0) markAll.mutate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, listData]);
+    if (open) setTab('new');
+  }, [open]);
 
   const notifications = listData?.notifications ?? [];
-  const isNew = (n: Notification) => newIds.has(n.notificationId);
+  const isNew = (n: Notification) => !n.readAt;
   const newItems = notifications.filter(isNew);
   const shown = tab === 'new' ? newItems : notifications;
 
   function handleClick(n: Notification) {
+    if (!n.readAt) markOne.mutate(n.notificationId);
     if (n.link) { setOpen(false); navigate(n.link); }
   }
 
@@ -182,8 +189,17 @@ export default function NotificationBell() {
 
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-100 rounded-xl shadow-2xl overflow-hidden z-50">
-          <div className="px-4 py-3 border-b border-gray-100">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-gray-900">Notifications</p>
+            {newItems.length > 0 && (
+              <button
+                onClick={() => markAll.mutate()}
+                disabled={markAll.isPending}
+                className="text-xs font-medium text-brand-green hover:underline disabled:opacity-50"
+              >
+                Mark all read
+              </button>
+            )}
           </div>
 
           {/* New / All tabs */}

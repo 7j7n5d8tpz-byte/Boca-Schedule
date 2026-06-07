@@ -33,7 +33,7 @@ interface GoalEntry {
   assisterId: string | null;
 }
 
-type Step = 'score' | 'goals' | 'goalkeepers' | 'cards' | 'motm' | 'assessment';
+type Step = 'score' | 'goals' | 'goalkeepers' | 'cards' | 'motm' | 'fines' | 'assessment';
 
 // ─── Highlights card ──────────────────────────────────────────────────────────
 
@@ -225,6 +225,7 @@ function StepProgress({ step, goalIndex, goalsFor }: { step: Step; goalIndex: nu
     { key: 'goalkeepers', label: 'Goalkeepers' },
     { key: 'cards',       label: 'Cards' },
     { key: 'motm',        label: 'Man of match' },
+    { key: 'fines',       label: 'Fines' },
     { key: 'assessment',  label: 'Feeling' },
   ];
   const currentIdx = steps.findIndex(s => s.key === step);
@@ -263,6 +264,9 @@ export default function MatchResults() {
   const [gkFirstHalfId, setGkFirstHalfId]   = useState<string | null>(null);
   const [gkSecondHalfId, setGkSecondHalfId] = useState<string | null>(null);
   const [longRead, setLongRead]           = useState('');
+  const [matchFines, setMatchFines]       = useState<{ playerId: string; fineTypeId: string }[]>([]);
+  const [fineDraftPlayer, setFineDraftPlayer] = useState('');
+  const [fineDraftType, setFineDraftType]     = useState('');
   const [showHighlights, setShowHighlights] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError]             = useState('');
@@ -277,6 +281,11 @@ export default function MatchResults() {
   const { data: existingResults, isLoading: resultsLoading } = useQuery({
     queryKey: ['match-results', matchId],
     queryFn: () => api.get(`/matches/${matchId}/results`).then(r => r.data.data),
+  });
+
+  const { data: fineTypes } = useQuery<{ fineTypeId: string; label: string; amountDkk: number }[]>({
+    queryKey: ['fine-types'],
+    queryFn: () => api.get('/fine-types').then(r => r.data.data),
   });
 
   // Seed from existing results when editing
@@ -362,7 +371,7 @@ export default function MatchResults() {
   }
 
   const saveMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const csIds = new Set<string>();
       if (gkFirstHalfId  && gkFirstHalfCleanSheet)  csIds.add(gkFirstHalfId);
       if (gkSecondHalfId && gkSecondHalfCleanSheet) csIds.add(gkSecondHalfId);
@@ -375,7 +384,13 @@ export default function MatchResults() {
         yellowCards: yellowCardIds.includes(p.userId) ? 1 : 0,
         redCards:    redCardIds.includes(p.userId) ? 1 : 0,
       }));
-      return api.post(`/matches/${matchId}/results`, { goalsFor, goalsAgainst, gameAssessment, goalEvents: goalEntries, longRead: longRead || null, manOfMatchId: motmId, gkFirstHalfId, gkSecondHalfId, players });
+      const res = await api.post(`/matches/${matchId}/results`, { goalsFor, goalsAgainst, gameAssessment, goalEvents: goalEntries, longRead: longRead || null, manOfMatchId: motmId, gkFirstHalfId, gkSecondHalfId, players });
+      // Submit any fines added in this session, then clear so a re-save can't duplicate them.
+      if (matchFines.length > 0) {
+        await Promise.all(matchFines.map(f => api.post('/fines', { playerId: f.playerId, fineTypeId: f.fineTypeId, matchId })));
+        setMatchFines([]);
+      }
+      return res;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['match-results', matchId] });
@@ -753,6 +768,84 @@ export default function MatchResults() {
                 ← Back
               </button>
               <button
+                onClick={() => setStep('fines')}
+                className="flex-[2] bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+              >
+                Continue →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Fines ── */}
+        {step === 'fines' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+              <h2 className="font-semibold text-gray-900">Fines</h2>
+              <p className="text-xs text-gray-400">
+                Optional — add any fines from this match. A fine admin approves them before they count
+                (unless you are one, in which case they apply right away).
+              </p>
+
+              {/* Added fines */}
+              {matchFines.length > 0 && (
+                <div className="space-y-1.5">
+                  {matchFines.map((f, i) => {
+                    const player = selectedPlayers.find(p => p.userId === f.playerId);
+                    const type = (fineTypes ?? []).find(t => t.fineTypeId === f.fineTypeId);
+                    return (
+                      <div key={i} className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                        <span className="truncate text-gray-800">{player?.name ?? 'Player'} · {type?.label ?? 'Fine'}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-gray-500">{type ? `${type.amountDkk} kr` : ''}</span>
+                          <button onClick={() => setMatchFines(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500">✕</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Add a fine */}
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <select
+                  value={fineDraftPlayer}
+                  onChange={e => setFineDraftPlayer(e.target.value)}
+                  className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
+                >
+                  <option value="">Player…</option>
+                  {selectedPlayers.map(p => <option key={p.userId} value={p.userId}>{p.name}</option>)}
+                </select>
+                <select
+                  value={fineDraftType}
+                  onChange={e => setFineDraftType(e.target.value)}
+                  className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
+                >
+                  <option value="">Fine…</option>
+                  {(fineTypes ?? []).map(t => <option key={t.fineTypeId} value={t.fineTypeId}>{t.label} — {t.amountDkk} kr</option>)}
+                </select>
+                <button
+                  onClick={() => {
+                    if (!fineDraftPlayer || !fineDraftType) return;
+                    setMatchFines(prev => [...prev, { playerId: fineDraftPlayer, fineTypeId: fineDraftType }]);
+                    setFineDraftPlayer(''); setFineDraftType('');
+                  }}
+                  disabled={!fineDraftPlayer || !fineDraftType}
+                  className="bg-brand-dark text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-40 shrink-0"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setStep('motm')}
+                className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                ← Back
+              </button>
+              <button
                 onClick={() => setStep('assessment')}
                 className="flex-[2] bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
               >
@@ -808,7 +901,7 @@ export default function MatchResults() {
 
             <div className="flex gap-2">
               <button
-                onClick={() => setStep('motm')}
+                onClick={() => setStep('fines')}
                 className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 ← Back

@@ -130,7 +130,7 @@ export default function FinesStats() {
             <BarChart data={chartTypes} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
               <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
               <YAxis type="category" dataKey="label" width={130} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number, _n, p: any) => [`${v}× · ${kr(p.payload.totalDkk)}`, 'Fines']} />
+              <Tooltip formatter={((value: any, _name: any, item: any) => [`${value}× · ${kr(item?.payload?.totalDkk ?? 0)}`, 'Fines']) as any} />
               <Bar dataKey="count" fill={GREEN} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -145,7 +145,7 @@ export default function FinesStats() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => [kr(v), 'Fined']} />
+                <Tooltip formatter={((value: any) => [kr(Number(value)), 'Fined']) as any} />
                 <Line type="monotone" dataKey="totalDkk" stroke={AMBER} strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>

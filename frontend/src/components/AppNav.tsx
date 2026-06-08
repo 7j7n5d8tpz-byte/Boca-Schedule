@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import RavenIcon from './RavenIcon';
 import NotificationBell from './NotificationBell';
+import KitStripe from './KitStripe';
 
 interface AppNavProps {
   backHref?: string;
@@ -45,7 +46,8 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
   }, [open]);
 
   return (
-    <nav className="bg-brand-dark border-b border-brand-green/40 px-4 py-3 flex items-center gap-3">
+    <>
+    <nav className="bg-brand-dark px-4 py-3 flex items-center gap-3">
 
       {/* ── Optional back link ── */}
       {(backHref || onBack) && (
@@ -67,7 +69,7 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
         className="flex items-center gap-2 sm:gap-3 shrink-0 rounded-lg hover:opacity-80 transition-opacity"
       >
         <RavenIcon className="w-10 h-10 sm:w-12 sm:h-12 shrink-0" />
-        <span className="hidden sm:block font-bold text-white text-lg leading-tight">Boca Boldisch</span>
+        <span className="hidden sm:block font-display font-extrabold uppercase tracking-wide text-white text-lg leading-tight">Boca Boldisch</span>
       </Link>
 
       {/* ── Spacer ── */}
@@ -135,5 +137,7 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
         )}
       </div>
     </nav>
+    <KitStripe orientation="horizontal" />
+    </>
   );
 }

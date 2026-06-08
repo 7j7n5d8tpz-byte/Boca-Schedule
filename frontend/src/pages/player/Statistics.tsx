@@ -20,6 +20,9 @@ function RadarTooltip({ active, payload }: any) {
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { Skeleton } from '../../components/Skeleton';
+import StatIcon, { CardChip } from '../../components/StatIcon';
+import Icon, { Star } from '../../components/Icon';
+import CountUp from '../../components/CountUp';
 
 interface PlayerStat {
   userId: string;
@@ -104,10 +107,10 @@ const POS_COLOR: Record<string, string> = {
 };
 
 const CHART_COLORS = {
-  goals: '#1a6b3a',
-  against: '#f87171',
+  goals: '#205B3B',      // brand green (kit)
+  against: '#c41230',    // brand crimson (kit)
   assists: '#8b5cf6',
-  cleanSheets: '#10b981',
+  cleanSheets: '#3da06a',
   attendance: '#f59e0b',
 };
 
@@ -127,7 +130,7 @@ function StatCard({ label, value, sub, color = 'text-gray-900' }: {
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <p className={`text-2xl font-bold font-numeric ${color}`}>{typeof value === 'number' ? <CountUp value={value} /> : value}</p>
       <p className="text-xs text-gray-500 mt-0.5">{label}</p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
@@ -190,6 +193,7 @@ export default function Statistics() {
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all' | '7-player' | 'futsal'>('all');
   const [view, setView] = useState<'team' | 'highlights'>('team');
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [showAllPlayers, setShowAllPlayers] = useState(false);
   const highlightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const isCoach = user?.role === 'coach' || user?.role === 'admin';
@@ -227,6 +231,9 @@ export default function Statistics() {
 
   const overview = data?.overview;
   const players = data?.players ?? [];
+  const PLAYER_PREVIEW = 8;
+  const visiblePlayers = showAllPlayers ? players : players.slice(0, PLAYER_PREVIEW);
+  const hasMorePlayers = players.length > PLAYER_PREVIEW;
   const matchHistory = data?.matchHistory ?? [];
 
   const focusPlayer = useMemo(
@@ -321,7 +328,7 @@ export default function Statistics() {
         {/* Header + filters */}
         <div className="flex items-center justify-between gap-4 flex-wrap mb-8">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-gray-900">Team Statistics</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Team Statistics</h1>
             {(data?.availableYears ?? []).length > 0 && (
               <select
                 value={selectedYear ?? data?.year ?? ''}
@@ -433,7 +440,7 @@ export default function Statistics() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-2xl font-bold text-gray-900">{h.goalsFor} – {h.goalsAgainst}</span>
+                      <span className="text-2xl font-bold font-numeric text-gray-900">{h.goalsFor} – {h.goalsAgainst}</span>
                       <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${resultColor}`}>{result}</span>
                     </div>
                   </div>
@@ -471,13 +478,13 @@ export default function Statistics() {
                     <div className="flex gap-4 flex-wrap">
                       {h.yellowCards.length > 0 && (
                         <div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">🟨 Yellow cards</p>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><CardChip color="yellow" /> Yellow cards</p>
                           <p className="text-sm text-gray-700 mt-0.5">{h.yellowCards.join(', ')}</p>
                         </div>
                       )}
                       {h.redCards.length > 0 && (
                         <div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">🟥 Red cards</p>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><CardChip color="red" /> Red cards</p>
                           <p className="text-sm text-gray-700 mt-0.5">{h.redCards.join(', ')}</p>
                         </div>
                       )}
@@ -486,7 +493,7 @@ export default function Statistics() {
 
                   {h.manOfMatch && (
                     <div className="flex items-center gap-2">
-                      <span className="text-base">⭐</span>
+                      <Star className="w-5 h-5 text-amber-500" />
                       <div>
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Man of the match</p>
                         <p className="text-sm font-semibold text-amber-600 mt-0.5">{h.manOfMatch}</p>
@@ -513,7 +520,7 @@ export default function Statistics() {
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-semibold">GK</span>
                               )}
                               {p.isScorer && (
-                                <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-semibold">⚽ Goal</span>
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-semibold inline-flex items-center gap-1"><StatIcon name="ball" className="w-3 h-3" /> Goal</span>
                               )}
                               {p.isAssister && (
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold">A</span>
@@ -569,7 +576,7 @@ export default function Statistics() {
             {/* Honours row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-                <span className="text-2xl">⚽</span>
+                <StatIcon name="ball" className="w-7 h-7" />
                 <div>
                   <p className="text-xs text-gray-500">Top scorer</p>
                   {overview.topScorer
@@ -578,7 +585,7 @@ export default function Statistics() {
                 </div>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-                <span className="text-2xl">🎯</span>
+                <StatIcon name="target" className="w-7 h-7" />
                 <div>
                   <p className="text-xs text-gray-500">Most assists</p>
                   {overview.topAssister
@@ -587,7 +594,7 @@ export default function Statistics() {
                 </div>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-                <span className="text-2xl">🧤</span>
+                <StatIcon name="glove" className="w-7 h-7" />
                 <div>
                   <p className="text-xs text-gray-500">Most clean sheets</p>
                   {overview.topKeeper
@@ -596,7 +603,7 @@ export default function Statistics() {
                 </div>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-                <span className="text-2xl">⭐</span>
+                <Star className="w-7 h-7 text-gray-900" />
                 <div>
                   <p className="text-xs text-gray-500">Top man of match</p>
                   {overview.topMotm
@@ -687,7 +694,7 @@ export default function Statistics() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Top scorers */}
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3">⚽ Top scorers</h2>
+                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="ball" className="w-4 h-4" /> Top scorers</h2>
                   {topScorers.map(p => (
                     <LeaderBar key={p.userId} name={p.name} value={p.totalGoals}
                       max={maxGoals} color={CHART_COLORS.goals} isMe={p.userId === user?.userId} />
@@ -696,7 +703,7 @@ export default function Statistics() {
 
                 {/* Top assisters */}
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3">🎯 Top assisters</h2>
+                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="target" className="w-4 h-4" /> Top assisters</h2>
                   {topAssisters.map(p => (
                     <LeaderBar key={p.userId} name={p.name} value={p.totalAssists}
                       max={maxAssists} color={CHART_COLORS.assists} isMe={p.userId === user?.userId} />
@@ -706,7 +713,7 @@ export default function Statistics() {
                 {/* Clean sheets */}
                 {topCleanSheets.length > 0 && topCleanSheets[0].totalCleanSheets > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h2 className="text-sm font-semibold text-gray-700 mb-3">🧤 Clean sheets</h2>
+                    <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="glove" className="w-4 h-4" /> Clean sheets</h2>
                     {topCleanSheets.map(p => (
                       <LeaderBar key={p.userId} name={p.name} value={p.totalCleanSheets}
                         max={maxCleanSheets} color={CHART_COLORS.cleanSheets} isMe={p.userId === user?.userId} />
@@ -717,7 +724,7 @@ export default function Statistics() {
                 {/* GK leaderboard */}
                 {gkLeaderboard.length > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h2 className="text-sm font-semibold text-gray-700 mb-3">🥅 Goalkeepers</h2>
+                    <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="glove" className="w-4 h-4" /> Goalkeepers</h2>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
                         <span className="text-xs text-gray-400 w-28 shrink-0">Player</span>
@@ -747,7 +754,7 @@ export default function Statistics() {
 
                 {/* Attendance */}
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3">📅 Attendance rate</h2>
+                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><Icon name="calendar" className="w-4 h-4 text-gray-400" /> Attendance rate</h2>
                   {topAttenders.filter(p => p.totalSignups > 0).map(p => (
                     <LeaderBar key={p.userId} name={p.name} value={Math.round(p.attendanceRate)}
                       max={maxAttend} color={CHART_COLORS.attendance} isMe={p.userId === user?.userId} />
@@ -757,7 +764,7 @@ export default function Statistics() {
                 {/* Cards */}
                 {cardedPlayers.length > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h2 className="text-sm font-semibold text-gray-700 mb-3">⚠️ Cards</h2>
+                    <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><CardChip color="yellow" /><CardChip color="red" /> Cards</h2>
                     <div className="space-y-1.5">
                       {cardedPlayers.map(p => {
                         const isMe = p.userId === user?.userId;
@@ -768,13 +775,13 @@ export default function Statistics() {
                             </span>
                             <div className="flex gap-2">
                               {p.totalYellowCards > 0 && (
-                                <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-                                  🟨 {p.totalYellowCards}
+                                <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                  <CardChip color="yellow" /> {p.totalYellowCards}
                                 </span>
                               )}
                               {p.totalRedCards > 0 && (
-                                <span className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
-                                  🟥 {p.totalRedCards}
+                                <span className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                                  <CardChip color="red" /> {p.totalRedCards}
                                 </span>
                               )}
                             </div>
@@ -793,7 +800,7 @@ export default function Statistics() {
               {/* Mobile cards */}
               <div className="sm:hidden space-y-3">
                 <h2 className="text-sm font-semibold text-gray-700">All players</h2>
-                {players.map(p => {
+                {visiblePlayers.map(p => {
                   const isMe = p.userId === user?.userId;
                   const rate = p.totalSignups > 0 ? p.attendanceRate : null;
                   return (
@@ -830,12 +837,18 @@ export default function Statistics() {
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500 border-t border-gray-50 pt-2">
                         {isCoach && <span>Signed up: <span className="font-medium text-gray-700">{p.totalSignups}</span></span>}
                         <span>Clean sheets: <span className="font-medium text-gray-700">{p.totalCleanSheets}</span></span>
-                        {p.totalYellowCards > 0 && <span className="text-amber-600 font-medium">🟨 {p.totalYellowCards}</span>}
-                        {p.totalRedCards > 0 && <span className="text-red-600 font-medium">🟥 {p.totalRedCards}</span>}
+                        {p.totalYellowCards > 0 && <span className="text-amber-600 font-medium inline-flex items-center gap-1"><CardChip color="yellow" /> {p.totalYellowCards}</span>}
+                        {p.totalRedCards > 0 && <span className="text-red-600 font-medium inline-flex items-center gap-1"><CardChip color="red" /> {p.totalRedCards}</span>}
                       </div>
                     </div>
                   );
                 })}
+                {hasMorePlayers && (
+                  <button onClick={() => setShowAllPlayers(v => !v)}
+                    className="w-full text-sm text-brand-green font-medium py-2 rounded-lg hover:bg-brand-green-50 transition-colors">
+                    {showAllPlayers ? 'Show less' : `Show all ${players.length} players`}
+                  </button>
+                )}
                 <p className="text-xs text-gray-400">Tap a player to view details</p>
               </div>
 
@@ -863,7 +876,7 @@ export default function Statistics() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {players.map(p => {
+                    {visiblePlayers.map(p => {
                       const isMe = p.userId === user?.userId;
                       return (
                         <tr key={p.userId}
@@ -906,6 +919,12 @@ export default function Statistics() {
                     })}
                   </tbody>
                 </table>
+                {hasMorePlayers && (
+                  <button onClick={() => setShowAllPlayers(v => !v)}
+                    className="w-full text-sm text-brand-green font-medium py-2.5 border-t border-gray-100 hover:bg-brand-green-50 transition-colors">
+                    {showAllPlayers ? 'Show less' : `Show all ${players.length} players`}
+                  </button>
+                )}
                 <p className="text-xs text-gray-400 px-5 py-3">Click a row to view player details</p>
               </div>
             </div>

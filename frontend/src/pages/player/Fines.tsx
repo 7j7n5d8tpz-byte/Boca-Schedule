@@ -11,7 +11,7 @@ export default function FinesPage() {
       <AppNav backHref="/dashboard" backLabel="← Dashboard" />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Team Fines</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900 title-stripe mb-8">Team Fines</h1>
 
         {/* Sidebar + content layout (mirrors Team Statistics) */}
         <div className="flex flex-col sm:flex-row gap-6 items-stretch sm:items-start">

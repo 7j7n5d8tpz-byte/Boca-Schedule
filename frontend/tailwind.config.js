@@ -3,6 +3,9 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        display: ['Archivo', 'system-ui', '-apple-system', 'sans-serif'],
+      },
       colors: {
         brand: {
           dark: '#1A1D22',

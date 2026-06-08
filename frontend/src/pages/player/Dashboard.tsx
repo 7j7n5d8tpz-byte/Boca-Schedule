@@ -7,6 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { formatLocation } from '../../components/LocationPicker';
 import { meetingTime, mapsUrl, buildMatchIcs, downloadIcs } from '../../utils';
 import { CardListSkeleton } from '../../components/Skeleton';
+import Icon from '../../components/Icon';
+import CountUp from '../../components/CountUp';
 
 interface Match {
   matchId: string;
@@ -212,8 +214,8 @@ function MatchCard({ match }: { match: Match }) {
         {/* Open spot available — claimable by players not in the squad */}
         {match.status === 'published' && !match.isSelected && match.openSpot && !match.myClaim && (
           <div className="bg-brand-green-50 border border-brand-green/30 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
-            <p className="text-xs text-gray-700">
-              🆓 A spot is open — claim it and the coach will confirm.
+            <p className="text-xs text-gray-700 flex items-center gap-1.5">
+              <Icon name="tag" className="w-4 h-4 text-brand-green shrink-0" /> A spot is open — claim it and the coach will confirm.
             </p>
             <button
               onClick={() => { setClaimError(''); claimMutation.mutate(); }}
@@ -284,9 +286,9 @@ function MatchCard({ match }: { match: Match }) {
             {(match.userSignedUp || match.isSelected) && (
               <button
                 onClick={addToCalendar}
-                className="text-xs text-gray-400 hover:text-brand-green transition-colors"
+                className="text-xs text-gray-400 hover:text-brand-green transition-colors inline-flex items-center gap-1.5"
               >
-                📅 Add to calendar
+                <Icon name="calendar" className="w-3.5 h-3.5" /> Add to calendar
               </button>
             )}
             {match.status === 'published' && (
@@ -454,8 +456,8 @@ export default function PlayerDashboard() {
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Welcome back, {user?.name?.split(' ')[0]}!</h1>
-          <p className="text-gray-500 text-sm mt-1">Here's what's coming up.</p>
+          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Welcome back, {user?.name?.split(' ')[0]}!</h1>
+          <p className="text-gray-500 text-sm mt-1 pl-[0.85rem]">Here's what's coming up.</p>
         </div>
 
         {/* Announcements */}
@@ -463,7 +465,7 @@ export default function PlayerDashboard() {
           <div className="space-y-2">
             {announcements!.map(a => (
               <div key={a.announcementId} className="bg-brand-green-50 border border-brand-green/30 rounded-xl px-4 py-3">
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">📣 {a.body}</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap flex gap-1.5"><Icon name="megaphone" className="w-4 h-4 text-brand-green shrink-0 mt-0.5" /> <span>{a.body}</span></p>
                 <p className="text-xs text-gray-400 mt-1">
                   {a.author}
                   {a.match && ` · for ${new Date(a.match.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${a.match.opponent ? ` vs ${a.match.opponent}` : ''}`}
@@ -491,10 +493,10 @@ export default function PlayerDashboard() {
                   { label: 'Assists',       value: assists },
                   { label: 'Signed up',     value: signups },
                   { label: 'Clean sheets',  value: sheets },
-                  { label: 'Attendance',    value: `${Math.round(attend)}%` },
+                  { label: 'Attendance',    value: Math.round(attend), suffix: '%' },
                 ].map(s => (
                   <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-                    <p className="text-2xl font-bold text-gray-900">{s.value}</p>
+                    <p className="text-2xl font-bold font-numeric text-gray-900"><CountUp value={s.value} />{s.suffix ?? ''}</p>
                     <p className="text-xs text-gray-500 mt-1">{s.label}</p>
                   </div>
                 ))}
@@ -502,14 +504,14 @@ export default function PlayerDashboard() {
 
               {/* Quick links */}
               <div className="grid grid-cols-2 gap-3">
-                <Link to="/statistics" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group">
+                <Link to="/statistics" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Team Stats</p>
                     <p className="text-xs text-gray-400 mt-0.5">Leaderboards &amp; match highlights</p>
                   </div>
                   <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
                 </Link>
-                <Link to="/profile" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group">
+                <Link to="/profile" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">My Profile</p>
                     <p className="text-xs text-gray-400 mt-0.5">Positions &amp; account info</p>
@@ -529,7 +531,7 @@ export default function PlayerDashboard() {
           return (
             <Link
               to="/fines"
-              className={`block rounded-xl border p-4 flex items-center justify-between gap-3 transition-colors group ${
+              className={`block rounded-xl border p-4 flex items-center justify-between gap-3 transition-colors group lift ${
                 due > 0 ? 'bg-amber-50 border-amber-300 hover:border-amber-400' : 'bg-white border-gray-200 hover:border-brand-green'
               }`}
             >
@@ -540,7 +542,7 @@ export default function PlayerDashboard() {
                     ? <span className="text-amber-700 font-medium">{due.toLocaleString('da-DK')} kr outstanding — tap to pay</span>
                     : awaiting > 0
                       ? <span className="text-blue-600">{awaiting.toLocaleString('da-DK')} kr awaiting confirmation</span>
-                      : 'All settled — nice 🎉'}
+                      : 'All settled — nice'}
                 </p>
               </div>
               <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>

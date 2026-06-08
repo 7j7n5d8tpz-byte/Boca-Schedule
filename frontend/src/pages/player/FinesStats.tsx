@@ -5,9 +5,12 @@ import {
 } from 'recharts';
 import { api } from '../../api/client';
 import { formatKr as kr } from './finesUtil';
+import Icon from '../../components/Icon';
+import StatIcon from '../../components/StatIcon';
+import type { ReactNode } from 'react';
 
 const GREEN = '#205B3B';
-const AMBER = '#f59e0b';
+const CRIMSON = '#c41230';
 
 interface StatsData {
   availableYears: number[];
@@ -37,7 +40,7 @@ export default function FinesStats() {
     return (
       <div className="space-y-4">
         <YearFilter year={year} setYear={setYear} years={data.availableYears} />
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">No fines yet — nothing to brag about. 😇</div>
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">No fines yet — nothing to brag about.</div>
       </div>
     );
   }
@@ -51,10 +54,10 @@ export default function FinesStats() {
 
       {/* Headline tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Tile emoji="💰" value={kr(data.pot.totalDkk)} label="The pot" sub={`${kr(data.pot.collectedDkk)} in · ${kr(data.pot.outstandingDkk)} owed`} />
-        <Tile emoji="👑" value={king?.name.split(' ')[0] ?? '—'} label="Bødekongen" sub={king ? kr(king.totalDkk) : ''} />
-        <Tile emoji="🧾" value={data.favouriteFine?.label ?? '—'} label="Favourite fine" sub={data.favouriteFine ? `${data.favouriteFine.count}×` : ''} small />
-        <Tile emoji="⚽" value={kr(data.perGameDkk)} label="Per game" sub="avg / match" />
+        <Tile icon={<Icon name="banknotes" className="w-5 h-5" />} value={kr(data.pot.totalDkk)} label="The pot" sub={`${kr(data.pot.collectedDkk)} in · ${kr(data.pot.outstandingDkk)} owed`} />
+        <Tile icon={<Icon name="crown" className="w-5 h-5" />} value={king?.name.split(' ')[0] ?? '—'} label="Bødekongen" sub={king ? kr(king.totalDkk) : ''} />
+        <Tile icon={<Icon name="receipt" className="w-5 h-5" />} value={data.favouriteFine?.label ?? '—'} label="Favourite fine" sub={data.favouriteFine ? `${data.favouriteFine.count}×` : ''} small />
+        <Tile icon={<StatIcon name="ball" gray className="w-5 h-5" />} value={kr(data.perGameDkk)} label="Per game" sub="avg / match" />
       </div>
 
       {/* Leaderboards */}
@@ -93,7 +96,7 @@ export default function FinesStats() {
 
         <Panel title={`The saints (${data.saints.length})`}>
           {data.saints.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-gray-400">Nobody — everyone's been fined 😈</p>
+            <p className="px-4 py-3 text-sm text-gray-400">Nobody — everyone's been fined</p>
           ) : (
             <div className="px-4 py-3 flex flex-wrap gap-1.5">
               {data.saints.map(n => (
@@ -106,7 +109,7 @@ export default function FinesStats() {
         <Panel title="Biggest single fine">
           {data.biggestFine ? (
             <div className="px-4 py-3">
-              <p className="text-2xl font-bold text-gray-900">{kr(data.biggestFine.amountDkk)}</p>
+              <p className="text-2xl font-bold font-numeric text-gray-900">{kr(data.biggestFine.amountDkk)}</p>
               <p className="text-sm text-gray-700">{data.biggestFine.playerName} — {data.biggestFine.label}</p>
               <p className="text-xs text-gray-400">{data.biggestFine.when}</p>
             </div>
@@ -116,7 +119,7 @@ export default function FinesStats() {
         <Panel title="Most expensive match">
           {data.mostExpensiveMatch ? (
             <div className="px-4 py-3">
-              <p className="text-2xl font-bold text-gray-900">{kr(data.mostExpensiveMatch.totalDkk)}</p>
+              <p className="text-2xl font-bold font-numeric text-gray-900">{kr(data.mostExpensiveMatch.totalDkk)}</p>
               <p className="text-sm text-gray-700">{data.mostExpensiveMatch.label}</p>
             </div>
           ) : <p className="px-4 py-3 text-sm text-gray-400">No match fines yet.</p>}
@@ -146,7 +149,7 @@ export default function FinesStats() {
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip formatter={((value: any) => [kr(Number(value)), 'Fined']) as any} />
-                <Line type="monotone" dataKey="totalDkk" stroke={AMBER} strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="totalDkk" stroke={CRIMSON} strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -169,11 +172,11 @@ function YearFilter({ year, setYear, years }: { year: string; setYear: (y: strin
   );
 }
 
-function Tile({ emoji, value, label, sub, small }: { emoji: string; value: string; label: string; sub?: string; small?: boolean }) {
+function Tile({ icon, value, label, sub, small }: { icon: ReactNode; value: string; label: string; sub?: string; small?: boolean }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <p className="text-lg">{emoji}</p>
-      <p className={`font-bold text-gray-900 leading-tight ${small ? 'text-sm' : 'text-xl'} truncate`} title={value}>{value}</p>
+      <p className="text-gray-400 mb-1">{icon}</p>
+      <p className={`font-bold font-numeric text-gray-900 leading-tight ${small ? 'text-sm' : 'text-xl'} truncate`} title={value}>{value}</p>
       <p className="text-xs text-gray-500 mt-0.5">{label}</p>
       {sub && <p className="text-[11px] text-gray-400 mt-0.5 truncate">{sub}</p>}
     </div>
@@ -183,7 +186,7 @@ function Tile({ emoji, value, label, sub, small }: { emoji: string; value: strin
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">{title}</h3>
+      <h3 className="text-sm font-semibold text-gray-700 mb-2">{title}</h3>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">{children}</div>
     </div>
   );

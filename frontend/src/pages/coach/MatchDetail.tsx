@@ -5,6 +5,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import LocationPicker, { encodeLocation, decodeLocation, formatLocation } from '../../components/LocationPicker';
 import { meetingTime, mapsUrl } from '../../utils';
+import Icon, { Star } from '../../components/Icon';
 
 interface SignupPlayer {
   signupId: string;
@@ -166,7 +167,7 @@ export default function MatchDetail() {
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">
               {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
             </h1>
             <p className="text-gray-500 mt-1">
@@ -447,11 +448,11 @@ export default function MatchDetail() {
           {/* Weight lever */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>⚖️ Fairness</span>
+              <span className="flex items-center gap-1"><Icon name="scale" className="w-3.5 h-3.5" /> Fairness</span>
               <span className="font-medium text-gray-600">
                 {fairnessWeight === 50 ? 'Balanced' : fairnessWeight < 50 ? 'Fairness priority' : 'Positions priority'}
               </span>
-              <span>🧩 Positions</span>
+              <span className="flex items-center gap-1"><Icon name="puzzle" className="w-3.5 h-3.5" /> Positions</span>
             </div>
             <input
               type="range"
@@ -472,7 +473,7 @@ export default function MatchDetail() {
 
         {/* Sign-ups list */}
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+          <h2 className="text-sm font-semibold text-gray-700">
             Signed up — {summary.totalSignups}
           </h2>
           {signups.length === 0 && (
@@ -500,7 +501,7 @@ export default function MatchDetail() {
                       : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
                   }`}
                 >
-                  {isPriority ? '★ Priority' : '☆ Priority'}
+                  <span className="flex items-center gap-1"><Star filled={isPriority} className="w-3.5 h-3.5" /> Priority</span>
                 </button>
               </div>
             );

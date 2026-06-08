@@ -155,7 +155,7 @@ export default function FinesView() {
       {/* Standings (only for the All-players view) */}
       {viewingAll && standings.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Standings</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Standings</h3>
           <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
             {standings.map(p => (
               <button key={p.playerId} onClick={() => setPlayer(p.playerId)} className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors">
@@ -203,7 +203,7 @@ export default function FinesView() {
       {/* Dispute dialog */}
       {disputeId && (
         <Dialog title="Dispute this fine" onClose={() => setDisputeId(null)}>
-          <p className="text-sm text-gray-600">Tell the fine admins why you think this fine is wrong. (Heads up: "Brok over tildelt bøde" is itself a fine 😉)</p>
+          <p className="text-sm text-gray-600">Tell the fine admins why you think this fine is wrong. (Heads up: "Brok over tildelt bøde" is itself a fine.)</p>
           <textarea value={disputeNote} onChange={e => setDisputeNote(e.target.value)} rows={3} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green" placeholder="Reason…" />
           <div className="flex justify-end gap-2">
             <button onClick={() => setDisputeId(null)} className="text-sm text-gray-600 hover:bg-gray-50 px-4 py-2 rounded-lg">Cancel</button>
@@ -604,7 +604,7 @@ function FineCardsAndTable({ fines, showPlayer, rowAction, empty }: {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">{title}</h3>
+      <h3 className="text-sm font-semibold text-gray-700 mb-2">{title}</h3>
       {children}
     </div>
   );
@@ -617,7 +617,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 function Dialog({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className={`bg-white rounded-2xl shadow-xl w-full ${wide ? 'max-w-lg' : 'max-w-sm'} p-6 space-y-4`} onClick={e => e.stopPropagation()}>
+      <div className={`bg-white rounded-2xl shadow-xl w-full ${wide ? 'max-w-lg' : 'max-w-sm'} p-6 space-y-4 boca-pop`} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold text-gray-900">{title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm shrink-0">✕</button>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Star } from './Icon';
 
 export interface SelectionPlayer {
   player: {
@@ -126,7 +127,7 @@ export function PitchView({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Formation</h2>
+        <h2 className="text-sm font-semibold text-gray-700">Formation</h2>
         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${allMet ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
           {allMet ? '✓ All positions covered' : '⚠ Formation incomplete'}
         </span>
@@ -314,9 +315,9 @@ export function PitchView({
                 <div className={`relative w-8 h-8 rounded-full ${TOKEN_STYLES[pos]} ring-2 shadow-xl flex items-center justify-center`}>
                   <span className="text-white text-[8px] font-extrabold tracking-tight drop-shadow">{pos}</span>
                   {sp.isPriority && (
-                    <span className="absolute text-yellow-300 font-bold pointer-events-none"
-                      style={{ top: '-9px', right: '-2px', fontSize: '13px', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
-                      ★
+                    <span className="absolute text-yellow-300 pointer-events-none"
+                      style={{ top: '-9px', right: '-3px', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.9))' }}>
+                      <Star className="w-3 h-3" />
                     </span>
                   )}
                   {!met && (
@@ -349,7 +350,7 @@ export function PitchView({
           </div>
         ))}
         <div className="flex items-center gap-1.5">
-          <span className="text-yellow-400 text-xs leading-none">★</span>
+          <Star className="w-3 h-3 text-yellow-400" />
           <span className="text-xs text-gray-400">Priority</span>
         </div>
         <div className="flex items-center gap-1.5">

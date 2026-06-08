@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { PitchView, POS_TAG, type SelectionPlayer, type Guest } from '../../components/PitchView';
+import { Star } from '../../components/Icon';
 
 interface FormationSlot { covered: boolean; required: number; filled: number }
 
@@ -89,7 +90,7 @@ function WhySquad({ opt, minPlayers }: { opt: OptimizationResult; minPlayers: nu
           <ul className="list-disc list-inside space-y-1 text-sm text-gray-500">
             <li>Fills your formation (e.g. GK, 2× DEF, 2× WIN…) and reaches at least the minimum squad size.</li>
             <li><span className="text-gray-700 font-medium">Fairness:</span> players who have played fewer games are favoured. Regular sign-ups are rewarded too, but games actually played weigh most (about 4:1).</li>
-            <li><span className="text-gray-700 font-medium">Priority (★):</span> players you starred are strongly favoured for a spot.</li>
+            <li><span className="text-gray-700 font-medium">Priority (<Star className="inline w-3 h-3 -mt-0.5 text-amber-500" />):</span> players you starred are strongly favoured for a spot.</li>
             <li><span className="text-gray-700 font-medium">Balance:</span> the Fairness↔Positions slider tilts between even playing time and best formation fit. This run was <span className="text-gray-700">{fairnessLabel(opt.fairnessWeight).toLowerCase()}</span>.</li>
           </ul>
           <p className="text-xs text-gray-400 pt-1">Reflects the last optimizer run — any manual changes below may differ.</p>
@@ -211,7 +212,7 @@ export default function Selections() {
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">
             {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
           </h1>
           <p className="text-gray-500 mt-1">{match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) · Selections</p>
@@ -302,7 +303,7 @@ export default function Selections() {
         {/* Guest players */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Guest players</h2>
+            <h2 className="text-sm font-semibold text-gray-700">Guest players</h2>
             <button
               onClick={() => setShowAddGuest(v => !v)}
               className="text-xs font-medium text-brand-green hover:text-brand-green-700"
@@ -368,7 +369,7 @@ export default function Selections() {
 
         {/* Player list */}
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">All signed-up players</h2>
+          <h2 className="text-sm font-semibold text-gray-700">All signed-up players</h2>
           {players.map(({ player, isPriority, selectedByOptimization, manuallyAdjusted }) => {
             const isSelected = ids.has(player.userId);
             return (
@@ -384,7 +385,7 @@ export default function Selections() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-gray-900 truncate">{player.name}</p>
-                    {isPriority && <span className="text-xs text-amber-600 font-medium shrink-0">★</span>}
+                    {isPriority && <Star className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
                     {manuallyAdjusted && <span className="text-xs text-gray-400 shrink-0">manual</span>}
                     {selectedByOptimization && !manuallyAdjusted && <span className="text-xs text-blue-400 shrink-0">optimizer</span>}
                   </div>

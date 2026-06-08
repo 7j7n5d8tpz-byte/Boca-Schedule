@@ -5,6 +5,7 @@ import { api } from '../../api/client';
 import { PitchView, POS_TAG, type SelectionPlayer } from '../../components/PitchView';
 import { meetingTime } from '../../utils';
 import { formatLocation } from '../../components/LocationPicker';
+import Icon, { Star } from '../../components/Icon';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -307,7 +308,7 @@ function SelectStep({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Batch optimize</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Batch optimize</h1>
         <p className="text-sm text-gray-500 mt-1">
           Select the matches you want to optimize together. The optimizer will balance player fairness across all selected matches jointly.
         </p>
@@ -405,7 +406,7 @@ function ConfigureStep({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Configure</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Configure</h1>
           <p className="text-sm text-gray-500 mt-1">Set fairness balance and priority players for each match.</p>
         </div>
         <button onClick={onBack} className="text-sm text-gray-400 hover:text-gray-600">← Back</button>
@@ -444,11 +445,11 @@ function ConfigureStep({
                   {/* Fairness slider */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>⚖️ Fairness</span>
+                      <span className="flex items-center gap-1"><Icon name="scale" className="w-3.5 h-3.5" /> Fairness</span>
                       <span className="font-medium text-gray-600">
                         {fw === 50 ? 'Balanced' : fw < 50 ? 'Fairness priority' : 'Positions priority'}
                       </span>
-                      <span>🧩 Positions</span>
+                      <span className="flex items-center gap-1"><Icon name="puzzle" className="w-3.5 h-3.5" /> Positions</span>
                     </div>
                     <input
                       type="range" min={0} max={100} step={10}
@@ -492,7 +493,7 @@ function ConfigureStep({
                                   : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
                               }`}
                             >
-                              {isPriority ? '★ Priority' : '☆ Priority'}
+                              <span className="flex items-center gap-1"><Star filled={isPriority} className="w-3.5 h-3.5" /> Priority</span>
                             </button>
                           </div>
                         );
@@ -620,7 +621,7 @@ function ReviewStep({
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">
             {reviewView === 'selections' ? 'Review selections' : 'Player balance'}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -719,7 +720,7 @@ function ReviewStep({
 
                 {/* Player list */}
                 <div className="space-y-2">
-                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">All signed up</h2>
+                  <h2 className="text-sm font-semibold text-gray-700">All signed up</h2>
                   {selectionPlayers.map(({ player, isPriority, selectedByOptimization }) => {
                     const isSelected = ids.has(player.userId);
                     return (
@@ -738,7 +739,7 @@ function ReviewStep({
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-gray-900 truncate">{player.name}</p>
-                            {isPriority && <span className="text-xs text-amber-600 font-medium shrink-0">★</span>}
+                            {isPriority && <Star className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
                             {selectedByOptimization && <span className="text-xs text-blue-400 shrink-0">optimizer</span>}
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">

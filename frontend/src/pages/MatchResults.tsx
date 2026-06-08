@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import { api } from '../api/client';
+import StatIcon, { CardChip } from '../components/StatIcon';
 
 const POS_COLOR: Record<string, string> = {
   GK:  'bg-yellow-100 text-yellow-700',
@@ -70,7 +71,13 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
   const showBottomSection = hasGoalDetails || hasCleanSheets || hasCards;
 
   return (
-    <div ref={cardRef} style={{ fontFamily: 'system-ui, sans-serif', background: '#0f1f0f', width: 480, padding: 32, borderRadius: 16 }}>
+    <div ref={cardRef} style={{ fontFamily: 'Archivo, system-ui, sans-serif', background: '#0f1f0f', width: 480, padding: 32, borderRadius: 16 }}>
+      {/* Kit stripe — green/crimson/green, full-bleed top accent */}
+      <div style={{
+        height: 6, marginLeft: -32, marginRight: -32, marginTop: -32, marginBottom: 26,
+        borderTopLeftRadius: 16, borderTopRightRadius: 16,
+        background: 'linear-gradient(to right, #205B3B 0 38%, #c41230 38% 62%, #205B3B 62% 100%)',
+      }} />
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
         <img src="/boca-logo.png" alt="Boca" style={{ width: 52, height: 52, borderRadius: 26 }} />
@@ -96,9 +103,9 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
         </div>
         {/* Score numbers row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-          <p style={{ color: '#fff', fontSize: 64, fontWeight: 800, lineHeight: 1, margin: 0, minWidth: 80, textAlign: 'center' }}>{props.goalsFor}</p>
+          <p style={{ color: '#fff', fontSize: 66, fontWeight: 900, lineHeight: 1, margin: 0, minWidth: 80, textAlign: 'center', letterSpacing: -2, fontFeatureSettings: '"tnum" 1' }}>{props.goalsFor}</p>
           <p style={{ color: '#4b5563', fontSize: 32, fontWeight: 300, margin: 0, width: 32, textAlign: 'center' }}>—</p>
-          <p style={{ color: '#9ca3af', fontSize: 64, fontWeight: 800, lineHeight: 1, margin: 0, minWidth: 80, textAlign: 'center' }}>{props.goalsAgainst}</p>
+          <p style={{ color: '#9ca3af', fontSize: 66, fontWeight: 900, lineHeight: 1, margin: 0, minWidth: 80, textAlign: 'center', letterSpacing: -2, fontFeatureSettings: '"tnum" 1' }}>{props.goalsAgainst}</p>
         </div>
         <p style={{ marginTop: 12, fontSize: 18, fontWeight: 700, color: won ? '#4ade80' : drew ? '#fbbf24' : '#f87171' }}>
           {won ? 'WIN' : drew ? 'DRAW' : 'LOSS'}
@@ -117,7 +124,10 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
       {/* Man of the match */}
       {props.manOfMatchName && (
         <div style={{ textAlign: 'center', marginBottom: showBottomSection ? 24 : 0 }}>
-          <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>⭐ Man of the Match</p>
+          <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
+            <img src="/icon-star-white.png" alt="" style={{ width: 12, height: 12, display: 'inline-block', verticalAlign: 'middle', marginRight: 5, marginTop: -2 }} />
+            Man of the Match
+          </p>
           <p style={{ color: '#fde68a', fontSize: 16, fontWeight: 700, margin: 0 }}>{props.manOfMatchName}</p>
         </div>
       )}
@@ -128,7 +138,10 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
           {/* Goals list */}
           {hasGoalDetails && (
             <div style={{ flex: 1 }}>
-              <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>⚽ Goals</p>
+              <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+                <img src="/icon-ball-white.png" alt="" style={{ width: 12, height: 12, display: 'inline-block', verticalAlign: 'middle', marginRight: 5, marginTop: -2 }} />
+                Goals
+              </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {props.goalDetails.map((g, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
@@ -150,7 +163,10 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
           {/* Clean sheets */}
           {hasCleanSheets && (
             <div style={{ flex: 1 }}>
-              <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>🧤 Clean sheet</p>
+              <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
+                <img src="/icon-glove-white.png" alt="" style={{ width: 12, height: 12, display: 'inline-block', verticalAlign: 'middle', marginRight: 5, marginTop: -2 }} />
+                Clean sheet
+              </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {props.cleanSheetNames.map((name, i) => (
                   <span key={i} style={{ color: '#d1fae5', fontSize: 13, fontWeight: 600 }}>{name}</span>
@@ -166,13 +182,13 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {props.yellowCardNames.map((name, i) => (
                   <div key={`y${i}`} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12 }}>🟨</span>
+                    <span style={{ display: 'inline-block', width: 9, height: 12, borderRadius: 2, background: '#facc15', flexShrink: 0 }} />
                     <span style={{ color: '#d1fae5', fontSize: 13, fontWeight: 600 }}>{name}</span>
                   </div>
                 ))}
                 {props.redCardNames.map((name, i) => (
                   <div key={`r${i}`} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12 }}>🟥</span>
+                    <span style={{ display: 'inline-block', width: 9, height: 12, borderRadius: 2, background: '#ef4444', flexShrink: 0 }} />
                     <span style={{ color: '#d1fae5', fontSize: 13, fontWeight: 600 }}>{name}</span>
                   </div>
                 ))}
@@ -448,7 +464,7 @@ export default function MatchResults() {
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Record match result</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Record match result</h1>
           {date && (
             <p className="text-gray-500 mt-1">
               {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · {match.matchTime.slice(0, 5)}
@@ -605,8 +621,8 @@ export default function MatchResults() {
                         : 'border-gray-200 bg-white hover:bg-gray-50'
                   }`}
                 >
-                  <span className={`text-sm font-medium ${gkFirstHalfCleanSheet ? 'text-brand-green-700' : 'text-gray-700'}`}>
-                    🧤 Clean sheet
+                  <span className={`text-sm font-medium flex items-center gap-1.5 ${gkFirstHalfCleanSheet ? 'text-brand-green-700' : 'text-gray-700'}`}>
+                    <StatIcon name="glove" className="w-4 h-4" /> Clean sheet
                   </span>
                   <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${gkFirstHalfCleanSheet ? 'bg-brand-green' : 'bg-gray-300'}`}>
                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${gkFirstHalfCleanSheet ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -646,8 +662,8 @@ export default function MatchResults() {
                         : 'border-gray-200 bg-white hover:bg-gray-50'
                   }`}
                 >
-                  <span className={`text-sm font-medium ${gkSecondHalfCleanSheet ? 'text-brand-green-700' : 'text-gray-700'}`}>
-                    🧤 Clean sheet
+                  <span className={`text-sm font-medium flex items-center gap-1.5 ${gkSecondHalfCleanSheet ? 'text-brand-green-700' : 'text-gray-700'}`}>
+                    <StatIcon name="glove" className="w-4 h-4" /> Clean sheet
                   </span>
                   <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${gkSecondHalfCleanSheet ? 'bg-brand-green' : 'bg-gray-300'}`}>
                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${gkSecondHalfCleanSheet ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -683,7 +699,7 @@ export default function MatchResults() {
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">🟨 Yellow cards</p>
+                <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><CardChip color="yellow" /> Yellow cards</p>
                 <div className="space-y-1.5">
                   {selectedPlayers.map(p => (
                     <PlayerButton
@@ -697,7 +713,7 @@ export default function MatchResults() {
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">🟥 Red cards</p>
+                <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><CardChip color="red" /> Red cards</p>
                 <div className="space-y-1.5">
                   {selectedPlayers.map(p => (
                     <PlayerButton
@@ -929,7 +945,7 @@ export default function MatchResults() {
             </div>
 
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full space-y-5">
+              <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full space-y-5 boca-pop">
                 <div className="flex items-center justify-between">
                   <h2 className="font-bold text-gray-900 text-lg">Result saved!</h2>
                   <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>

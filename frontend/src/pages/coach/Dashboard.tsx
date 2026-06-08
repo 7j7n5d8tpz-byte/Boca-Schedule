@@ -278,7 +278,7 @@ export default function CoachDashboard() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Matches</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Matches</h1>
             {!isLoading && (
               <p className="text-sm text-gray-500 mt-1">
                 {matches.length} upcoming · {totalSignups} total sign-ups
@@ -317,7 +317,7 @@ export default function CoachDashboard() {
         {/* Result entry shortcuts */}
         {(pendingResults.length > 0 || completedResults.length > 0) && (
           <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Record results</h2>
+            <h2 className="text-sm font-semibold text-gray-700">Record results</h2>
             {pendingResults.length === 0 && (
               <p className="text-sm text-gray-400">All results recorded.</p>
             )}

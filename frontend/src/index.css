@@ -2,6 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Display typeface (Archivo) for all headings. */
+@layer base {
+  h1, h2, h3, h4 {
+    font-family: 'Archivo', system-ui, -apple-system, sans-serif;
+    letter-spacing: -0.015em;
+  }
+}
+
+/* Tabular display numerals for scorelines / big stat figures. */
+.font-numeric {
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.02em;
+}
+
+/* ─── Motion ─────────────────────────────────────────────────────────────── */
+@keyframes bocaFadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes bocaPop {
+  0%   { opacity: 0; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Subtle per-page entrance. */
+.boca-page main { animation: bocaFadeInUp 0.38s cubic-bezier(0.22, 0.8, 0.2, 1) both; }
+/* Reveal pop for modals / matchday moments. */
+.boca-pop { animation: bocaPop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* Card hover-lift. */
+.lift { transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease; }
+.lift:hover { transform: translateY(-2px); box-shadow: 0 10px 24px -12px rgba(16, 47, 31, 0.28); }
+
+@media (prefers-reduced-motion: reduce) {
+  .boca-page main, .boca-pop { animation: none; }
+  .lift { transition: none; }
+  .lift:hover { transform: none; box-shadow: none; }
+}
+
+/* Kit-stripe page-title accent: green/crimson/green left bar (mirrors the shirt). */
+.title-stripe {
+  position: relative;
+  padding-left: 0.85rem;
+}
+.title-stripe::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.12em;
+  bottom: 0.12em;
+  width: 9px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #205b3b 0 34%,
+    #c41230 34% 66%,
+    #205b3b 66% 100%
+  );
+}
+
 /* iOS Safari renders native date/time controls as gray, centre-aligned pills
    that ignore our field styling and size to their own intrinsic width (looks
    broken next to the white text inputs/selects). Normalise them to match the

@@ -1,5 +1,5 @@
 import AppNav from '../../components/AppNav';
-import { useState } from 'react';
+import { useState, useLayoutEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
@@ -163,6 +163,15 @@ export default function CoachDashboard() {
   const [editBody, setEditBody] = useState('');
   const [editMatchId, setEditMatchId] = useState('');
 
+  // Auto-grow the edit textarea to fit its content (it starts at rows=2).
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = editRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [editBody, editId]);
+
   const startEdit = (a: Announcement) => {
     setEditId(a.announcementId);
     setEditBody(a.body);
@@ -282,11 +291,12 @@ export default function CoachDashboard() {
                   {editId === a.announcementId ? (
                     <div className="space-y-2">
                       <textarea
+                        ref={editRef}
                         value={editBody}
                         onChange={e => setEditBody(e.target.value)}
                         rows={2}
                         maxLength={500}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-green resize-none"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-green resize-y overflow-hidden"
                       />
                       <select
                         value={editMatchId}

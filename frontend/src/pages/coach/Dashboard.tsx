@@ -142,18 +142,21 @@ export default function CoachDashboard() {
   });
   const [announceBody, setAnnounceBody] = useState('');
   const [announceMatchId, setAnnounceMatchId] = useState('');
+  const [announceError, setAnnounceError] = useState('');
 
   const postAnnouncement = useMutation({
     mutationFn: () => api.post('/announcements', { body: announceBody.trim(), matchId: announceMatchId || null }),
     onSuccess: () => {
-      setAnnounceBody(''); setAnnounceMatchId('');
+      setAnnounceBody(''); setAnnounceMatchId(''); setAnnounceError('');
       qc.invalidateQueries({ queryKey: ['announcements'] });
     },
+    onError: (err: any) => setAnnounceError(err.response?.data?.error?.message ?? 'Failed to post announcement'),
   });
 
   const deleteAnnouncement = useMutation({
     mutationFn: (id: string) => api.delete(`/announcements/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['announcements'] }),
+    onSuccess: () => { setAnnounceError(''); qc.invalidateQueries({ queryKey: ['announcements'] }); },
+    onError: (err: any) => setAnnounceError(err.response?.data?.error?.message ?? 'Failed to remove announcement'),
   });
 
   const [editId, setEditId] = useState<string | null>(null);
@@ -164,15 +167,17 @@ export default function CoachDashboard() {
     setEditId(a.announcementId);
     setEditBody(a.body);
     setEditMatchId(a.match?.matchId ?? '');
+    setAnnounceError('');
   };
   const cancelEdit = () => { setEditId(null); setEditBody(''); setEditMatchId(''); };
 
   const editAnnouncement = useMutation({
     mutationFn: (id: string) => api.put(`/announcements/${id}`, { body: editBody.trim(), matchId: editMatchId || null }),
     onSuccess: () => {
-      cancelEdit();
+      cancelEdit(); setAnnounceError('');
       qc.invalidateQueries({ queryKey: ['announcements'] });
     },
+    onError: (err: any) => setAnnounceError(err.response?.data?.error?.message ?? 'Failed to save announcement'),
   });
 
   const STATUS_ORDER: Record<string, number> = {
@@ -268,6 +273,7 @@ export default function CoachDashboard() {
               {postAnnouncement.isPending ? 'Posting…' : 'Post'}
             </button>
           </div>
+          {announceError && <p className="text-sm text-red-500">{announceError}</p>}
 
           {(announcements ?? []).length > 0 && (
             <div className="space-y-2 pt-1">

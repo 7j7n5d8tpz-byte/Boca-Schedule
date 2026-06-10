@@ -2,8 +2,13 @@ import { test, expect } from '@playwright/test';
 import { loginAs, TEST_USERS } from './helpers/auth';
 
 test.describe('Coach flow', () => {
-  test('logs in and lands on the coach dashboard', async ({ page }) => {
+  test('logs in to the shared dashboard and reaches the coach view from the menu', async ({ page }) => {
     await loginAs(page, 'coach');
+    // Every role lands on the shared player dashboard; the coach view is reached
+    // from the menu.
+    await expect(page).toHaveURL(/dashboard/);
+    await page.getByRole('button', { name: /open menu/i }).click();
+    await page.getByRole('link', { name: /coach view/i }).click();
     await expect(page).toHaveURL(/coach/);
     await expect(page.getByRole('heading', { name: /matches|squad|schedule/i }).first()).toBeVisible();
   });

@@ -1,0 +1,19 @@
+name: Supabase keepalive
+
+# The free-tier Supabase project pauses after 7 days with no API/DB activity.
+# This pings the always-on backend's /health/db endpoint, which issues a real
+# Supabase query and so resets the inactivity timer. Mon & Thu (max gap ~4 days)
+# keeps a comfortable margin under the 7-day window. No secrets needed — the
+# backend holds the service-role key.
+on:
+  schedule:
+    - cron: '0 6 * * 1,4' # 06:00 UTC, Monday and Thursday
+  workflow_dispatch: {} # allow a manual run from the Actions tab
+
+jobs:
+  ping:
+    name: Ping backend DB health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hit /health/db (resets Supabase pause timer)
+        run: curl -fsS --retry 3 --retry-delay 10 https://boca-backend.fly.dev/health/db

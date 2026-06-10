@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { errorHandler } from './middleware/errorHandler.js';
+import { supabaseAdmin } from './lib/supabase.js';
 import authRoutes from './routes/auth.js';
 import matchRoutes from './routes/matches.js';
 import signupRoutes from './routes/signups.js';
@@ -48,6 +49,18 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: isTest ? 10_000 :
 app.use(limiter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
+// Keepalive: unlike /health (process-only), this issues a real Supabase query so
+// a scheduled ping resets the free-tier project's 7-day inactivity pause timer.
+// Public and intentionally cheap (a head count, no rows transferred).
+app.get('/health/db', async (_req, res) => {
+  const { error } = await supabaseAdmin.from('users').select('user_id', { head: true, count: 'exact' });
+  if (error) {
+    res.status(503).json({ status: 'error', db: 'unreachable', message: error.message });
+    return;
+  }
+  res.json({ status: 'ok', db: 'reachable' });
+});
 
 app.use(
   ['/api/auth/login', '/api/auth/register', '/api/auth/forgot-password', '/api/auth/reset-password'],

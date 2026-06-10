@@ -2,10 +2,9 @@ import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { optimizeBatch } from '../lib/optimizer.js';
 
 const router = Router();
-
-const JULIA_URL = process.env.JULIA_URL || process.env.JULIA_SERVICE_URL || 'http://localhost:3002';
 
 // POST /api/optimize/batch
 // Jointly optimizes multiple matches in one solver call.
@@ -86,7 +85,7 @@ router.post('/batch', authenticate, requireRole('coach', 'admin'), async (req, r
       };
     });
 
-    const juliaMatches = matchDataResults.map(({ matchId, match, signups, fairnessWeight }) => ({
+    const optimizerMatches = matchDataResults.map(({ matchId, match, signups, fairnessWeight }) => ({
       match_id: matchId,
       match_type: match.match_type,
       target_players: match.max_players,
@@ -98,18 +97,14 @@ router.post('/batch', authenticate, requireRole('coach', 'admin'), async (req, r
       })),
     }));
 
-    const juliaRes = await fetch(`${JULIA_URL}/optimize/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ total_matches: totalMatches, players, matches: juliaMatches }),
-    });
-
-    if (!juliaRes.ok) {
+    let batchResult: any;
+    try {
+      batchResult = await optimizeBatch({ total_matches: totalMatches, players, matches: optimizerMatches });
+    } catch (optErr) {
+      console.error('Batch optimizer error', optErr);
       res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: 'Optimization service error — please try again.' } });
       return;
     }
-
-    const batchResult: any = await juliaRes.json();
 
     if (batchResult.error && !batchResult.matches) {
       res.status(422).json({ success: false, error: { code: 'OPTIMIZER_FAILED', message: batchResult.error } });

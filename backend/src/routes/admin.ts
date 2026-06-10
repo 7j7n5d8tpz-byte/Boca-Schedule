@@ -212,24 +212,9 @@ router.get('/system/health', async (_req, res, next) => {
   try {
     const { error: dbError } = await supabaseAdmin.from('users').select('user_id', { head: true, count: 'exact' });
 
-    // Actually probe the Julia optimizer rather than reporting a hardcoded value.
-    //   not_configured = no URL set; unhealthy = set but unreachable (e.g. a Fly
-    //   cold start); healthy = reachable. Tolerant of Julia's absence.
-    const juliaUrl = process.env.JULIA_URL || process.env.JULIA_SERVICE_URL;
-    let optimizationService: { status: 'healthy' | 'unhealthy' | 'not_configured' };
-    if (!juliaUrl) {
-      optimizationService = { status: 'not_configured' };
-    } else {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-        const juliaRes = await fetch(`${juliaUrl}/health`, { signal: controller.signal });
-        clearTimeout(timeout);
-        optimizationService = { status: juliaRes.ok ? 'healthy' : 'unhealthy' };
-      } catch {
-        optimizationService = { status: 'unhealthy' };
-      }
-    }
+    // The optimizer now runs in-process (HiGHS-WASM, see lib/optimizer.ts) rather
+    // than as a separate Julia service, so it is healthy whenever the API is up.
+    const optimizationService: { status: 'healthy' | 'unhealthy' | 'not_configured' } = { status: 'healthy' };
 
     res.json({
       success: true,

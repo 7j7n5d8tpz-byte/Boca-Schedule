@@ -2,10 +2,9 @@ import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { optimizeMatch } from '../lib/optimizer.js';
 
 const router = Router({ mergeParams: true });
-
-const JULIA_URL = process.env.JULIA_URL || process.env.JULIA_SERVICE_URL || 'http://localhost:3002';
 
 // GET /api/matches/:matchId/selections
 // Accessible to coach/admin OR players with can_enter_results (for result entry page)
@@ -201,26 +200,22 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
       };
     });
 
-    const juliaRes = await fetch(`${JULIA_URL}/optimize`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        match_id: matchId,
+    let result: any;
+    try {
+      result = await optimizeMatch({
+        match_id: String(matchId),
         match_type: match.match_type,
         target_players: match.max_players,
         max_players: match.max_players,
         total_matches: totalMatches,
         fairness_weight,
         players,
-      }),
-    });
-
-    if (!juliaRes.ok) {
+      });
+    } catch (optErr) {
+      console.error('Optimizer error', optErr);
       res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: 'Optimization service error — please try again.' } });
       return;
     }
-
-    const result: any = await juliaRes.json();
 
     if (result.error && !result.selected_ids) {
       res.status(422).json({ success: false, error: { code: 'OPTIMIZER_FAILED', message: result.error } });

@@ -156,6 +156,25 @@ export default function CoachDashboard() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['announcements'] }),
   });
 
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState('');
+  const [editMatchId, setEditMatchId] = useState('');
+
+  const startEdit = (a: Announcement) => {
+    setEditId(a.announcementId);
+    setEditBody(a.body);
+    setEditMatchId(a.match?.matchId ?? '');
+  };
+  const cancelEdit = () => { setEditId(null); setEditBody(''); setEditMatchId(''); };
+
+  const editAnnouncement = useMutation({
+    mutationFn: (id: string) => api.put(`/announcements/${id}`, { body: editBody.trim(), matchId: editMatchId || null }),
+    onSuccess: () => {
+      cancelEdit();
+      qc.invalidateQueries({ queryKey: ['announcements'] });
+    },
+  });
+
   const STATUS_ORDER: Record<string, number> = {
     signup_open:   0,
     signup_closed: 1,
@@ -253,22 +272,73 @@ export default function CoachDashboard() {
           {(announcements ?? []).length > 0 && (
             <div className="space-y-2 pt-1">
               {announcements!.map(a => (
-                <div key={a.announcementId} className="bg-brand-green-50 border border-brand-green/30 rounded-lg px-3 py-2 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{a.body}</p>
-                    {a.match && (
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        for {new Date(a.match.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{a.match.opponent ? ` vs ${a.match.opponent}` : ''}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => deleteAnnouncement.mutate(a.announcementId)}
-                    disabled={deleteAnnouncement.isPending}
-                    className="shrink-0 text-xs text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
+                <div key={a.announcementId} className="bg-brand-green-50 border border-brand-green/30 rounded-lg px-3 py-2">
+                  {editId === a.announcementId ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editBody}
+                        onChange={e => setEditBody(e.target.value)}
+                        rows={2}
+                        maxLength={500}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-green resize-none"
+                      />
+                      <select
+                        value={editMatchId}
+                        onChange={e => setEditMatchId(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-green"
+                      >
+                        <option value="">No match (stays until removed)</option>
+                        {matches.filter(m => m.status !== 'completed').map(m => (
+                          <option key={m.matchId} value={m.matchId}>
+                            {new Date(m.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                            {m.opponent ? ` vs ${m.opponent}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={cancelEdit}
+                          disabled={editAnnouncement.isPending}
+                          className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => editAnnouncement.mutate(a.announcementId)}
+                          disabled={!editBody.trim() || editAnnouncement.isPending}
+                          className="text-xs bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          {editAnnouncement.isPending ? 'Saving…' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{a.body}</p>
+                        {a.match && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            for {new Date(a.match.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{a.match.opponent ? ` vs ${a.match.opponent}` : ''}
+                          </p>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex gap-2">
+                        <button
+                          onClick={() => startEdit(a)}
+                          className="text-xs text-brand-green hover:text-brand-green-700 font-medium"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => deleteAnnouncement.mutate(a.announcementId)}
+                          disabled={deleteAnnouncement.isPending}
+                          className="text-xs text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

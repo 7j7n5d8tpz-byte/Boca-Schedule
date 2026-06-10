@@ -71,6 +71,49 @@ describe('Announcements', () => {
     expect(get.body.data.some((a: any) => a.body === 'Old notice')).toBe(false);
   });
 
+  it('coach can edit an announcement; a player cannot', async () => {
+    const create = await request(app)
+      .post('/api/announcements')
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ body: 'Original text' });
+    const id = create.body.data.announcementId;
+    createdIds.push(id);
+
+    const playerPut = await request(app)
+      .put(`/api/announcements/${id}`)
+      .set('Authorization', `Bearer ${player.token}`)
+      .send({ body: 'hacked' });
+    expect(playerPut.status).toBe(403);
+
+    const put = await request(app)
+      .put(`/api/announcements/${id}`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ body: 'Edited text' });
+    expect(put.status).toBe(200);
+    expect(put.body.data.body).toBe('Edited text');
+
+    const get = await request(app)
+      .get('/api/announcements')
+      .set('Authorization', `Bearer ${player.token}`);
+    const found = get.body.data.find((a: any) => a.announcementId === id);
+    expect(found.body).toBe('Edited text');
+  });
+
+  it('rejects an empty edit', async () => {
+    const create = await request(app)
+      .post('/api/announcements')
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ body: 'Keep me' });
+    const id = create.body.data.announcementId;
+    createdIds.push(id);
+
+    const put = await request(app)
+      .put(`/api/announcements/${id}`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ body: '   ' });
+    expect(put.status).toBe(422);
+  });
+
   it('coach can remove an announcement', async () => {
     const create = await request(app)
       .post('/api/announcements')

@@ -81,6 +81,37 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
   }
 });
 
+// PUT /api/announcements/:id — coach/admin
+router.put('/:id', authenticate, requireRole('coach', 'admin'), async (req, res, next) => {
+  try {
+    const parsed = CreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Announcement text is required (max 500 chars)' } });
+      return;
+    }
+    const { body, matchId } = parsed.data;
+
+    const { data, error } = await supabaseAdmin
+      .from('announcements')
+      .update({ body, match_id: matchId ?? null })
+      .eq('announcement_id', req.params.id)
+      .select('announcement_id, body, created_at, match_id')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Announcement not found' } });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: { announcementId: data.announcement_id, body: data.body, createdAt: data.created_at, matchId: data.match_id },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // DELETE /api/announcements/:id — coach/admin
 router.delete('/:id', authenticate, requireRole('coach', 'admin'), async (req, res, next) => {
   try {

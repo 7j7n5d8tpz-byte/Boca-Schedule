@@ -591,7 +591,7 @@ function ReviewStep({
 
       {/* Sidebar nav — horizontal tab bar on mobile, sidebar on sm+ */}
       <aside className="w-full sm:w-40 shrink-0">
-        <div className="flex sm:flex-col gap-1 sm:sticky sm:top-6 sm:pt-1">
+        <div className="flex sm:flex-col gap-1 sm:sticky sm:top-[calc(var(--app-nav-offset)+0.5rem)] sm:pt-1 transition-[top] duration-[var(--app-nav-dur)]">
           {(['selections', 'balance'] as const).map(v => (
             <button
               key={v}

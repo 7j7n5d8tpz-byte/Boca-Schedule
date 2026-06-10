@@ -97,12 +97,19 @@ function timeAgo(iso: string): string {
   return `${d}d ago`;
 }
 
-export default function NotificationBell() {
+export default function NotificationBell({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'new' | 'all'>('new');
   const ref = useRef<HTMLDivElement>(null);
+
+  // Report open/close to the parent (AppNav) so it can suspend its auto-hide
+  // while the panel is open. Via a ref so parent re-renders don't re-fire it —
+  // only an actual open-state change does.
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  useEffect(() => { onOpenChangeRef.current?.(open); }, [open]);
 
   const { data: countData } = useQuery<{ unreadCount: number }>({
     queryKey: ['notif-count'],

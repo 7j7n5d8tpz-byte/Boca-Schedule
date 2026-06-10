@@ -17,7 +17,7 @@ export default function FinesPage() {
         <div className="flex flex-col sm:flex-row gap-6 items-stretch sm:items-start">
 
           {/* Sidebar — horizontal tab bar on mobile, sidebar on sm+ */}
-          <nav className="w-full sm:w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-2 flex sm:flex-col gap-1 sm:sticky sm:top-4">
+          <nav className="w-full sm:w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-2 flex sm:flex-col gap-1 sm:sticky sm:top-[calc(var(--app-nav-offset)+0.5rem)] transition-[top] duration-[var(--app-nav-dur)]">
             {([['overview', 'Overview'], ['stats', 'Stats']] as const).map(([id, label]) => (
               <button
                 key={id}

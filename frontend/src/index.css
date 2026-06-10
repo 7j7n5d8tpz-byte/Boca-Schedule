@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Height of the sticky AppNav (crest height + py-3 on each side). Sticky
+   sidebars offset their `top` by `--app-nav-offset` so they sit just below the
+   nav. When the nav hides on scroll-down (`.app-nav-hidden` on <html>) the
+   offset collapses to 0, so sidebars follow the nav up to the top; it expands
+   again on scroll-up. Sidebars transition `top` with the same 300ms as the
+   nav's slide so the two move seamlessly together. */
+:root { --app-nav-h: 72px; --app-nav-offset: var(--app-nav-h); --app-nav-dur: 300ms; }
+@media (min-width: 640px) { :root { --app-nav-h: 80px; } }
+/* Collapsing (hiding) runs a touch slower than the reveal; sidebars read this
+   duration so they stay in lockstep with the nav in both directions. */
+:root.app-nav-hidden { --app-nav-offset: 0px; --app-nav-dur: 450ms; }
+
 /* Display typeface (Archivo) for all headings. */
 @layer base {
   h1, h2, h3, h4 {
@@ -66,10 +78,11 @@ input[type="time"]::-webkit-date-and-time-value {
 /* The fixed watermark below intentionally bleeds past the right edge. On phones
    that off-screen overflow makes the page horizontally scrollable, which shifts
    the content left so cards look clipped. Clamp horizontal overflow at the root
-   on mobile only — the sidebar is `sm:sticky` (static below sm), so this can't
-   break sticky positioning, which lives at the >=640px breakpoint. */
+   on mobile only. Use `clip`, not `hidden`: `overflow: hidden` establishes a
+   scroll container and breaks `position: sticky` descendants (the AppNav is
+   sticky at every breakpoint, including mobile), whereas `clip` just clips. */
 @media (max-width: 639px) {
-  html, body { overflow-x: hidden; }
+  html, body { overflow-x: clip; }
 }
 
 .boca-page::after {

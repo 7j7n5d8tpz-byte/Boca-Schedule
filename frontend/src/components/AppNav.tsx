@@ -20,7 +20,7 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
   // Hide the (sticky) nav when scrolling down, reveal it when scrolling up —
   // so it's reachable from anywhere on the page, not just the top.
   const lastY = useRef(0);
-  const autoHide = useRef<ReturnType<typeof setTimeout>>();
+  const autoHide = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const openRef = useRef(open);
   openRef.current = open;
   const hoveringRef = useRef(false);

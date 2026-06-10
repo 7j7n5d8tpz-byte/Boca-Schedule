@@ -321,14 +321,14 @@ export default function Statistics() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref="/dashboard" backLabel="← Dashboard" />
+      <AppNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
 
         {/* Header + filters */}
         <div className="flex items-center justify-between gap-4 flex-wrap mb-8">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Team Statistics</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900">Team Statistics</h1>
             {(data?.availableYears ?? []).length > 0 && (
               <select
                 value={selectedYear ?? data?.year ?? ''}

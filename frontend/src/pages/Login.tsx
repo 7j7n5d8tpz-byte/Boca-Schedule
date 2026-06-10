@@ -15,8 +15,10 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const role = await login(email, password);
-      navigate(role === 'admin' ? '/admin' : role === 'coach' ? '/coach' : '/dashboard');
+      // Everyone lands on the shared player dashboard; coaches/admins reach their
+      // management views from the menu.
+      await login(email, password);
+      navigate('/dashboard');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message ?? '';
       if (msg.toLowerCase().includes('too many requests') || err?.response?.status === 429) {
@@ -32,18 +34,18 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center">
       <div className="w-full max-w-md">
-        {/* Brand header */}
-        <div className="bg-brand-dark rounded-t-2xl px-8 pt-8 pb-6 relative overflow-hidden">
-          {/* Stripe accent — mirrors the shirt stripe */}
-          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-brand-green" />
-          <div className="absolute left-1.5 top-0 bottom-0 w-0.5 bg-brand-red" />
-          <div className="flex items-center gap-4">
-            <img src="/boca-logo.png" alt="Boca" className="w-14 h-14 shrink-0 drop-shadow-md" />
-            <div>
-              <h1 className="text-xl font-bold text-white leading-tight">Boca Schedule</h1>
-              <p className="text-white/50 text-xs">Team management</p>
-            </div>
+        {/* Brand hero — the shirt's kit stripe, crest centred on it. */}
+        <div className="bg-brand-dark rounded-t-2xl px-8 pt-12 pb-10 relative overflow-hidden flex flex-col items-center">
+          {/* Bold green-red-green stripe running the full height, like the jersey. */}
+          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex" aria-hidden>
+            <div className="w-4 bg-brand-green" />
+            <div className="w-4 bg-brand-red" />
+            <div className="w-4 bg-brand-green" />
           </div>
+          {/* Crest sits on the stripe; wordmark below. */}
+          <img src="/boca-logo.png" alt="Boca Boldisch" className="relative w-28 h-28 drop-shadow-xl" />
+          <h1 className="relative mt-4 font-display font-extrabold uppercase tracking-wide text-white text-2xl leading-none text-center">Boca Boldisch</h1>
+          <p className="relative mt-1.5 text-white/50 text-xs tracking-wide">Team management</p>
         </div>
 
         {/* Form card */}

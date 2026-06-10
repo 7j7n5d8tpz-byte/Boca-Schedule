@@ -129,11 +129,11 @@ export default function PlayerProfile() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref="/dashboard" backLabel="← Dashboard" />
+      <AppNav />
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">My Profile</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900">My Profile</h1>
           {!editing && (
             <button
               onClick={() => setEditing(true)}

@@ -135,16 +135,15 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
-        <div className="bg-brand-dark rounded-t-2xl px-8 pt-8 pb-6 relative overflow-hidden">
-          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-brand-green" />
-          <div className="absolute left-1.5 top-0 bottom-0 w-0.5 bg-brand-red" />
-          <div className="flex items-center gap-4">
-            <img src="/boca-logo.png" alt="Boca" className="w-14 h-14 shrink-0 drop-shadow-md" />
-            <div>
-              <h1 className="text-xl font-bold text-white leading-tight">Boca Schedule</h1>
-              <p className="text-white/50 text-xs">Create account</p>
-            </div>
+        <div className="bg-brand-dark rounded-t-2xl px-8 pt-12 pb-10 relative overflow-hidden flex flex-col items-center">
+          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex" aria-hidden>
+            <div className="w-4 bg-brand-green" />
+            <div className="w-4 bg-brand-red" />
+            <div className="w-4 bg-brand-green" />
           </div>
+          <img src="/boca-logo.png" alt="Boca Boldisch" className="relative w-28 h-28 drop-shadow-xl" />
+          <h1 className="relative mt-4 font-display font-extrabold uppercase tracking-wide text-white text-2xl leading-none text-center">Boca Boldisch</h1>
+          <p className="relative mt-1.5 text-white/50 text-xs tracking-wide">Create account</p>
         </div>
         <div className="bg-white rounded-b-2xl shadow-md p-8">
         <p className="text-gray-500 text-sm mb-6">

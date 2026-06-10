@@ -212,7 +212,7 @@ export default function Selections() {
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">
+          <h1 className="text-2xl font-extrabold text-gray-900">
             {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
           </h1>
           <p className="text-gray-500 mt-1">{match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) · Selections</p>

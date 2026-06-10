@@ -8,10 +8,10 @@ export default function FinesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref="/dashboard" backLabel="← Dashboard" />
+      <AppNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        <h1 className="text-2xl font-extrabold text-gray-900 title-stripe mb-8">Team Fines</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900 mb-8">Team Fines</h1>
 
         {/* Sidebar + content layout (mirrors Team Statistics) */}
         <div className="flex flex-col sm:flex-row gap-6 items-stretch sm:items-start">

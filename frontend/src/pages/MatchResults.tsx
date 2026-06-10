@@ -464,7 +464,7 @@ export default function MatchResults() {
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Record match result</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900">Record match result</h1>
           {date && (
             <p className="text-gray-500 mt-1">
               {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · {match.matchTime.slice(0, 5)}

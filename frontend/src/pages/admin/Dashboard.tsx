@@ -749,7 +749,7 @@ export default function AdminDashboard() {
       <AppNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Admin panel</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900">Admin panel</h1>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 w-fit">

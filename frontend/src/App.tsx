@@ -24,12 +24,10 @@ const queryClient = new QueryClient({
 });
 
 function RoleRouter() {
-  const { user, isAuthenticated } = useAuth();
-
+  const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-
-  if (user?.role === 'admin') return <Navigate to="/admin" replace />;
-  if (user?.role === 'coach') return <Navigate to="/coach" replace />;
+  // The player dashboard is the shared home for every role; coaches/admins open
+  // their management views from the menu.
   return <Navigate to="/dashboard" replace />;
 }
 

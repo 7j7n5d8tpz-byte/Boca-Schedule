@@ -456,8 +456,8 @@ export default function PlayerDashboard() {
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Welcome back, {user?.name?.split(' ')[0]}!</h1>
-          <p className="text-gray-500 text-sm mt-1 pl-[0.85rem]">Here's what's coming up.</p>
+          <h1 className="text-2xl font-extrabold text-gray-900">Welcome back, {user?.name?.split(' ')[0]}!</h1>
+          <p className="text-gray-500 text-sm mt-1">Here's what's coming up.</p>
         </div>
 
         {/* Announcements */}

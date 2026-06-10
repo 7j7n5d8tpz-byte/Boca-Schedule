@@ -220,6 +220,8 @@ export default function FinesView() {
 export function ManageFines() {
   const qc = useQueryClient();
   const [drillPlayer, setDrillPlayer] = useState<{ id: string; name: string } | null>(null);
+  const [q, setQ] = useState('');
+  const [showHelp, setShowHelp] = useState(false);
   const { data } = useQuery<AdminData>({ queryKey: ['fines-admin'], queryFn: () => api.get('/fines/admin').then(r => r.data.data) });
   const { data: ledger } = useQuery<Fine[]>({ queryKey: ['fines-team'], queryFn: () => api.get('/fines').then(r => r.data.data) });
 
@@ -237,6 +239,11 @@ export function ManageFines() {
 
   if (!data) return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">Loading…</div>;
 
+  const s = q.trim().toLowerCase();
+  const matches = (name: string) => !s || name.toLowerCase().includes(s);
+  const paymentClaimed = data.paymentClaimed.filter(f => matches(f.playerName ?? ''));
+  const overview = data.overview.filter(p => matches(p.name));
+
   return (
     <div className="space-y-8">
       {/* Treasury */}
@@ -249,6 +256,36 @@ export function ManageFines() {
           <p className="text-xl sm:text-2xl font-bold text-amber-600">{kr(data.treasury.outstandingDkk)}</p>
           <p className="text-xs text-gray-500 mt-0.5">Outstanding</p>
         </div>
+      </div>
+
+      {/* How-to for fine admins — collapsed by default to stay out of the way. */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <button
+          onClick={() => setShowHelp(v => !v)}
+          className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+        >
+          <span className="text-sm font-medium text-gray-700">How confirming payments works</span>
+          <span className={`text-gray-400 transition-transform ${showHelp ? 'rotate-90' : ''}`}>›</span>
+        </button>
+        {showHelp && (
+          <ol className="list-decimal pl-9 pr-4 pb-4 space-y-1.5 text-sm text-gray-600">
+            <li>A player pays the box and taps “I've paid” — it lands in <span className="font-medium text-gray-700">Payments to confirm</span>.</li>
+            <li>Open MobilePay and find the transfer. Search the player's name below to jump straight to them.</li>
+            <li>Amount matches what they claimed? <span className="font-medium text-gray-700">Confirm</span>. Nothing arrived, or it's short? <span className="font-medium text-gray-700">Not received</span> — it bounces back to outstanding and the player is nudged.</li>
+            <li>Paid in cash or by another route? Open them under <span className="font-medium text-gray-700">Who owes what</span> and <span className="font-medium text-gray-700">Mark paid</span> — no claim needed.</li>
+            <li>Settle promptly so the shared ledger and standings stay honest — that's the whole point of full transparency.</li>
+          </ol>
+        )}
+      </div>
+
+      {/* Jump to a player by name to match an incoming MobilePay payment. */}
+      <div>
+        <input
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Search a player by name…"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+        />
       </div>
 
       <IssueFineForm onDone={invalidate} />
@@ -272,10 +309,10 @@ export function ManageFines() {
         )}
       </Section>
 
-      <Section title={`Payments to confirm (${data.paymentClaimed.length})`}>
-        {data.paymentClaimed.length === 0 ? <Empty>No pending payments.</Empty> : (
+      <Section title={`Payments to confirm (${paymentClaimed.length})`}>
+        {paymentClaimed.length === 0 ? <Empty>{s ? 'No matches.' : 'No pending payments.'}</Empty> : (
           <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
-            {data.paymentClaimed.map(f => (
+            {paymentClaimed.map(f => (
               <div key={f.fineId} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{f.playerName} · {kr(f.amountDkk)}</p>
@@ -292,9 +329,9 @@ export function ManageFines() {
       </Section>
 
       <Section title="Who owes what">
-        {data.overview.length === 0 ? <Empty>No fines yet.</Empty> : (
+        {overview.length === 0 ? <Empty>{s ? 'No matches.' : 'No fines yet.'}</Empty> : (
           <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
-            {data.overview.map(p => (
+            {overview.map(p => (
               <button
                 key={p.playerId}
                 onClick={() => setDrillPlayer({ id: p.playerId, name: p.name })}

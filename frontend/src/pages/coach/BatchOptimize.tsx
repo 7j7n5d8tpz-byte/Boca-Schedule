@@ -308,7 +308,7 @@ function SelectStep({
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Batch optimize</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900">Batch optimize</h1>
         <p className="text-sm text-gray-500 mt-1">
           Select the matches you want to optimize together. The optimizer will balance player fairness across all selected matches jointly.
         </p>
@@ -406,7 +406,7 @@ function ConfigureStep({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">Configure</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900">Configure</h1>
           <p className="text-sm text-gray-500 mt-1">Set fairness balance and priority players for each match.</p>
         </div>
         <button onClick={onBack} className="text-sm text-gray-400 hover:text-gray-600">← Back</button>
@@ -621,7 +621,7 @@ function ReviewStep({
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 title-stripe">
+          <h1 className="text-2xl font-extrabold text-gray-900">
             {reviewView === 'selections' ? 'Review selections' : 'Player balance'}
           </h1>
           <p className="text-sm text-gray-500 mt-1">

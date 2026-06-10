@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import RavenIcon from './RavenIcon';
 import NotificationBell from './NotificationBell';
-import KitStripe from './KitStripe';
 
 interface AppNavProps {
   backHref?: string;
@@ -46,7 +45,6 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
   }, [open]);
 
   return (
-    <>
     <nav className="bg-brand-dark px-4 py-3 flex items-center gap-3">
 
       {/* ── Optional back link ── */}
@@ -60,15 +58,27 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
         </>
       )}
 
-      {/* ── Logo + name → home (wordmark hidden on phones so the back link + nav
-             icons always fit; the logo itself stays as the home affordance) ── */}
+      {/* ── Logo + name → player dashboard, the shared home for everyone (coaches
+             and admins are players too; their /coach and /admin views are
+             management-only and reached via the menu). Wordmark hidden on phones
+             so the back link + nav icons always fit. ── */}
       <Link
-        to="/"
+        to="/dashboard"
         onClick={() => setOpen(false)}
         aria-label="Boca Boldisch home"
         className="flex items-center gap-2 sm:gap-3 shrink-0 rounded-lg hover:opacity-80 transition-opacity"
       >
-        <RavenIcon className="w-10 h-10 sm:w-12 sm:h-12 shrink-0" />
+        {/* Crest on the kit stripe — mirrors the login hero lockup. The stripe
+            runs the full nav height (extends past the crest via -top-3/-bottom-3
+            into the nav's py-3 padding) and the crest sits on top of it. */}
+        <span className="relative flex items-center shrink-0">
+          <span className="absolute left-1/2 -translate-x-1/2 -top-3 -bottom-3 flex" aria-hidden>
+            <span className="w-3 sm:w-3.5 bg-brand-green" />
+            <span className="w-3 sm:w-3.5 bg-brand-red" />
+            <span className="w-3 sm:w-3.5 bg-brand-green" />
+          </span>
+          <RavenIcon className="relative z-10 w-12 h-12 sm:w-14 sm:h-14 shrink-0" />
+        </span>
         <span className="hidden sm:block font-display font-extrabold uppercase tracking-wide text-white text-lg leading-tight">Boca Boldisch</span>
       </Link>
 
@@ -137,7 +147,5 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
         )}
       </div>
     </nav>
-    <KitStripe orientation="horizontal" />
-    </>
   );
 }

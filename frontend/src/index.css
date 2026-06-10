@@ -42,27 +42,6 @@
   .lift:hover { transform: none; box-shadow: none; }
 }
 
-/* Kit-stripe page-title accent: green/crimson/green left bar (mirrors the shirt). */
-.title-stripe {
-  position: relative;
-  padding-left: 0.85rem;
-}
-.title-stripe::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.12em;
-  bottom: 0.12em;
-  width: 9px;
-  border-radius: 2px;
-  background: linear-gradient(
-    to right,
-    #205b3b 0 34%,
-    #c41230 34% 66%,
-    #205b3b 66% 100%
-  );
-}
-
 /* iOS Safari renders native date/time controls as gray, centre-aligned pills
    that ignore our field styling and size to their own intrinsic width (looks
    broken next to the white text inputs/selects). Normalise them to match the

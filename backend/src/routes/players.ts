@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
+import { storeAvatar, AvatarTooLargeError, AVATAR_DATA_URL_RE } from '../lib/avatar.js';
 
 const router = Router();
 
@@ -431,7 +432,7 @@ router.put('/:playerId/profile', authenticate, async (req, res, next) => {
 // The client sends an already-cropped, resized webp as a data URL; we just
 // decode it and store it. Bucket + column come from migration 20260614000001.
 const AvatarSchema = z.object({
-  image: z.string().regex(/^data:image\/(webp|jpeg|png);base64,/, 'Expected a base64 image data URL'),
+  image: z.string().regex(AVATAR_DATA_URL_RE, 'Expected a base64 image data URL'),
 });
 
 router.put('/:playerId/avatar', authenticate, async (req, res, next) => {
@@ -448,25 +449,16 @@ router.put('/:playerId/avatar', authenticate, async (req, res, next) => {
       return;
     }
 
-    const [meta, b64] = body.data.image.split(',');
-    const ext = meta.includes('webp') ? 'webp' : meta.includes('png') ? 'png' : 'jpeg';
-    const contentType = `image/${ext}`;
-    const buffer = Buffer.from(b64, 'base64');
-    if (buffer.byteLength > 2_097_152) {
-      res.status(413).json({ success: false, error: { code: 'TOO_LARGE', message: 'Image too large' } });
-      return;
+    let avatarUrl: string;
+    try {
+      avatarUrl = await storeAvatar(playerId as string, body.data.image);
+    } catch (err) {
+      if (err instanceof AvatarTooLargeError) {
+        res.status(413).json({ success: false, error: { code: 'TOO_LARGE', message: 'Image too large' } });
+        return;
+      }
+      throw err;
     }
-
-    // Stable path per user; upsert overwrites the previous photo.
-    const path = `${playerId}.${ext}`;
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('avatars')
-      .upload(path, buffer, { contentType, upsert: true });
-    if (uploadError) throw uploadError;
-
-    const { data: pub } = supabaseAdmin.storage.from('avatars').getPublicUrl(path);
-    // Cache-bust so the new image shows immediately despite the stable path.
-    const avatarUrl = `${pub.publicUrl}?v=${Date.now()}`;
 
     const { error } = await supabaseAdmin.from('users').update({ avatar_url: avatarUrl }).eq('user_id', playerId);
     if (error) throw error;

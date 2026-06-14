@@ -4,6 +4,7 @@ import { supabaseAdmin, supabaseAnon } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { sendAdminRegistrationNotification } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
+import { storeAvatar, AVATAR_DATA_URL_RE } from '../lib/avatar.js';
 
 const router = Router();
 
@@ -12,6 +13,8 @@ const RegisterSchema = z.object({
   password: z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/).regex(/[!@#$%^&*]/),
   name: z.string().min(2).max(100),
   preferredPositions: z.array(z.enum(['GK', 'DEF', 'WIN', 'MID', 'STR'])).optional(),
+  // Optional cropped profile picture (base64 data URL) chosen during sign-up.
+  avatar: z.string().regex(AVATAR_DATA_URL_RE).optional(),
 });
 
 const LoginSchema = z.object({
@@ -30,7 +33,7 @@ router.post('/register', async (req, res, next) => {
       return;
     }
 
-    const { email, password, name, preferredPositions } = body.data;
+    const { email, password, name, preferredPositions, avatar } = body.data;
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -39,6 +42,17 @@ router.post('/register', async (req, res, next) => {
     });
 
     if (!authError && authData?.user) {
+      // Upload the optional sign-up photo first so the profile row can carry its
+      // URL. A failed upload must not block registration — fall back to no photo.
+      let avatarUrl: string | null = null;
+      if (avatar) {
+        try {
+          avatarUrl = await storeAvatar(authData.user.id, avatar);
+        } catch (err) {
+          console.error('Failed to store sign-up avatar:', err);
+        }
+      }
+
       // New account — create profile, inactive until admin approves
       const { error: profileError } = await supabaseAdmin.from('users').insert({
         user_id: authData.user.id,
@@ -46,6 +60,7 @@ router.post('/register', async (req, res, next) => {
         name,
         role: 'player',
         preferred_positions: preferredPositions ?? [],
+        avatar_url: avatarUrl,
         is_active: false,
       });
       if (profileError) {

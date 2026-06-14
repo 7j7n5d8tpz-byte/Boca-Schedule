@@ -23,7 +23,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center">
+    <div className="min-h-dvh bg-gray-50 boca-page flex items-center justify-center">
       <div className="w-full max-w-md">
         <div className="bg-brand-dark rounded-t-2xl px-8 pt-12 pb-10 relative overflow-hidden flex flex-col items-center">
           <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex" aria-hidden>

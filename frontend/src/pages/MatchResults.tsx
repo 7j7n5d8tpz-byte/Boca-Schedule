@@ -449,7 +449,7 @@ export default function MatchResults() {
   const manOfMatchName   = motmId ? (selectedPlayers.find(p => p.userId === motmId)?.name ?? null) : null;
 
   if (selectionsLoading || resultsLoading) {
-    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
+    return <div className="min-h-dvh bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
   }
 
   const match = selectionsData?.match;
@@ -457,7 +457,7 @@ export default function MatchResults() {
   const currentEntry = goalEntries[goalIndex] ?? { scorerId: null, assisterId: null };
 
   return (
-    <div className="min-h-screen bg-gray-50 boca-page">
+    <div className="min-h-dvh bg-gray-50 boca-page">
       <AppNav onBack={() => navigate(-1)} />
 
       <main className="max-w-lg mx-auto px-4 py-8 space-y-6">

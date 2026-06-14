@@ -133,7 +133,7 @@ export default function Register() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center">
+      <div className="min-h-dvh bg-gray-50 boca-page flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-md p-8 w-full max-w-md text-center space-y-4">
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto text-2xl">✓</div>
           <h2 className="text-xl font-bold text-gray-900">Request submitted</h2>
@@ -153,7 +153,7 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center py-12 px-4">
+    <div className="min-h-dvh bg-gray-50 boca-page flex items-center justify-center py-12 px-4">
       <div className="w-full max-w-md">
         <div className="bg-brand-dark rounded-t-2xl px-8 pt-12 pb-10 relative overflow-hidden flex flex-col items-center">
           <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 flex" aria-hidden>

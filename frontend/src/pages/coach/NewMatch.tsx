@@ -63,7 +63,7 @@ export default function NewMatch() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 boca-page">
+    <div className="min-h-dvh bg-gray-50 boca-page">
       <AppNav backHref="/coach" backLabel="← Matches" />
 
       <main className="max-w-lg mx-auto px-4 py-8">

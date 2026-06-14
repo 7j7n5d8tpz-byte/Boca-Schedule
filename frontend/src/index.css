@@ -83,6 +83,14 @@ input[type="time"]::-webkit-date-and-time-value {
    and breaks `position: sticky` descendants (the AppNav is sticky at every
    breakpoint), whereas `clip` just clips. */
 html, body { overflow-x: clip; }
+/* The root scroller must carry the page background colour itself. iOS Safari
+   tints the chrome it overlaps (the status-bar/notch region at the top and the
+   strip exposed when its toolbar collapses at the bottom) with the topmost
+   solid background it finds. With no background here it samples the brand-dark
+   nav — leaving a dark bar pinned at the top after the nav scrolls away, and a
+   bare-white strip at the bottom. Painting html/body the page grey makes both
+   regions match the content, so the scroll reads seamless. */
+html, body { background-color: #f9fafb; } /* tailwind gray-50 — matches .boca-page */
 
 /* ─── Push drawer ──────────────────────────────────────────────────────────
    The whole app (#root) slides right when the left nav drawer opens, so the

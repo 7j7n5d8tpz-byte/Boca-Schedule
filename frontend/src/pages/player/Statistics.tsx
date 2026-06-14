@@ -318,7 +318,7 @@ export default function Statistics() {
   const hasPerformance  = players.some(p => p.totalGoals > 0 || p.totalAssists > 0 || p.totalCleanSheets > 0);
 
   return (
-    <div className="min-h-screen bg-gray-50 boca-page">
+    <div className="min-h-dvh bg-gray-50 boca-page">
       <AppNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8">

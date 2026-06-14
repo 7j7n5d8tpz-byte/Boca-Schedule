@@ -5,8 +5,9 @@ Monorepo for the Boca Boldisch football scheduling app.
 ## Stack & layout
 
 - `frontend/` — Vite + React (port 5173). Calls the backend via a **relative** `/api`.
-- `backend/` — Express + TypeScript (port 3001). Uses Supabase `service_role`.
-- `optimization-service/` — Julia optimizer (port 3002).
+- `backend/` — Express + TypeScript (port 3001). Uses Supabase `service_role`. The squad
+  optimizer runs **in-process** here (HiGHS-WASM) — see `backend/src/lib/optimizer.ts`;
+  there is no separate optimizer service or port.
 - `supabase/` — local Supabase config + migrations.
 - npm workspaces; root `npm run dev` runs backend + frontend concurrently.
 
@@ -20,9 +21,9 @@ develop locally  →  test locally  →  commit  →  push to main  →  CI gate
 ```
 
 - Do all development and manual testing **locally first**. Local Supabase (Docker),
-  Julia, backend, and frontend are fully isolated from production.
+  backend, and frontend are fully isolated from production.
 - Start the stack with the `/start` skill; stop with `/stop`. Ports: Supabase API
-  54321 / DB 54322 / Studio 54323, backend 3001, Julia 3002, frontend 5173.
+  54321 / DB 54322 / Studio 54323, backend 3001, frontend 5173.
 - Before manual testing or pushing, run the `/test` skill: it runs the same gates as CI
   locally (typecheck → frontend unit → backend integration → E2E), cheapest-first and
   stops at the first failure. Requires the stack up via `/start`; it does not auto-start.
@@ -40,7 +41,6 @@ push/PR to `main`:
 4. **Deploy (push to `main` only, after E2E passes):**
    - `supabase db push` — applies new migrations to the prod DB
    - Backend → Fly.io (`boca-backend`)
-   - Julia → Fly.io (`boca-julia`)
 
 Any push to `main` triggers the full pipeline, including a prod deploy — even a
 config-only commit will redeploy (a no-op if no code/migrations changed).
@@ -48,8 +48,8 @@ config-only commit will redeploy (a no-op if no code/migrations changed).
 ## Production
 
 - Frontend: https://boca-schedule.vercel.app — Vercel, auto-deploys on push to `main`.
-- Backend: `boca-backend.fly.dev` (health: `/health`).
-- Julia: `boca-julia.fly.dev` (512 MB; can flake on cold deploys — backend tolerates its absence).
+- Backend: `boca-backend.fly.dev` (health: `/health`). Squad optimizer runs in-process
+  (HiGHS-WASM) — no separate optimizer service.
 - DB/Auth: Supabase project `bqucqglcueffoqiywers` (West EU).
 
 Secrets live in GitHub Actions and Vercel — never committed. `.env*` is gitignored.

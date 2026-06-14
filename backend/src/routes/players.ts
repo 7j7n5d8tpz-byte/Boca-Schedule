@@ -35,7 +35,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
   try {
     // Fetch all players and available years in parallel
     const [{ data: allUsers }, { data: allMatchDates }] = await Promise.all([
-      supabaseAdmin.from('users').select('user_id, name, preferred_positions').in('role', ['player', 'coach', 'admin']).eq('is_active', true).order('name'),
+      supabaseAdmin.from('users').select('user_id, name, preferred_positions, avatar_url').in('role', ['player', 'coach', 'admin']).eq('is_active', true).order('name'),
       supabaseAdmin.from('matches').select('match_date').in('status', ['completed', 'published']),
     ]);
 
@@ -48,7 +48,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
     const matchTypeFilter = (req.query.matchType as string | undefined) ?? 'all';
 
     type PlayerRow = {
-      userId: string; name: string; preferredPositions: string[];
+      userId: string; name: string; preferredPositions: string[]; avatarUrl: string | null;
       totalSignups: number; totalSelected: number; totalPlayed: number;
       totalGoals: number; totalAssists: number; totalCleanSheets: number;
       totalYellowCards: number; totalRedCards: number; totalManOfMatch: number;
@@ -118,7 +118,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
         const selected = selectedMap.get(u.user_id) ?? 0;
         const played = playedMap.get(u.user_id) ?? 0;
         return {
-          userId: u.user_id, name: u.name, preferredPositions: u.preferred_positions ?? [],
+          userId: u.user_id, name: u.name, preferredPositions: u.preferred_positions ?? [], avatarUrl: u.avatar_url ?? null,
           totalSignups: signups, totalSelected: selected, totalPlayed: played,
           totalGoals: perf.goals, totalAssists: perf.assists, totalCleanSheets: perf.cleanSheets,
           totalYellowCards: perf.yellowCards, totalRedCards: perf.redCards, totalManOfMatch: perf.motmCount,
@@ -126,7 +126,9 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
           attendanceRate: signups > 0 ? +((played / signups) * 100).toFixed(2) : 0,
           gkAppearances: gkAppearanceMap.get(u.user_id) ?? 0,
         };
-      }).filter((p: PlayerRow) => p.totalSignups > 0 || p.totalPlayed > 0);
+      });
+      // Return the whole active roster — players who haven't appeared in a match
+      // yet show with zeroed stats rather than being hidden.
 
       const matchHistory: MatchRow[] = (historyData ?? []).map((r: any) => ({
         matchId: r.match_id,

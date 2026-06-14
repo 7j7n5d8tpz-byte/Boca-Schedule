@@ -23,11 +23,13 @@ import { Skeleton } from '../../components/Skeleton';
 import StatIcon, { CardChip } from '../../components/StatIcon';
 import Icon, { Star } from '../../components/Icon';
 import CountUp from '../../components/CountUp';
+import Avatar from '../../components/Avatar';
 
 interface PlayerStat {
   userId: string;
   name: string;
   preferredPositions: string[];
+  avatarUrl?: string | null;
   totalSignups: number;
   totalPlayed: number;
   totalGoals: number;
@@ -193,7 +195,6 @@ export default function Statistics() {
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all' | '7-player' | 'futsal'>('all');
   const [view, setView] = useState<'team' | 'highlights'>('team');
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
-  const [showAllPlayers, setShowAllPlayers] = useState(false);
   const highlightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const isCoach = user?.role === 'coach' || user?.role === 'admin';
@@ -231,9 +232,6 @@ export default function Statistics() {
 
   const overview = data?.overview;
   const players = data?.players ?? [];
-  const PLAYER_PREVIEW = 8;
-  const visiblePlayers = showAllPlayers ? players : players.slice(0, PLAYER_PREVIEW);
-  const hasMorePlayers = players.length > PLAYER_PREVIEW;
   const matchHistory = data?.matchHistory ?? [];
 
   const focusPlayer = useMemo(
@@ -800,7 +798,7 @@ export default function Statistics() {
               {/* Mobile cards */}
               <div className="sm:hidden space-y-3">
                 <h2 className="text-sm font-semibold text-gray-700">All players</h2>
-                {visiblePlayers.map(p => {
+                {players.map(p => {
                   const isMe = p.userId === user?.userId;
                   const rate = p.totalSignups > 0 ? p.attendanceRate : null;
                   return (
@@ -810,9 +808,6 @@ export default function Statistics() {
                         <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
                           {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
                         </span>
-                        {p.preferredPositions.map(pos => (
-                          <span key={pos} className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
-                        ))}
                       </div>
                       <div className="grid grid-cols-4 gap-2 text-center">
                         <div>
@@ -843,12 +838,6 @@ export default function Statistics() {
                     </div>
                   );
                 })}
-                {hasMorePlayers && (
-                  <button onClick={() => setShowAllPlayers(v => !v)}
-                    className="w-full text-sm text-brand-green font-medium py-2 rounded-lg hover:bg-brand-green-50 transition-colors">
-                    {showAllPlayers ? 'Show less' : `Show all ${players.length} players`}
-                  </button>
-                )}
                 <p className="text-xs text-gray-400">Tap a player to view details</p>
               </div>
 
@@ -876,7 +865,7 @@ export default function Statistics() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {visiblePlayers.map(p => {
+                    {players.map(p => {
                       const isMe = p.userId === user?.userId;
                       return (
                         <tr key={p.userId}
@@ -888,9 +877,6 @@ export default function Statistics() {
                               <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
                                 {p.name}
                               </span>
-                              {p.preferredPositions.map(pos => (
-                                <span key={pos} className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
-                              ))}
                             </div>
                           </td>
                           {isCoach && <td className="hidden sm:table-cell px-3 py-2.5 text-center text-gray-700">{p.totalSignups}</td>}
@@ -919,12 +905,6 @@ export default function Statistics() {
                     })}
                   </tbody>
                 </table>
-                {hasMorePlayers && (
-                  <button onClick={() => setShowAllPlayers(v => !v)}
-                    className="w-full text-sm text-brand-green font-medium py-2.5 border-t border-gray-100 hover:bg-brand-green-50 transition-colors">
-                    {showAllPlayers ? 'Show less' : `Show all ${players.length} players`}
-                  </button>
-                )}
                 <p className="text-xs text-gray-400 px-5 py-3">Click a row to view player details</p>
               </div>
             </div>
@@ -934,13 +914,24 @@ export default function Statistics() {
         {/* ── Selected player view ── */}
         {view === 'team' && !isLoading && selectedPlayer && focusPlayer && (
           <>
-            <div className="flex items-center gap-3">
+            <div className="space-y-3">
               <button onClick={() => setSelectedPlayer('')} className="text-sm text-gray-400 hover:text-gray-600">← All players</button>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold text-gray-900">{focusPlayer.name}</h2>
-                {focusPlayer.preferredPositions.map(pos => (
-                  <span key={pos} className={`text-xs font-medium px-2 py-0.5 rounded-full ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
-                ))}
+              {/* Profile header — who it is, their positions, and their photo. */}
+              <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+                <Avatar src={focusPlayer.avatarUrl} name={focusPlayer.name} size={64} className="ring-1 ring-gray-200" />
+                <div className="min-w-0">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {focusPlayer.name}
+                    {focusPlayer.userId === user?.userId && <span className="text-brand-green ml-2 text-sm font-medium">you</span>}
+                  </h2>
+                  <div className="flex gap-1.5 flex-wrap mt-2">
+                    {focusPlayer.preferredPositions.length > 0
+                      ? focusPlayer.preferredPositions.map(pos => (
+                          <span key={pos} className={`text-xs font-medium px-2 py-0.5 rounded-full ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
+                        ))
+                      : <span className="text-sm text-gray-400">No positions set</span>}
+                  </div>
+                </div>
               </div>
             </div>
 

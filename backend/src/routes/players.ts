@@ -64,7 +64,19 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       const { data: yearMatches } = await yearMatchQuery;
 
       const matchIds = (yearMatches ?? []).map((m: any) => m.match_id);
-      if (matchIds.length === 0) return { players: [], matchHistory: [] };
+      if (matchIds.length === 0) {
+        // No matches this year, but still show the whole active roster with
+        // zeroed stats — otherwise the "All players" table is empty whenever
+        // the selected year has no matches yet.
+        const players: PlayerRow[] = (allUsers ?? []).map((u: any) => ({
+          userId: u.user_id, name: u.name, preferredPositions: u.preferred_positions ?? [], avatarUrl: u.avatar_url ?? null,
+          totalSignups: 0, totalSelected: 0, totalPlayed: 0,
+          totalGoals: 0, totalAssists: 0, totalCleanSheets: 0,
+          totalYellowCards: 0, totalRedCards: 0, totalManOfMatch: 0,
+          avgRating: 0, attendanceRate: 0, gkAppearances: 0,
+        }));
+        return { players, matchHistory: [] };
+      }
 
       const [{ data: perfData }, { data: signupData }, { data: selectionData }, { data: historyData }, { data: completedMatchData }, { data: gkData }] = await Promise.all([
         supabaseAdmin.from('match_performance').select('player_id, goals, assists, clean_sheet, self_rating, yellow_cards, red_cards, man_of_match').in('match_id', matchIds),

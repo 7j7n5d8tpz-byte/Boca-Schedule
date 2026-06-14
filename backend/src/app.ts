@@ -34,6 +34,11 @@ app.use(cors({
   credentials: true,
 }));
 
+// Avatar uploads carry a base64 image, which can exceed the default 100 kb JSON
+// limit. Parse this one path with a higher cap *before* the global parser; once
+// body-parser has run, the global express.json() below is a no-op for it.
+app.use('/api/players/:playerId/avatar', express.json({ limit: '4mb' }));
+
 app.use(express.json());
 
 const isTest = process.env.NODE_ENV === 'test';

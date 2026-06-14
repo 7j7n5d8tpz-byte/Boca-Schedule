@@ -116,6 +116,7 @@ router.post('/login', async (req, res, next) => {
           name: profile?.name,
           role: profile?.role,
           preferredPositions: profile?.preferred_positions,
+          avatarUrl: profile?.avatar_url ?? null,
           isFineAdmin: profile?.role === 'admin' || (profile?.is_fine_admin ?? false),
         },
         tokens: {

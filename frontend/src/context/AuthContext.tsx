@@ -22,6 +22,7 @@ interface User {
   name: string;
   role: 'player' | 'coach' | 'admin';
   preferredPositions: string[];
+  avatarUrl?: string | null;
   isFineAdmin?: boolean;
 }
 
@@ -29,6 +30,7 @@ interface AuthContextValue {
   user: User | null;
   login: (email: string, password: string) => Promise<string>;
   logout: () => Promise<void>;
+  updateUser: (patch: Partial<User>) => void;
   isAuthenticated: boolean;
 }
 
@@ -49,6 +51,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { await api.post('/auth/logout'); } catch { /* ignore */ }
     clearSession();
     setUser(null);
+  }, []);
+
+  // Patch the in-memory user and persist it, so changes like a new avatar show
+  // immediately across the app without a re-login.
+  const updateUser = useCallback((patch: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      localStorage.setItem('user', JSON.stringify(next));
+      return next;
+    });
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<string> => {
@@ -88,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, logout]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUser, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

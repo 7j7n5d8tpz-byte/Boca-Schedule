@@ -427,6 +427,75 @@ router.put('/:playerId/profile', authenticate, async (req, res, next) => {
   }
 });
 
+// PUT /api/players/:playerId/avatar — upload a cropped profile picture.
+// The client sends an already-cropped, resized webp as a data URL; we just
+// decode it and store it. Bucket + column come from migration 20260614000001.
+const AvatarSchema = z.object({
+  image: z.string().regex(/^data:image\/(webp|jpeg|png);base64,/, 'Expected a base64 image data URL'),
+});
+
+router.put('/:playerId/avatar', authenticate, async (req, res, next) => {
+  try {
+    const { playerId } = req.params;
+    if (playerId !== req.user!.userId && req.user!.role !== 'admin') {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Cannot edit another user\'s photo' } });
+      return;
+    }
+
+    const body = AvatarSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid image' } });
+      return;
+    }
+
+    const [meta, b64] = body.data.image.split(',');
+    const ext = meta.includes('webp') ? 'webp' : meta.includes('png') ? 'png' : 'jpeg';
+    const contentType = `image/${ext}`;
+    const buffer = Buffer.from(b64, 'base64');
+    if (buffer.byteLength > 2_097_152) {
+      res.status(413).json({ success: false, error: { code: 'TOO_LARGE', message: 'Image too large' } });
+      return;
+    }
+
+    // Stable path per user; upsert overwrites the previous photo.
+    const path = `${playerId}.${ext}`;
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from('avatars')
+      .upload(path, buffer, { contentType, upsert: true });
+    if (uploadError) throw uploadError;
+
+    const { data: pub } = supabaseAdmin.storage.from('avatars').getPublicUrl(path);
+    // Cache-bust so the new image shows immediately despite the stable path.
+    const avatarUrl = `${pub.publicUrl}?v=${Date.now()}`;
+
+    const { error } = await supabaseAdmin.from('users').update({ avatar_url: avatarUrl }).eq('user_id', playerId);
+    if (error) throw error;
+
+    res.json({ success: true, data: { avatarUrl } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/players/:playerId/avatar — remove the profile picture.
+router.delete('/:playerId/avatar', authenticate, async (req, res, next) => {
+  try {
+    const { playerId } = req.params;
+    if (playerId !== req.user!.userId && req.user!.role !== 'admin') {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Cannot edit another user\'s photo' } });
+      return;
+    }
+
+    await supabaseAdmin.storage.from('avatars').remove([`${playerId}.webp`, `${playerId}.png`, `${playerId}.jpeg`]);
+    const { error } = await supabaseAdmin.from('users').update({ avatar_url: null }).eq('user_id', playerId);
+    if (error) throw error;
+
+    res.json({ success: true, data: { avatarUrl: null } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/matches/:matchId/performance
 router.post('/:matchId/performance', authenticate, async (req, res, next) => {
   try {

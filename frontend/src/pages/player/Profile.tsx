@@ -1,8 +1,9 @@
 import AppNav from '../../components/AppNav';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import AvatarCropper from '../../components/AvatarCropper';
 
 function PasswordStrength({ password }: { password: string }) {
   const checks = [
@@ -45,8 +46,12 @@ const POS_COLOR: Record<string, string> = {
 };
 
 export default function PlayerProfile() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const qc = useQueryClient();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState('');
 
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState('');
@@ -95,6 +100,33 @@ export default function PlayerProfile() {
       setSaveError(err.response?.data?.error?.message ?? 'Failed to save');
     },
   });
+
+  const avatarMutation = useMutation({
+    mutationFn: (image: string) =>
+      api.put(`/players/${user!.userId}/avatar`, { image }).then(r => r.data.data.avatarUrl as string),
+    onSuccess: (avatarUrl) => {
+      updateUser({ avatarUrl });
+      setCropSrc(null);
+      setAvatarError('');
+    },
+    onError: (err: any) => setAvatarError(err.response?.data?.error?.message ?? 'Failed to upload photo'),
+  });
+
+  const removeAvatarMutation = useMutation({
+    mutationFn: () => api.delete(`/players/${user!.userId}/avatar`),
+    onSuccess: () => { updateUser({ avatarUrl: null }); setAvatarError(''); },
+    onError: (err: any) => setAvatarError(err.response?.data?.error?.message ?? 'Failed to remove photo'),
+  });
+
+  function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setAvatarError('Please choose an image file.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result as string);
+    reader.readAsDataURL(file);
+  }
 
   const changePasswordMutation = useMutation({
     mutationFn: () => api.put('/auth/change-password', { currentPassword, newPassword }),
@@ -146,6 +178,39 @@ export default function PlayerProfile() {
 
         {/* Profile card */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          {/* Avatar */}
+          <div className="flex items-center gap-4">
+            <span className="w-20 h-20 rounded-full overflow-hidden bg-brand-green/15 text-brand-green text-2xl font-bold flex items-center justify-center shrink-0 ring-1 ring-gray-200">
+              {user?.avatarUrl
+                ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+                : (user?.name?.charAt(0).toUpperCase() ?? '?')}
+            </span>
+            <div className="space-y-1">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-sm font-medium text-brand-green hover:underline"
+                >
+                  {user?.avatarUrl ? 'Change photo' : 'Add photo'}
+                </button>
+                {user?.avatarUrl && (
+                  <button
+                    onClick={() => removeAvatarMutation.mutate()}
+                    disabled={removeAvatarMutation.isPending}
+                    className="text-sm text-gray-400 hover:text-red-500 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400">JPG, PNG or WebP. You choose the crop.</p>
+              {avatarError && <p className="text-xs text-red-500">{avatarError}</p>}
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={onFilePicked} className="hidden" />
+          </div>
+
+          <div className="h-px bg-gray-100" />
+
           {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
 
           {!isLoading && data && (
@@ -330,6 +395,15 @@ export default function PlayerProfile() {
         </div>
 
       </main>
+
+      {cropSrc && (
+        <AvatarCropper
+          src={cropSrc}
+          busy={avatarMutation.isPending}
+          onCancel={() => setCropSrc(null)}
+          onSave={(dataUrl) => avatarMutation.mutate(dataUrl)}
+        />
+      )}
     </div>
   );
 }

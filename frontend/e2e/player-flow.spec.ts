@@ -36,9 +36,8 @@ test.describe('Player flow', () => {
 
   test('profile page loads', async ({ page }) => {
     await loginAs(page, 'player');
-    await page.getByRole('button', { name: /open menu/i }).click();
-    // Click user name (links to profile)
-    await page.getByRole('link', { name: /e2e[ -]?player/i }).first().click();
+    // Profile is reached via the avatar button on the right of the nav.
+    await page.getByRole('link', { name: /your profile/i }).click();
     await expect(page).toHaveURL(/profile/);
     await expect(page.getByRole('heading', { name: /profile/i })).toBeVisible();
   });

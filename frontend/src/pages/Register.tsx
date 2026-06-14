@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
+import AvatarCropper from '../components/AvatarCropper';
 
 const POSITIONS = ['GK', 'DEF', 'WIN', 'MID', 'STR'] as const;
 type Position = (typeof POSITIONS)[number];
@@ -67,6 +68,24 @@ export default function Register() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Optional profile picture chosen during sign-up. `avatar` holds the cropped
+  // webp data URL; `cropSrc` is the raw pick being adjusted in the cropper.
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setAvatarError('Please choose an image file.'); return; }
+    setAvatarError('');
+    const reader = new FileReader();
+    reader.onload = () => setCropSrc(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
   function togglePosition(pos: Position) {
     setForm((f) => ({
       ...f,
@@ -100,6 +119,7 @@ export default function Register() {
         email: form.email.toLowerCase().trim(),
         password: form.password,
         preferredPositions: form.preferredPositions,
+        ...(avatar ? { avatar } : {}),
       });
       setSubmitted(true);
     } catch {
@@ -158,6 +178,41 @@ export default function Register() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {/* Profile picture (optional) */}
+          <div className="flex flex-col items-center gap-2 pb-1">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-20 h-20 rounded-full overflow-hidden bg-brand-green/15 text-brand-green text-2xl font-bold flex items-center justify-center ring-1 ring-gray-200 hover:ring-brand-green transition"
+              aria-label={avatar ? 'Change profile picture' : 'Add a profile picture'}
+            >
+              {avatar
+                ? <img src={avatar} alt="" className="w-full h-full object-cover" />
+                : (form.name.trim().charAt(0).toUpperCase() || '+')}
+            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-sm font-medium text-brand-green hover:underline"
+              >
+                {avatar ? 'Change photo' : 'Add a photo'}
+                <span className="text-gray-400 font-normal"> (optional)</span>
+              </button>
+              {avatar && (
+                <button
+                  type="button"
+                  onClick={() => setAvatar(null)}
+                  className="text-sm text-gray-400 hover:text-red-500"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            {avatarError && <p className="text-xs text-red-500">{avatarError}</p>}
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={onFilePicked} className="hidden" />
+          </div>
+
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full name</label>
@@ -261,6 +316,14 @@ export default function Register() {
         </form>
         </div>
       </div>
+
+      {cropSrc && (
+        <AvatarCropper
+          src={cropSrc}
+          onCancel={() => setCropSrc(null)}
+          onSave={(dataUrl) => { setAvatar(dataUrl); setCropSrc(null); }}
+        />
+      )}
     </div>
   );
 }

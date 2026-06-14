@@ -48,6 +48,37 @@ describe('Auth', () => {
       });
       expect(res.status).toBe(422);
     });
+
+    it('stores an optional profile picture chosen at sign-up', async () => {
+      // 1x1 transparent webp — smallest valid avatar payload.
+      const image = 'data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==';
+      const email = `reg-avatar-${Date.now()}@bocatest.internal`;
+      const res = await request(app).post('/api/auth/register').send({
+        email,
+        password: 'Test123!',
+        name: 'Avatar Signup',
+        avatar: image,
+      });
+      expect(res.status).toBe(201);
+
+      const { data } = await supabaseAdmin.from('users').select('user_id, avatar_url').eq('email', email).single();
+      expect(data?.avatar_url).toBeTruthy();
+      // Cleanup
+      if (data?.user_id) {
+        await supabaseAdmin.storage.from('avatars').remove([`${data.user_id}.webp`]);
+        await deleteTestUser(data.user_id);
+      }
+    });
+
+    it('rejects a malformed avatar payload', async () => {
+      const res = await request(app).post('/api/auth/register').send({
+        email: `reg-badavatar-${Date.now()}@bocatest.internal`,
+        password: 'Test123!',
+        name: 'Bad Avatar',
+        avatar: 'not-a-data-url',
+      });
+      expect(res.status).toBe(422);
+    });
   });
 
   // ── Login ───────────────────────────────────────────────────────────────────

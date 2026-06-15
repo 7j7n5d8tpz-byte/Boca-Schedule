@@ -134,6 +134,12 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
       // leave — never engages the hover bypass. Hover is a mouse-only concept.
       onPointerEnter={e => { if (e.pointerType === 'mouse') { hoveringRef.current = true; clearTimeout(autoHide.current); } }}
       onPointerLeave={e => { if (e.pointerType === 'mouse') { hoveringRef.current = false; armAutoHide(); } }}
+      // Extend the nav's dark background up under the iOS notch (the py-3 top
+      // padding plus the safe-area inset), so the status-bar region reads as the
+      // nav rather than a stuck dark bar. env() is 0 off-notch / without
+      // viewport-fit=cover, leaving the plain py-3. The full-height translate on
+      // hide carries this padding too, so it clears completely when scrolled.
+      style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
       className={`sticky top-0 z-40 bg-brand-dark px-4 py-3 flex items-center gap-3 transition-[transform,opacity] ${
         hidden ? '-translate-y-full opacity-0 duration-[450ms]' : 'translate-y-0 opacity-100 duration-300'
       }`}

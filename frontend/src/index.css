@@ -83,6 +83,14 @@ input[type="time"]::-webkit-date-and-time-value {
    and breaks `position: sticky` descendants (the AppNav is sticky at every
    breakpoint), whereas `clip` just clips. */
 html, body { overflow-x: clip; }
+/* With viewport-fit=cover (see index.html) the page paints into the iOS safe
+   areas. Give the root the page grey so the home-indicator strip at the bottom
+   and any over-scroll show the page colour rather than browser white; the nav
+   covers the top inset with its own dark background while it's showing, and the
+   grey content fills it once the nav scrolls away. `color-scheme: light` keeps
+   the browser chrome from ever defaulting dark. */
+:root { color-scheme: light; }
+html, body { background-color: #f9fafb; } /* tailwind gray-50 — matches .boca-page */
 
 /* ─── Push drawer ──────────────────────────────────────────────────────────
    The whole app (#root) slides right when the left nav drawer opens, so the

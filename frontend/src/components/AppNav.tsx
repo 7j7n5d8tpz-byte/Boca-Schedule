@@ -134,6 +134,12 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
       // leave — never engages the hover bypass. Hover is a mouse-only concept.
       onPointerEnter={e => { if (e.pointerType === 'mouse') { hoveringRef.current = true; clearTimeout(autoHide.current); } }}
       onPointerLeave={e => { if (e.pointerType === 'mouse') { hoveringRef.current = false; armAutoHide(); } }}
+      // In the installed (full-screen) app the transparent status bar overlays
+      // the page, so pad the nav's top by the safe-area inset to keep its
+      // content (burger/logo/bell) clear of the status bar / notch. env() is 0
+      // in a normal Safari tab, leaving the plain py-3. The full-height
+      // hide-translate carries this padding, so the nav still clears completely.
+      style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
       className={`sticky top-0 z-40 bg-brand-dark px-4 py-3 flex items-center gap-3 transition-[transform,opacity] ${
         hidden ? '-translate-y-full opacity-0 duration-[450ms]' : 'translate-y-0 opacity-100 duration-300'
       }`}

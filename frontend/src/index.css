@@ -73,6 +73,9 @@ input[type="time"]::-webkit-date-and-time-value {
 
 .boca-page {
   isolation: isolate;
+  /* In the installed full-screen app the home-indicator overlays the page;
+     keep page content clear of it. 0 in a normal Safari tab. */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Clamp horizontal overflow at the root, at every breakpoint. Two reasons:

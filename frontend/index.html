@@ -13,6 +13,19 @@
          sticks). Pin it to the page grey so both regions blend into the content
          and it scrolls edge-to-edge with no framing bars, top or bottom. -->
     <meta name="theme-color" content="#f9fafb" />
+    <!-- Installed (Add to Home Screen) web-app mode: launches full-screen with
+         no Safari toolbars. black-translucent makes the status bar transparent
+         so the page paints edge-to-edge behind it — the immersive, frameless
+         look. Applies only to the Home-Screen-launched app, not the Safari tab.
+         In standalone env(safe-area-inset-*) is non-zero, so the nav pads its
+         top by the inset (see AppNav) to clear the status bar / notch. Note the
+         status-bar text is white in this mode. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Boca Boldisch" />
+    <link rel="apple-touch-icon" href="/boca-logo.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Boca Boldisch</title>
   </head>
   <body>

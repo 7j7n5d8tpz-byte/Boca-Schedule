@@ -324,7 +324,8 @@ export default function Statistics() {
       <main className="max-w-5xl mx-auto px-4 py-8">
 
         {/* Header + filters */}
-        <div className="flex items-center justify-between gap-4 flex-wrap mb-8">
+        {/* Desktop (sm+): title + year + segmented match-type on the left, player select on the right. */}
+        <div className="hidden sm:flex items-center justify-between gap-4 flex-wrap mb-8">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-extrabold text-gray-900">Team Statistics</h1>
             {(data?.availableYears ?? []).length > 0 && (
@@ -369,6 +370,52 @@ export default function Statistics() {
               ))}
             </select>
           )}
+        </div>
+
+        {/* Mobile (<sm): title, then all filter dropdowns grouped in a highlighted
+            box. Match type is a dropdown here (not segmented buttons) so the year
+            and player selects fit on the same row and the header stays compact. */}
+        <div className="sm:hidden mb-8">
+          <h1 className="text-2xl font-extrabold text-gray-900 mb-3">Team Statistics</h1>
+          <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl p-2">
+            {(data?.availableYears ?? []).length > 0 && (
+              <select
+                aria-label="Year"
+                value={selectedYear ?? data?.year ?? ''}
+                onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedPlayer(''); }}
+                className="shrink-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
+              >
+                {(data?.availableYears ?? []).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            )}
+            <select
+              aria-label="Match type"
+              value={matchTypeFilter}
+              onChange={e => setMatchTypeFilter(e.target.value as 'all' | '7-player' | 'futsal')}
+              className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
+            >
+              <option value="all">All types</option>
+              <option value="7-player">7-player</option>
+              <option value="futsal">Futsal</option>
+            </select>
+            {view === 'team' && (
+              <select
+                aria-label="Player"
+                value={selectedPlayer}
+                onChange={e => setSelectedPlayer(e.target.value)}
+                className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
+              >
+                <option value="">All players</option>
+                {players.map(p => (
+                  <option key={p.userId} value={p.userId}>
+                    {p.name}{p.userId === user?.userId ? ' (you)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
 
         {/* Sidebar + content layout */}

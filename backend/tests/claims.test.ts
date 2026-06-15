@@ -66,7 +66,13 @@ describe('Open-spot claims', () => {
   });
 
   it('lists pending claimants to the coach but not to players', async () => {
-    await request(app).post(`/api/matches/${matchId}/claims`).set('Authorization', `Bearer ${p2.token}`);
+    // Assert p2's claim is actually created — otherwise a failure here surfaces
+    // confusingly as a wrong count below (and a missing row in the next test).
+    const p2ClaimRes = await request(app)
+      .post(`/api/matches/${matchId}/claims`)
+      .set('Authorization', `Bearer ${p2.token}`);
+    expect(p2ClaimRes.status).toBe(201);
+    expect(p2ClaimRes.body.data.status).toBe('pending');
 
     const coachRes = await request(app)
       .get(`/api/matches/${matchId}/claims`)

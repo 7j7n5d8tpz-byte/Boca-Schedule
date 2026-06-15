@@ -11,9 +11,12 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     testTimeout: 20000,
     hookTimeout: 30000,
-    // Run files sequentially — tests share a real DB and must not race
+    // Run files sequentially — tests share a real DB and must not race.
+    // singleFork keeps everything in one process; fileParallelism: false is the
+    // supported switch for serial files (the old `sequence.sequential` was not a
+    // real Vitest option and was silently ignored).
     pool: 'forks',
-    forks: { singleFork: true },
-    sequence: { sequential: true },
+    poolOptions: { forks: { singleFork: true } },
+    fileParallelism: false,
   },
 });

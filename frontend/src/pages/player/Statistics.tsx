@@ -374,8 +374,10 @@ export default function Statistics() {
         {/* Sidebar + content layout */}
         <div className="flex flex-col sm:flex-row gap-6 items-stretch sm:items-start">
 
-          {/* Sidebar — horizontal tab bar on mobile, sidebar on sm+ */}
-          <nav className="w-full sm:w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-2 flex sm:flex-col gap-1 sm:sticky sm:top-[calc(var(--app-nav-offset)+0.5rem)] transition-[top] duration-[var(--app-nav-dur)]">
+          {/* Sidebar — horizontal tab bar on mobile, sidebar on sm+.
+              Hidden on mobile when viewing a specific player (the highlights tab
+              just crowds the top); always shown as a sidebar on sm+. */}
+          <nav className={`w-full sm:w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-2 ${selectedPlayer && view === 'team' ? 'hidden sm:flex' : 'flex'} sm:flex-col gap-1 sm:sticky sm:top-[calc(var(--app-nav-offset)+0.5rem)] transition-[top] duration-[var(--app-nav-dur)]`}>
             <button
               onClick={() => setView('team')}
               className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${

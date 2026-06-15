@@ -88,6 +88,17 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
     return () => root.classList.remove('app-nav-hidden');
   }, [hidden]);
 
+  // Match mobile-Safari's status-bar backdrop to what's actually at the top: the
+  // brand-dark nav when it's showing, the page grey once it hides on scroll.
+  // Content flows under the status bar (no top inset), so theme-color is what
+  // tints it — without this it defaults dark and sticks. Restore grey on
+  // unmount (e.g. navigating to the nav-less login page). See index.html.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    meta?.setAttribute('content', hidden ? '#f9fafb' : '#1A1D22');
+    return () => meta?.setAttribute('content', '#f9fafb');
+  }, [hidden]);
+
   const isCoach = user?.role === 'coach' || user?.role === 'admin';
   const isAdmin  = user?.role === 'admin';
   const isFineAdmin = isAdmin || !!user?.isFineAdmin;
@@ -134,12 +145,6 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
       // leave — never engages the hover bypass. Hover is a mouse-only concept.
       onPointerEnter={e => { if (e.pointerType === 'mouse') { hoveringRef.current = true; clearTimeout(autoHide.current); } }}
       onPointerLeave={e => { if (e.pointerType === 'mouse') { hoveringRef.current = false; armAutoHide(); } }}
-      // Extend the nav's dark background up under the iOS notch (the py-3 top
-      // padding plus the safe-area inset), so the status-bar region reads as the
-      // nav rather than a stuck dark bar. env() is 0 off-notch / without
-      // viewport-fit=cover, leaving the plain py-3. The full-height translate on
-      // hide carries this padding too, so it clears completely when scrolled.
-      style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
       className={`sticky top-0 z-40 bg-brand-dark px-4 py-3 flex items-center gap-3 transition-[transform,opacity] ${
         hidden ? '-translate-y-full opacity-0 duration-[450ms]' : 'translate-y-0 opacity-100 duration-300'
       }`}

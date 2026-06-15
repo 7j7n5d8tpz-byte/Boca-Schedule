@@ -10,6 +10,13 @@
          `env(safe-area-inset-*)` resolves to 0. The nav adds top safe-area
          padding (see AppNav) so its content clears the notch. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Mobile Safari paints a status-bar backdrop on top of the page (content
+         flows under it; there is no top safe-area inset when the address bar is
+         at the bottom). Its colour comes from theme-color — with none set it
+         defaults dark and sticks. Default to the page grey (matches scrolled
+         content and the nav-less login pages); AppNav flips it to the brand-dark
+         nav colour while the nav shows, so the top reads seamless either way. -->
+    <meta name="theme-color" content="#f9fafb" />
     <title>Boca Boldisch</title>
   </head>
   <body>

@@ -207,7 +207,7 @@ export default function CoachDashboard() {
   const completedResults = matches.filter(m => m.status === 'completed');
 
   return (
-    <div className="min-h-dvh bg-gray-50 boca-page">
+    <div className="min-h-screen bg-gray-50 boca-page">
       {/* Nav */}
       <AppNav />
 

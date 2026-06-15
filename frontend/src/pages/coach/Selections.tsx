@@ -195,8 +195,8 @@ export default function Selections() {
     setSelectedIds(next);
   }
 
-  if (isLoading) return <div className="min-h-dvh bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
-  if (!data) return <div className="min-h-dvh bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
+  if (isLoading) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
+  if (!data) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
 
   const { match, players } = data;
   const date = new Date(`${match.matchDate}T${match.matchTime}`);
@@ -207,7 +207,7 @@ export default function Selections() {
   const isDirty = players.some(p => p.isSelected !== ids.has(p.player.userId));
 
   return (
-    <div className="min-h-dvh bg-gray-50 boca-page">
+    <div className="min-h-screen bg-gray-50 boca-page">
       <AppNav backHref={`/coach/matches/${matchId}`} backLabel="← Sign-ups" />
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">

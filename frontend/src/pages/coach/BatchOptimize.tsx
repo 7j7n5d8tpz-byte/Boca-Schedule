@@ -188,7 +188,7 @@ export default function BatchOptimize() {
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-dvh bg-gray-50 boca-page">
+    <div className="min-h-screen bg-gray-50 boca-page">
       <AppNav backHref="/coach" backLabel="← Matches" />
 
       <main className={`${step === 'review' ? 'max-w-4xl' : 'max-w-2xl'} mx-auto px-4 py-8 space-y-6`}>

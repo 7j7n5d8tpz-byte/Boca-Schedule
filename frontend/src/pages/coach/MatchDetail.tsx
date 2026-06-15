@@ -150,18 +150,18 @@ export default function MatchDetail() {
   }
 
   if (isLoading) {
-    return <div className="min-h-dvh bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
+    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
   }
 
   if (!data) {
-    return <div className="min-h-dvh bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
+    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
   }
 
   const { match, signups, summary } = data;
   const date = new Date(`${match.matchDate}T${match.matchTime}`);
 
   return (
-    <div className="min-h-dvh bg-gray-50 boca-page">
+    <div className="min-h-screen bg-gray-50 boca-page">
       <AppNav backHref="/coach" backLabel="← Matches" />
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">

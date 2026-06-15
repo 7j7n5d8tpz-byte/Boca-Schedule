@@ -88,6 +88,16 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
     return () => root.classList.remove('app-nav-hidden');
   }, [hidden]);
 
+  // Keep mobile-Safari's status-bar tint matched to whatever sits at the very
+  // top: the brand-dark nav when it's showing, the page grey once it hides on
+  // scroll. Restores grey on unmount (e.g. navigating to login, which has no
+  // nav). See the theme-color meta in index.html.
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    meta?.setAttribute('content', hidden ? '#f9fafb' : '#1A1D22');
+    return () => meta?.setAttribute('content', '#f9fafb');
+  }, [hidden]);
+
   const isCoach = user?.role === 'coach' || user?.role === 'admin';
   const isAdmin  = user?.role === 'admin';
   const isFineAdmin = isAdmin || !!user?.isFineAdmin;
@@ -219,10 +229,15 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
              fixed to the viewport while #root slides aside. ── */}
       {createPortal(
         <>
-          {/* Backdrop over the pushed-aside page */}
+          {/* Backdrop over the pushed-aside page. `touch-action: none` makes it
+              swallow swipe/scroll gestures so the page behind can't move while
+              the drawer is open — locking background scroll without toggling
+              overflow on the root scroller (which desyncs iOS Safari's toolbar;
+              see index.css). Tap-to-close still fires (taps aren't a pan). */}
           <div
             onClick={() => setOpen(false)}
             aria-hidden
+            style={{ touchAction: 'none' }}
             className={`fixed inset-0 z-[60] bg-black/40 transition-opacity duration-300 ${
               open ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}

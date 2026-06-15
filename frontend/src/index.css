@@ -102,11 +102,13 @@ html, body { background-color: #f9fafb; } /* tailwind gray-50 — matches .boca-
   transition: transform var(--app-nav-dur, 300ms) cubic-bezier(0.22, 0.8, 0.2, 1);
 }
 html.app-drawer-open #root { transform: translateX(280px); }
-/* While the drawer is open, lock the page behind it so a swipe/scroll only
-   moves the drawer's own list (it has its own `overflow-y-auto`), not the page
-   underneath. `clip` (not `hidden`) prevents scrolling without establishing a
-   scroll container — so it doesn't break the sticky nav or shift layout. */
-html.app-drawer-open, html.app-drawer-open body { overflow-y: clip; }
+/* Background scroll is locked by the backdrop swallowing touch gestures
+   (`touch-action: none` on it), NOT by toggling overflow on the root scroller.
+   Toggling html/body `overflow` mid-scroll desyncs iOS Safari's dynamic
+   toolbar/viewport: closing the drawer on the same page leaves a stale strip
+   at the bottom that only a navigation (full re-layout) clears. The backdrop
+   covers the whole viewport while open, so gesture-locking it is enough; the
+   drawer's own list keeps default touch-action and still scrolls. */
 @media (prefers-reduced-motion: reduce) { #root { transition: none; } }
 
 .boca-page::after {

@@ -3,19 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/boca-logo.png" />
-    <!-- viewport-fit=cover lets the page paint into the iOS safe areas (the
-         status-bar notch at top, the home-indicator strip at bottom). Without
-         it those regions stay browser-tinted (a dark bar at top, a white bar at
-         the bottom) no matter what the page background or theme-color is, and
-         `env(safe-area-inset-*)` resolves to 0. The nav adds top safe-area
-         padding (see AppNav) so its content clears the notch. -->
+    <!-- viewport-fit=cover lets the page paint into the iOS safe areas so the
+         page background reaches the screen edges (otherwise the home-indicator
+         strip stayed browser-white). -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- Mobile Safari paints a status-bar backdrop on top of the page (content
-         flows under it; there is no top safe-area inset when the address bar is
-         at the bottom). Its colour comes from theme-color — with none set it
-         defaults dark and sticks. Default to the page grey (matches scrolled
-         content and the nav-less login pages); AppNav flips it to the brand-dark
-         nav colour while the nav shows, so the top reads seamless either way. -->
+    <!-- Mobile Safari tints the chrome it overlaps — the status-bar region at
+         the top and the toolbar region at the bottom — with theme-color (content
+         flows under both; with none set Safari defaults the top dark and it
+         sticks). Pin it to the page grey so both regions blend into the content
+         and it scrolls edge-to-edge with no framing bars, top or bottom. -->
     <meta name="theme-color" content="#f9fafb" />
     <title>Boca Boldisch</title>
   </head>

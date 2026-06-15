@@ -88,17 +88,6 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
     return () => root.classList.remove('app-nav-hidden');
   }, [hidden]);
 
-  // Match mobile-Safari's status-bar backdrop to what's actually at the top: the
-  // brand-dark nav when it's showing, the page grey once it hides on scroll.
-  // Content flows under the status bar (no top inset), so theme-color is what
-  // tints it — without this it defaults dark and sticks. Restore grey on
-  // unmount (e.g. navigating to the nav-less login page). See index.html.
-  useEffect(() => {
-    const meta = document.querySelector('meta[name="theme-color"]');
-    meta?.setAttribute('content', hidden ? '#f9fafb' : '#1A1D22');
-    return () => meta?.setAttribute('content', '#f9fafb');
-  }, [hidden]);
-
   const isCoach = user?.role === 'coach' || user?.role === 'admin';
   const isAdmin  = user?.role === 'admin';
   const isFineAdmin = isAdmin || !!user?.isFineAdmin;

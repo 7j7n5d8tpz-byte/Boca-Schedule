@@ -84,11 +84,10 @@ input[type="time"]::-webkit-date-and-time-value {
    breakpoint), whereas `clip` just clips. */
 html, body { overflow-x: clip; }
 /* With viewport-fit=cover (see index.html) the page paints into the iOS safe
-   areas. Give the root the page grey so the home-indicator strip at the bottom
-   and any over-scroll show the page colour rather than browser white; the nav
-   covers the top inset with its own dark background while it's showing, and the
-   grey content fills it once the nav scrolls away. `color-scheme: light` keeps
-   the browser chrome from ever defaulting dark. */
+   areas. Give the root the page grey so the home-indicator strip and any
+   over-scroll show the page colour rather than browser white — matching the
+   grey theme-color so the chrome blends edge-to-edge. `color-scheme: light`
+   keeps the browser chrome from ever defaulting dark. */
 :root { color-scheme: light; }
 html, body { background-color: #f9fafb; } /* tailwind gray-50 — matches .boca-page */
 

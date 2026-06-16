@@ -241,8 +241,14 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
               open ? 'translate-x-0' : '-translate-x-full'
             }`}
           >
-            {/* Header: user + close */}
-            <div className="flex items-center gap-3 px-4 py-4 border-b border-white/10">
+            {/* Header: user + close. In the installed (full-screen) app the
+                transparent status bar overlays the drawer too, so pad the top
+                by the safe-area inset to keep the profile clear of the
+                clock/notch. env() is 0 in a normal Safari tab, leaving py-4. */}
+            <div
+              style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
+              className="flex items-center gap-3 px-4 py-4 border-b border-white/10"
+            >
               <span className="w-9 h-9 rounded-full overflow-hidden bg-brand-green/30 text-brand-green text-sm font-bold flex items-center justify-center shrink-0">
                 {avatarUrl
                   ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -274,8 +280,13 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
               {isAdmin && navLink('/admin', 'Admin panel', 'text-purple-300')}
             </div>
 
-            {/* Footer: log out */}
-            <div className="border-t border-white/10 py-2">
+            {/* Footer: log out. Pad the bottom by the safe-area inset so Log out
+                clears the home indicator in the installed full-screen app
+                (env() is 0 in a normal Safari tab, leaving py-2). */}
+            <div
+              style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+              className="border-t border-white/10 py-2"
+            >
               <button
                 onClick={() => { logout(); setOpen(false); }}
                 className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-white/10 transition-colors"

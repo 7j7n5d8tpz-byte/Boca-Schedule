@@ -24,7 +24,12 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Boca Boldisch" />
-    <link rel="apple-touch-icon" href="/boca-logo.png" />
+    <!-- iOS ignores the manifest icons and the rel="icon" PNG; it uses this
+         apple-touch-icon. It also composites any transparency onto black and
+         can fail on very large PNGs, which left the Home-Screen icon as the
+         grey "B" fallback. This is a 180x180 *opaque* crest-on-brand-grey PNG
+         so iOS renders the actual crest. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Boca Boldisch</title>
   </head>

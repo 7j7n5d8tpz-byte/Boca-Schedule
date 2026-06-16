@@ -308,6 +308,13 @@ export default function Statistics() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [view]);
 
+  // Selecting a player swaps in a new view in place (no route change), so the
+  // page would otherwise keep the list's scroll position. Jump to the top so
+  // the player's profile starts at the top, matching a normal page navigation.
+  useEffect(() => {
+    if (selectedPlayer) window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [selectedPlayer]);
+
   useEffect(() => {
     if (!selectedMatchId || view !== 'highlights' || highlightsLoading) return;
     const el = highlightRefs.current.get(selectedMatchId);

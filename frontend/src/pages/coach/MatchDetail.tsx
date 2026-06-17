@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import LocationPicker, { encodeLocation, decodeLocation, formatLocation } from '../../components/LocationPicker';
+import OpponentPicker from '../../components/OpponentPicker';
 import { meetingTime, mapsUrl } from '../../utils';
 import Icon, { Star } from '../../components/Icon';
 
@@ -20,6 +21,7 @@ interface MatchData {
   matchTime: string;
   location: string;
   opponent: string | null;
+  opponentId: string | null;
   matchType: string;
   matchCategory: string;
   serieLetter: string | null;
@@ -54,7 +56,7 @@ export default function MatchDetail() {
   const [fairnessWeight, setFairnessWeight] = useState(50); // 0 = positions, 100 = fairness
   const [showEdit, setShowEdit] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [editFields, setEditFields] = useState({ matchDate: '', matchTime: '', opponent: '', matchCategory: 'serie' as 'serie' | 'pokal', serieLetter: 'A', signupOpenDate: '', signupCloseDate: '', minPlayers: 0, maxPlayers: 0 });
+  const [editFields, setEditFields] = useState({ matchDate: '', matchTime: '', opponentId: null as string | null, matchCategory: 'serie' as 'serie' | 'pokal', serieLetter: 'A', signupOpenDate: '', signupCloseDate: '', minPlayers: 0, maxPlayers: 0 });
   const [editVenue, setEditVenue] = useState('');
   const [editCourt, setEditCourt] = useState('');
 
@@ -70,12 +72,12 @@ export default function MatchDetail() {
   });
 
   const editMutation = useMutation({
-    mutationFn: (fields: { matchDate: string; matchTime: string; location: string; opponent: string; matchCategory: 'serie' | 'pokal'; serieLetter: string; signupOpenDate: string; signupCloseDate: string; minPlayers: number; maxPlayers: number }) =>
+    mutationFn: (fields: { matchDate: string; matchTime: string; location: string; opponentId: string | null; matchCategory: 'serie' | 'pokal'; serieLetter: string; signupOpenDate: string; signupCloseDate: string; minPlayers: number; maxPlayers: number }) =>
       api.put(`/matches/${matchId}`, {
         matchDate: fields.matchDate,
         matchTime: fields.matchTime,
         location: fields.location,
-        opponent: fields.opponent.trim() || null,
+        opponentId: fields.opponentId,
         matchCategory: fields.matchCategory,
         serieLetter: fields.matchCategory === 'serie' ? fields.serieLetter : null,
         // Local-time interpretation (00:00 open, 20:00 deadline) → UTC instant,
@@ -128,7 +130,7 @@ export default function MatchDetail() {
     setEditFields({
       matchDate: match.matchDate,
       matchTime: match.matchTime.slice(0, 5),
-      opponent: match.opponent ?? '',
+      opponentId: match.opponentId ?? null,
       matchCategory: (match.matchCategory as 'serie' | 'pokal') ?? 'serie',
       serieLetter: match.serieLetter ?? 'A',
       signupOpenDate: match.signupOpenDate?.slice(0, 10) ?? '',
@@ -331,12 +333,9 @@ export default function MatchDetail() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">Opponent <span className="text-gray-400">(optional)</span></label>
-                <input
-                  type="text"
-                  placeholder="e.g. FC Vesterbro"
-                  value={editFields.opponent}
-                  onChange={e => setEditFields(f => ({ ...f, opponent: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                <OpponentPicker
+                  opponentId={editFields.opponentId}
+                  onChange={(id) => setEditFields(f => ({ ...f, opponentId: id }))}
                 />
               </div>
               <div>

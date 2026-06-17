@@ -90,6 +90,42 @@ interface Overview {
   topMotm: { name: string; value: number } | null;
 }
 
+interface OpponentSummary {
+  opponentId: string;
+  name: string;
+  matchesPlayed: number;
+}
+
+interface OpponentMatch {
+  matchId: string;
+  matchDate: string;
+  matchTime: string;
+  matchType: string;
+  location: string;
+  goalsFor: number;
+  goalsAgainst: number;
+  gameAssessment: string | null;
+}
+
+interface OpponentHistory {
+  opponentId: string;
+  name: string;
+  summary: {
+    played: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    avgGoalsFor: number;
+    avgGoalsAgainst: number;
+    biggestWin: OpponentMatch | null;
+    biggestLoss: OpponentMatch | null;
+    lastResult: OpponentMatch | null;
+  };
+  matches: OpponentMatch[];
+}
+
 interface TeamStats {
   year: number;
   availableYears: number[];
@@ -193,8 +229,9 @@ export default function Statistics() {
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all' | '7-player' | 'futsal'>('all');
-  const [view, setView] = useState<'team' | 'highlights'>('team');
+  const [view, setView] = useState<'team' | 'highlights' | 'opponents'>('team');
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [selectedOpponent, setSelectedOpponent] = useState<string>('');
   const highlightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   const isCoach = user?.role === 'coach' || user?.role === 'admin';
@@ -230,6 +267,25 @@ export default function Statistics() {
     enabled: view === 'highlights',
   });
 
+  const { data: opponentsList = [] } = useQuery<OpponentSummary[]>({
+    queryKey: ['opponents'],
+    queryFn: () => api.get('/opponents').then(r => r.data.data),
+    enabled: view === 'opponents',
+    staleTime: 60_000,
+  });
+
+  const { data: opponentHistory, isLoading: opponentLoading } = useQuery<OpponentHistory>({
+    queryKey: ['opponent-history', selectedOpponent, matchTypeFilter],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (matchTypeFilter !== 'all') params.set('matchType', matchTypeFilter);
+      const qs = params.toString();
+      return api.get(`/opponents/${selectedOpponent}/history${qs ? `?${qs}` : ''}`).then(r => r.data.data);
+    },
+    enabled: view === 'opponents' && !!selectedOpponent,
+    staleTime: 60_000,
+  });
+
   const overview = data?.overview;
   const players = data?.players ?? [];
   const matchHistory = data?.matchHistory ?? [];
@@ -249,6 +305,22 @@ export default function Statistics() {
     'Goals against': m.goalsAgainst,
     result: m.goalsFor > m.goalsAgainst ? 'W' : m.goalsFor < m.goalsAgainst ? 'L' : 'D',
   }));
+
+  // Per-meeting goals chart for the selected opponent (chronological).
+  const opponentChartData = (opponentHistory?.matches ?? []).map(m => ({
+    name: fmtDate(m.matchDate),
+    matchId: m.matchId,
+    'Goals for': m.goalsFor,
+    'Goals against': m.goalsAgainst,
+  }));
+
+  // Drill into a match's highlights from the opponents view. The match may be
+  // from any year, so realign the year filter the highlights query reads from.
+  function openHighlight(matchId: string, matchDate: string) {
+    setSelectedYear(new Date(matchDate).getFullYear());
+    setSelectedMatchId(matchId);
+    setView('highlights');
+  }
 
   // Leaderboard data
   const topScorers   = [...players].sort((a, b) => b.totalGoals - a.totalGoals).slice(0, 7);
@@ -438,7 +510,9 @@ export default function Statistics() {
                 view === 'team' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              Team stats
+              {/* Short label on mobile so three tabs share the row without wrapping. */}
+              <span className="sm:hidden">Team</span>
+              <span className="hidden sm:inline">Team stats</span>
             </button>
             <button
               onClick={() => setView('highlights')}
@@ -446,7 +520,17 @@ export default function Statistics() {
                 view === 'highlights' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              Match highlights
+              <span className="sm:hidden">Highlights</span>
+              <span className="hidden sm:inline">Match highlights</span>
+            </button>
+            <button
+              onClick={() => setView('opponents')}
+              className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === 'opponents' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <span className="sm:hidden">Opponents</span>
+              <span className="hidden sm:inline">Opponent breakdown</span>
             </button>
           </nav>
 
@@ -594,6 +678,150 @@ export default function Statistics() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ── Opponent breakdown view ── */}
+        {view === 'opponents' && (
+          <div className="space-y-6">
+            {/* Opponent picker — full-width select works on phone and desktop. */}
+            <select
+              aria-label="Opponent"
+              value={selectedOpponent}
+              onChange={e => setSelectedOpponent(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
+            >
+              <option value="">Select an opponent…</option>
+              {opponentsList.map(o => (
+                <option key={o.opponentId} value={o.opponentId}>
+                  {o.name} ({o.matchesPlayed})
+                </option>
+              ))}
+            </select>
+
+            {opponentsList.length === 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                No opponents recorded yet — add an opponent when creating a match.
+              </div>
+            )}
+
+            {selectedOpponent && opponentLoading && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-xl" />)}
+                </div>
+                <Skeleton className="h-52 w-full rounded-xl" />
+              </div>
+            )}
+
+            {selectedOpponent && !opponentLoading && opponentHistory && (
+              opponentHistory.summary.played === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                  No completed matches with results against {opponentHistory.name} yet.
+                </div>
+              ) : (
+                <>
+                  {/* Record & goals summary */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <StatCard label="Wins"   value={opponentHistory.summary.wins}   color="text-green-600" />
+                    <StatCard label="Draws"  value={opponentHistory.summary.draws} />
+                    <StatCard label="Losses" value={opponentHistory.summary.losses} color="text-red-500" />
+                    <StatCard
+                      label="Goals (for / against)"
+                      value={`${opponentHistory.summary.goalsFor} / ${opponentHistory.summary.goalsAgainst}`}
+                      sub={`Avg ${opponentHistory.summary.avgGoalsFor} / ${opponentHistory.summary.avgGoalsAgainst}`}
+                      color={opponentHistory.summary.goalsFor >= opponentHistory.summary.goalsAgainst ? 'text-green-600' : 'text-red-500'}
+                    />
+                  </div>
+
+                  <p className="text-sm text-gray-500">
+                    Played {opponentHistory.summary.played} ·{' '}
+                    {opponentHistory.summary.lastResult && (
+                      <>Last: {opponentHistory.summary.lastResult.goalsFor}–{opponentHistory.summary.lastResult.goalsAgainst} ({fmtDate(opponentHistory.summary.lastResult.matchDate)})</>
+                    )}
+                  </p>
+
+                  {/* Goals trend over meetings */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <h2 className="text-sm font-semibold text-gray-700 mb-4">Goals for vs against — each meeting</h2>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={opponentChartData} barCategoryGap="30%">
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <Tooltip content={<ResultTooltip />} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="Goals for"     fill={CHART_COLORS.goals}   radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="Goals against" fill={CHART_COLORS.against} radius={[3, 3, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Per-match result list — stacked cards on mobile, table on sm+ */}
+                  <div className="sm:hidden space-y-3">
+                    {opponentHistory.matches.map(m => {
+                      const result = m.goalsFor > m.goalsAgainst ? 'W' : m.goalsFor < m.goalsAgainst ? 'L' : 'D';
+                      const resultColor = result === 'W' ? 'bg-green-100 text-green-700' : result === 'L' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600';
+                      const assessment = m.gameAssessment ? ASSESSMENT_LABEL[m.gameAssessment] : null;
+                      return (
+                        <button
+                          key={m.matchId}
+                          onClick={() => openHighlight(m.matchId, m.matchDate)}
+                          className="w-full text-left bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900">{new Date(m.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              <span className={`mr-2 px-1.5 py-0.5 rounded ${m.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>{m.matchType}</span>
+                              {assessment && <span className={assessment.color}>{assessment.label}</span>}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-lg font-bold font-numeric text-gray-900">{m.goalsFor}–{m.goalsAgainst}</span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${resultColor}`}>{result}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-gray-400 border-b border-gray-100">
+                          <th className="px-4 py-2 font-medium">Date</th>
+                          <th className="px-4 py-2 font-medium">Type</th>
+                          <th className="px-4 py-2 font-medium">Result</th>
+                          <th className="px-4 py-2 font-medium">Assessment</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {opponentHistory.matches.map(m => {
+                          const result = m.goalsFor > m.goalsAgainst ? 'W' : m.goalsFor < m.goalsAgainst ? 'L' : 'D';
+                          const resultColor = result === 'W' ? 'bg-green-100 text-green-700' : result === 'L' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600';
+                          const assessment = m.gameAssessment ? ASSESSMENT_LABEL[m.gameAssessment] : null;
+                          return (
+                            <tr
+                              key={m.matchId}
+                              onClick={() => openHighlight(m.matchId, m.matchDate)}
+                              className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <td className="px-4 py-2 text-gray-700">{new Date(m.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                              <td className="px-4 py-2 text-gray-500">{m.matchType}</td>
+                              <td className="px-4 py-2">
+                                <span className="font-numeric font-semibold text-gray-900 mr-2">{m.goalsFor}–{m.goalsAgainst}</span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${resultColor}`}>{result}</span>
+                              </td>
+                              <td className={`px-4 py-2 ${assessment ? assessment.color : 'text-gray-300'}`}>{assessment ? assessment.label : '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <p className="text-xs text-gray-400 px-4 py-2 text-right">Click a match to view its highlights</p>
+                  </div>
+                </>
+              )
+            )}
           </div>
         )}
 

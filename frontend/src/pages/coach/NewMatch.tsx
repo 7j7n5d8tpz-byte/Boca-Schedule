@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import LocationPicker, { encodeLocation } from '../../components/LocationPicker';
+import OpponentPicker from '../../components/OpponentPicker';
 
 export default function NewMatch() {
   const navigate = useNavigate();
@@ -15,7 +16,7 @@ export default function NewMatch() {
   const [matchTime, setMatchTime] = useState('20:00');
   const [venue, setVenue] = useState('');
   const [court, setCourt] = useState('');
-  const [opponent, setOpponent] = useState('');
+  const [opponentId, setOpponentId] = useState<string | null>(null);
   const [matchType, setMatchType] = useState<'futsal' | '7-player' | '11-player'>('7-player');
   const [matchCategory, setMatchCategory] = useState<'serie' | 'pokal'>('serie');
   const [serieLetter, setSerieLetter] = useState('A');
@@ -30,7 +31,7 @@ export default function NewMatch() {
       matchDate,
       matchTime: matchTime + ':00',
       location: encodeLocation(venue, court),
-      opponent: opponent.trim() || undefined,
+      opponentId: opponentId ?? undefined,
       matchType,
       matchCategory,
       serieLetter: matchCategory === 'serie' ? serieLetter : undefined,
@@ -113,13 +114,7 @@ export default function NewMatch() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Opponent team <span className="text-gray-400 font-normal">(optional)</span></label>
-            <input
-              type="text"
-              value={opponent}
-              onChange={e => setOpponent(e.target.value)}
-              placeholder="e.g. FC Vesterbro"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-            />
+            <OpponentPicker opponentId={opponentId} onChange={(id) => setOpponentId(id)} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

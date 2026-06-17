@@ -19,6 +19,7 @@ import calendarRoutes from './routes/calendar.js';
 import announcementRoutes from './routes/announcements.js';
 import notificationRoutes from './routes/notifications.js';
 import fineRoutes from './routes/fines.js';
+import opponentRoutes from './routes/opponents.js';
 
 const app = express();
 
@@ -81,6 +82,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api', claimRoutes);
 app.use('/api', resultRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/opponents', opponentRoutes);
 app.use('/api/optimize', batchOptimizeRoutes);
 app.use('/api/cron', cronRoutes);
 app.use('/api/calendar', calendarRoutes);

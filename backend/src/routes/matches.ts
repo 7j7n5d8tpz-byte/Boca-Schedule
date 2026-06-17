@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { sendSelectionNotifications, sendCancellationNotifications, sendReleaseNotification, sendSpotOpenNotification } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
+import { resolveOpponent } from '../lib/opponents.js';
 
 // Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
 function matchLabel(m: { match_date: string; match_time?: string; opponent?: string | null }): string {
@@ -25,6 +26,7 @@ const CreateMatchSchema = z.object({
   minPlayers: z.number().int().positive(),
   maxPlayers: z.number().int().positive(),
   opponent: z.string().max(100).optional(),
+  opponentId: z.string().uuid().optional(),
   matchCategory: z.enum(['serie', 'pokal']).default('serie'),
   serieLetter: z.string().max(10).optional(),
   priorityEnabled: z.boolean().default(true),
@@ -114,6 +116,7 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
         location: m.location,
         matchType: m.match_type,
         opponent: m.opponent ?? null,
+        opponentId: m.opponent_id ?? null,
         matchCategory: m.match_category ?? 'serie',
         serieLetter: m.serie_letter ?? null,
         status: m.status,
@@ -146,12 +149,14 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
     }
 
     const d = body.data;
+    const opp = await resolveOpponent(d.opponent, d.opponentId, req.user!.userId);
     const { data, error } = await supabaseAdmin.from('matches').insert({
       match_date: d.matchDate,
       match_time: d.matchTime,
       location: d.location,
       match_type: d.matchType,
-      opponent: d.opponent ?? null,
+      opponent: opp?.name ?? null,
+      opponent_id: opp?.opponentId ?? null,
       match_category: d.matchCategory,
       serie_letter: d.matchCategory === 'serie' ? (d.serieLetter ?? 'A') : null,
       signup_open_date: d.signupOpenDate,
@@ -191,6 +196,7 @@ const HistoricalMatchSchema = z.object({
   matchDate: z.string().date(),
   matchTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
   opponent: z.string().max(100).optional(),
+  opponentId: z.string().uuid().optional(),
   matchType: z.enum(['futsal', '7-player', '11-player']),
   matchCategory: z.enum(['serie', 'pokal']).default('serie'),
   serieLetter: z.string().max(10).optional(),
@@ -221,12 +227,14 @@ router.post('/historical', authenticate, requireRole('coach', 'admin'), async (r
     const signupOpen  = new Date(matchMs - 7 * 86_400_000).toISOString();
     const signupClose = new Date(matchMs - 1 * 86_400_000).toISOString();
 
+    const opp = await resolveOpponent(d.opponent, d.opponentId, req.user!.userId);
     const { data: match, error } = await supabaseAdmin.from('matches').insert({
       match_date: d.matchDate,
       match_time: matchTime,
       location: 'Historical',
       match_type: d.matchType,
-      opponent: d.opponent ?? null,
+      opponent: opp?.name ?? null,
+      opponent_id: opp?.opponentId ?? null,
       match_category: d.matchCategory,
       serie_letter: d.matchCategory === 'serie' ? (d.serieLetter ?? 'A') : null,
       signup_open_date: signupOpen,
@@ -269,6 +277,7 @@ const UpdateMatchSchema = z.object({
   matchTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
   location: z.string().min(1).max(200).optional(),
   opponent: z.string().max(100).nullable().optional(),
+  opponentId: z.string().uuid().nullable().optional(),
   matchCategory: z.enum(['serie', 'pokal']).optional(),
   serieLetter: z.string().max(10).nullable().optional(),
   status: z.enum(['draft','signup_open','signup_closed','optimized','published','completed','cancelled']).optional(),
@@ -313,7 +322,18 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
     if (d.matchDate !== undefined) updates.match_date = d.matchDate;
     if (d.matchTime !== undefined) updates.match_time = d.matchTime;
     if (d.location !== undefined) updates.location = d.location;
-    if (d.opponent !== undefined) updates.opponent = d.opponent;
+    // Opponent: resolve the FK and keep the denormalized `opponent` text in sync.
+    // An explicit null on either field clears both.
+    if (d.opponentId !== undefined || d.opponent !== undefined) {
+      if (d.opponentId === null || (d.opponentId === undefined && d.opponent === null)) {
+        updates.opponent_id = null;
+        updates.opponent = null;
+      } else {
+        const opp = await resolveOpponent(d.opponent, d.opponentId ?? undefined, req.user!.userId);
+        updates.opponent_id = opp?.opponentId ?? null;
+        updates.opponent = opp?.name ?? null;
+      }
+    }
     if (d.matchCategory !== undefined) {
       updates.match_category = d.matchCategory;
       updates.serie_letter = d.matchCategory === 'serie' ? (d.serieLetter ?? 'A') : null;
@@ -423,6 +443,7 @@ router.get('/:matchId/signups', authenticate, requireRole('coach', 'admin'), asy
           matchTime: match.match_time,
           location: match.location,
           opponent: match.opponent ?? null,
+          opponentId: match.opponent_id ?? null,
           matchType: match.match_type,
           matchCategory: match.match_category ?? 'serie',
           serieLetter: match.serie_letter ?? null,

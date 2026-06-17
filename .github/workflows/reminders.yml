@@ -16,6 +16,7 @@ jobs:
       - name: Trigger signup reminders
         run: |
           code=$(curl -s -o /tmp/body -w '%{http_code}' -X POST \
+            --retry 4 --retry-delay 2 --retry-connrefused --retry-all-errors \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             https://boca-backend.fly.dev/api/cron/signup-reminders)
           echo "HTTP $code"; cat /tmp/body; echo
@@ -25,6 +26,7 @@ jobs:
       - name: Trigger daily reminders (match-day / pick-squad / record-result)
         run: |
           code=$(curl -s -o /tmp/body -w '%{http_code}' -X POST \
+            --retry 4 --retry-delay 2 --retry-connrefused --retry-all-errors \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
             https://boca-backend.fly.dev/api/cron/daily-reminders)
           echo "HTTP $code"; cat /tmp/body; echo

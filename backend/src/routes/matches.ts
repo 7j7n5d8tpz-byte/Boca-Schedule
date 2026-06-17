@@ -26,7 +26,7 @@ const CreateMatchSchema = z.object({
   maxPlayers: z.number().int().positive(),
   opponent: z.string().max(100).optional(),
   matchCategory: z.enum(['serie', 'pokal']).default('serie'),
-  serieLetter: z.string().max(2).optional(),
+  serieLetter: z.string().max(10).optional(),
   priorityEnabled: z.boolean().default(true),
   optimizationWeights: z.object({
     fairness: z.number(),
@@ -193,7 +193,7 @@ const HistoricalMatchSchema = z.object({
   opponent: z.string().max(100).optional(),
   matchType: z.enum(['futsal', '7-player', '11-player']),
   matchCategory: z.enum(['serie', 'pokal']).default('serie'),
-  serieLetter: z.string().max(2).optional(),
+  serieLetter: z.string().max(10).optional(),
   participantIds: z.array(z.string().uuid()).default([]),
 });
 
@@ -270,7 +270,7 @@ const UpdateMatchSchema = z.object({
   location: z.string().min(1).max(200).optional(),
   opponent: z.string().max(100).nullable().optional(),
   matchCategory: z.enum(['serie', 'pokal']).optional(),
-  serieLetter: z.string().max(2).nullable().optional(),
+  serieLetter: z.string().max(10).nullable().optional(),
   status: z.enum(['draft','signup_open','signup_closed','optimized','published','completed','cancelled']).optional(),
   minPlayers: z.number().int().positive().optional(),
   maxPlayers: z.number().int().positive().optional(),

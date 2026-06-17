@@ -140,7 +140,7 @@ export default function HistoricalMatch() {
                 onChange={e => setSerieLetter(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               >
-                {['A','B','C','D','E','F'].map(l => <option key={l} value={l}>{l}</option>)}
+                {['Mester','A','B','C','D','E','F'].map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
           )}

@@ -164,7 +164,7 @@ export default function MatchDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref="/coach" backLabel="← Matches" />
+      <AppNav backHref="/coach" backLabel="Matches" />
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-start justify-between gap-4">

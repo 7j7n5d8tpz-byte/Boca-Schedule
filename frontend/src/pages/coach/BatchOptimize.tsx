@@ -189,7 +189,7 @@ export default function BatchOptimize() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref="/coach" backLabel="← Matches" />
+      <AppNav backHref="/coach" backLabel="Matches" />
 
       <main className={`${step === 'review' ? 'max-w-4xl' : 'max-w-2xl'} mx-auto px-4 py-8 space-y-6`}>
 
@@ -409,7 +409,12 @@ function ConfigureStep({
           <h1 className="text-2xl font-extrabold text-gray-900">Configure</h1>
           <p className="text-sm text-gray-500 mt-1">Set fairness balance and priority players for each match.</p>
         </div>
-        <button onClick={onBack} className="text-sm text-gray-400 hover:text-gray-600">← Back</button>
+        <button onClick={onBack} className="inline-flex items-center gap-1 text-sm font-medium text-brand-green hover:text-brand-green-700">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 shrink-0" aria-hidden>
+            <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Back
+        </button>
       </div>
 
       <div className="space-y-3">

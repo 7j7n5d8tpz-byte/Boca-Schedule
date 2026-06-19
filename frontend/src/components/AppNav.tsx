@@ -11,7 +11,7 @@ interface AppNavProps {
   onBack?: () => void;
 }
 
-export default function AppNav({ backHref, backLabel = '← Back', onBack }: AppNavProps) {
+export default function AppNav({ backHref, backLabel = 'Back', onBack }: AppNavProps) {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -160,16 +160,22 @@ export default function AppNav({ backHref, backLabel = '← Back', onBack }: App
         <span className="block w-5 h-0.5 bg-white/80 rounded" />
       </button>
 
-      {/* ── Optional back link ── */}
-      {(backHref || onBack) && (
-        <>
-          {backHref
-            ? <Link to={backHref} className="text-white/50 hover:text-white/80 text-sm transition-colors shrink-0">{backLabel}</Link>
-            : <button onClick={onBack} className="text-white/50 hover:text-white/80 text-sm transition-colors shrink-0">{backLabel}</button>
-          }
-          <div className="w-px h-5 bg-white/20 shrink-0" />
-        </>
-      )}
+      {/* ── Optional back button ── a pill (subtle bg + arrow icon) so it reads
+             as a clear, tappable control against the dark nav, not faint text. ── */}
+      {(backHref || onBack) && (() => {
+        const cls = 'inline-flex items-center gap-1 rounded-lg bg-white/10 hover:bg-white/20 text-white/90 hover:text-white text-sm font-medium pl-2 pr-3 py-1.5 transition-colors shrink-0';
+        const inner = (
+          <>
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 shrink-0" aria-hidden>
+              <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {backLabel}
+          </>
+        );
+        return backHref
+          ? <Link to={backHref} aria-label={`Back to ${backLabel}`} className={cls}>{inner}</Link>
+          : <button onClick={onBack} aria-label={`Back to ${backLabel}`} className={cls}>{inner}</button>;
+      })()}
 
       {/* ── Logo + name → player dashboard, the shared home for everyone (coaches
              and admins are players too; their /coach and /admin views are

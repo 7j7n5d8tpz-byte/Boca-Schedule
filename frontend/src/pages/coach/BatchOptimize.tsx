@@ -409,7 +409,7 @@ function ConfigureStep({
           <h1 className="text-2xl font-extrabold text-gray-900">Configure</h1>
           <p className="text-sm text-gray-500 mt-1">Set fairness balance and priority players for each match.</p>
         </div>
-        <button onClick={onBack} className="inline-flex items-center gap-1 text-sm font-medium text-brand-green hover:text-brand-green-700">
+        <button onClick={onBack} className="inline-flex items-center gap-1 rounded-lg bg-brand-green/10 hover:bg-brand-green/20 text-brand-green text-sm font-medium pl-2 pr-3 py-1.5 transition-colors">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 shrink-0" aria-hidden>
             <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>

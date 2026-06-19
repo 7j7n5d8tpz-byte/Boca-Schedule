@@ -1199,7 +1199,12 @@ export default function Statistics() {
         {view === 'team' && !isLoading && selectedPlayer && focusPlayer && (
           <>
             <div className="space-y-3">
-              <button onClick={() => setSelectedPlayer('')} className="text-sm text-gray-400 hover:text-gray-600">← All players</button>
+              <button onClick={() => setSelectedPlayer('')} className="inline-flex items-center gap-1 text-sm font-medium text-brand-green hover:text-brand-green-700">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 shrink-0" aria-hidden>
+                  <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                All players
+              </button>
               {/* Profile header — who it is, their positions, and their photo. */}
               <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
                 <Avatar src={focusPlayer.avatarUrl} name={focusPlayer.name} size={64} className="ring-1 ring-gray-200" />

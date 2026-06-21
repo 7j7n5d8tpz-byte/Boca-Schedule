@@ -31,7 +31,8 @@ router.get('/users', async (req, res, next) => {
   try {
     const { role, isActive, search, limit = '50', offset = '0' } = req.query;
 
-    let query = supabaseAdmin.from('users').select('*', { count: 'exact' });
+    // Hide merged tombstones — they're retired placeholders, not real accounts.
+    let query = supabaseAdmin.from('users').select('*', { count: 'exact' }).is('merged_into', null);
     if (role) query = query.eq('role', role);
     if (isActive !== undefined) query = query.eq('is_active', isActive === 'true');
     if (search) {
@@ -54,6 +55,7 @@ router.get('/users', async (req, res, next) => {
           name: u.name,
           role: u.role,
           isActive: u.is_active,
+          isPlaceholder: u.is_placeholder ?? false,
           canEnterResults: u.can_enter_results ?? false,
           isFineAdmin: u.is_fine_admin ?? false,
           createdAt: u.created_at,
@@ -97,6 +99,44 @@ router.post('/users', async (req, res, next) => {
       success: true,
       data: { userId: authData.user.id, email, name, role: userRole, temporaryPassword: true },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/admin/users/:placeholderId/merge
+// Fold a historical-import placeholder into a real (registered) account: all of
+// the placeholder's history moves across and the placeholder is retired. Done
+// in a single SQL function (merge_placeholder_player) so it's atomic.
+const MergeSchema = z.object({ targetUserId: z.string().uuid() });
+router.post('/users/:placeholderId/merge', async (req, res, next) => {
+  try {
+    const { placeholderId } = req.params;
+    const body = MergeSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'targetUserId (uuid) is required' } });
+      return;
+    }
+    const { targetUserId } = body.data;
+
+    const { data: pair } = await supabaseAdmin
+      .from('users').select('user_id, name, is_placeholder, merged_into').in('user_id', [placeholderId, targetUserId]);
+    const placeholder = (pair ?? []).find((u: any) => u.user_id === placeholderId);
+    const target = (pair ?? []).find((u: any) => u.user_id === targetUserId);
+
+    const { error } = await supabaseAdmin.rpc('merge_placeholder_player', {
+      p_placeholder: placeholderId,
+      p_target: targetUserId,
+    });
+    if (error) {
+      res.status(400).json({ success: false, error: { code: 'MERGE_FAILED', message: error.message } });
+      return;
+    }
+
+    await writeAudit(req.user!.userId, 'placeholder_merged', 'user', placeholderId,
+      { name: placeholder?.name }, { mergedInto: targetUserId, targetName: target?.name });
+
+    res.json({ success: true, message: 'Placeholder merged', data: { placeholderId, targetUserId } });
   } catch (err) {
     next(err);
   }

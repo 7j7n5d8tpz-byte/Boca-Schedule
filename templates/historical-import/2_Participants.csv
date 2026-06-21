@@ -1,0 +1,98 @@
+match_ref,player_name,yellow_card,red_card
+M1,Jonas Langager,FALSE,FALSE
+M1,Mikkel Randeris,FALSE,FALSE
+M1,Villads Stokholm,FALSE,FALSE
+M1,Emil Aagaard Madsen,FALSE,FALSE
+M1,Marius Havaleska,FALSE,FALSE
+M1,Joakim S. Holm,FALSE,FALSE
+M1,Lukas Westheimer,FALSE,FALSE
+M1,Mads Emil Oxholm Iversen,FALSE,FALSE
+M1,Lau Bøllingtoft,FALSE,FALSE
+M1,Oliver Eskling Hansen,FALSE,FALSE
+M2,Mads Emil Oxholm Iversen,TRUE,FALSE
+M2,Joakim S. Holm,FALSE,FALSE
+M2,Anton Vergod Knudsen,FALSE,FALSE
+M2,Frederik Kragelund,FALSE,FALSE
+M2,Jeppe Thorlann,FALSE,FALSE
+M2,Gustaf Knudsen,FALSE,FALSE
+M2,Alexander Thoren Basthof,FALSE,FALSE
+M2,Ajay Kumar,FALSE,FALSE
+M2,Emil Aagaard Madsen,FALSE,FALSE
+M2,Lukas Westheimer,FALSE,FALSE
+M3,Rasmus Kongsted,FALSE,FALSE
+M3,Ajay Kumar,FALSE,FALSE
+M3,Emil Aagaard Madsen,FALSE,FALSE
+M3,Jacob Abisala-Meier,FALSE,FALSE
+M3,Mads Emil Oxholm Iversen,FALSE,FALSE
+M3,Oliver Eskling Hansen,FALSE,FALSE
+M3,Mads Skipper Sørensen,FALSE,FALSE
+M3,Stephan. Krainer,FALSE,FALSE
+M3,Frederik Kragelund,FALSE,FALSE
+M3,Jonas Langager,FALSE,FALSE
+M4,Alexander Basthof,FALSE,FALSE
+M4,Ajay Kumar,FALSE,FALSE
+M4,Christoffer Ole Olsen,FALSE,FALSE
+M4,Emil Aagaard Madsen,FALSE,FALSE
+M4,Frederik Kragelund,FALSE,FALSE
+M4,Jonas Langager,FALSE,FALSE
+M4,Mads Emil Oxholm Iversen,FALSE,FALSE
+M4,Marius Havaleska Lyhne,FALSE,FALSE
+M4,Rasmus Kongsted,FALSE,FALSE
+M4,Stephan Krainer,FALSE,FALSE
+M5,Ajay Kumar,FALSE,FALSE
+M5,Anton Vergod Knudsen,FALSE,FALSE
+M5,Lau Bøllingtoft,FALSE,FALSE
+M5,Jeppe Thorlann,FALSE,FALSE
+M5,Villads Stokholm,FALSE,FALSE
+M5,Joakim S. Holm,FALSE,FALSE
+M5,Oliver Eskling,FALSE,FALSE
+M5,Mikkel Randeris Kristensen,FALSE,FALSE
+M5,Tobias Lynggaard Jensen,FALSE,FALSE
+M5,Stephan Krainer,FALSE,FALSE
+M6,Anton Vergod Knudsen,FALSE,FALSE
+M6,Christoffer Ole Olsen,FALSE,FALSE
+M6,Ajay Kumar,FALSE,FALSE
+M6,Gustaf Knudsen,FALSE,FALSE
+M6,Joakim S. Holm,FALSE,FALSE
+M6,Oliver Eskling,FALSE,FALSE
+M6,Marius Havaleska Lyhne,FALSE,FALSE
+M6,Lau Bøllingtoft,FALSE,FALSE
+M6,Tobias Lynggaard Jensen,FALSE,FALSE
+M6,Villads Stokholm,FALSE,FALSE
+M7,Ajay Kumar,FALSE,FALSE
+M7,Gæst,FALSE,FALSE
+M7,Emil Aagaard Madsen,FALSE,FALSE
+M7,Gustaf Knudsen,FALSE,FALSE
+M7,Mads Emil Oxholm Iversen,FALSE,FALSE
+M7,Marius Havaleska Lyhne,FALSE,FALSE
+M7,Stephan Krainer,FALSE,FALSE
+M8,Alexander Basthof,FALSE,FALSE
+M8,Anton Vergod Knudsen,FALSE,FALSE
+M8,Gustaf Knudsen,FALSE,FALSE
+M8,Mads Emil Oxholm Iversen,FALSE,FALSE
+M8,Marius Havaleska Lyhne,FALSE,FALSE
+M8,Oliver Eskling Hansen,FALSE,FALSE
+M8,Christoffer Ole Olsen,FALSE,FALSE
+M8,Mikkel Randeris Kristensen,FALSE,FALSE
+M8,Tobias Hahn,FALSE,FALSE
+M8,Stephan Krainer,FALSE,FALSE
+M9,Ajay Kumar,FALSE,FALSE
+M9,Anton Vergod Knudsen,FALSE,FALSE
+M9,Emil Aagaard Madsen,FALSE,FALSE
+M9,Frederik Kragelund,FALSE,FALSE
+M9,Gustaf Knudsen,FALSE,FALSE
+M9,Joakim S. Holm,FALSE,FALSE
+M9,Lukas Westheimer,FALSE,FALSE
+M9,Mads Emil Oxholm Iversen,FALSE,FALSE
+M9,Jacob Abisala-Meier,FALSE,FALSE
+M9,Oskar Mygind (gæst),FALSE,FALSE
+M10,Alexander Basthof,FALSE,FALSE
+M10,Anton Vergod Knudsen,FALSE,FALSE
+M10,Christoffer Ole Olsen,FALSE,FALSE
+M10,Frederik Kragelund,FALSE,FALSE
+M10,Joakim S. Holm,FALSE,FALSE
+M10,Jonas Langager,FALSE,FALSE
+M10,Mads Skipper Sørensen,FALSE,FALSE
+M10,Rasmus Kongsted,FALSE,FALSE
+M10,Villads Stokholm,FALSE,FALSE
+M10,Stephan Krainer,FALSE,FALSE

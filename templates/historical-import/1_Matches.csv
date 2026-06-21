@@ -1,0 +1,13 @@
+match_ref,match_date,kickoff_time,venue,opponent,match_type,category,serie_letter,goals_for,goals_against,gk_first_half,gk_second_half,clean_sheet,man_of_match,game_assessment,match_report
+M1,2026-04-12,12:20,,Hyrderne FC,7-player,serie,A,1,1,,,FALSE,Mikkel Randeris,,
+M2,2026-04-18,11:10,,Premier United,7-player,serie,A,5,3,,,FALSE,Mads Emil Oxholm Iversen,Strong Performance,
+M3,2026-04-24,17:30,,FC Horn,7-player,serie,A,1,4,Frederik Kragelund,Jonas Langager,FALSE,,Uheldig,"De sorte ravne kæmper! 2 flotte halvlege på kassen af krage og langager. Vi får simpelthen jinxet det i omklædning, inden kampen mod bundproppen."
+M4,2026-05-04,17:30,Kløvermarken,Tiim Dennis,7-player,serie,A,2,5,,,FALSE,,,
+M5,2026-05-15,19:50,,Nordatlandtisk BK,7-player,serie,A,2,4,,,FALSE,Joakim S. Holm,,Vi er ikke så stærke på bundhold kan vi konstatere...
+M6,2026-05-20,19:50,Valby,Ålenes FF,7-player,pokal,,1,2,Gustaf Knudsen,,FALSE,Anton Vergod Knudsen,,"De spillede bolden ind fra bag vores baglinjen uden dommeren så det og scorede første mål.
+
+Men vi spiller så stærkt op til dem i langt det meste af kampen"
+M7,2026-05-30,13:10,,Idrætsbørnehuset,7-player,serie,A,0,1,,,FALSE,David?,,"Boca spiller en fuldstændig fejlfri kamp, med masser skud på stolperne. Vi kommer desværre bagud på et langskud der rammer en flyvende Aya i rykkene, efter den rammer overlæggeren."
+M8,2026-06-08,17:30,Kløvermarken,FC Fynsk Forår,7-player,serie,A,2,6,,,FALSE,,,
+M9,2026-06-21,11:10,Valby,Cant Complain,7-player,serie,A,4,5,,,FALSE,,,
+M10,2026-08-15,13:10,Kløvermarken,Premier United,7-player,serie,A,,,,,FALSE,,,

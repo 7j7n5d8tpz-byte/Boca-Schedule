@@ -14,10 +14,15 @@ const UpdateProfileSchema = z.object({
 // GET /api/players — all registered players except self
 router.get('/', authenticate, async (req, res, next) => {
   try {
+    // Roster for selection / signup pickers: real people only. Placeholder
+    // players (historical-import stand-ins, not yet registered) and merged
+    // tombstones must not be selectable for future matches.
     const { data, error } = await supabaseAdmin
       .from('users')
       .select('user_id, name, preferred_positions')
       .neq('user_id', req.user!.userId)
+      .eq('is_placeholder', false)
+      .is('merged_into', null)
       .order('name');
     if (error) throw error;
     res.json({ success: true, data: (data ?? []).map((p: any) => ({
@@ -35,7 +40,10 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
   try {
     // Fetch all players and available years in parallel
     const [{ data: allUsers }, { data: allMatchDates }] = await Promise.all([
-      supabaseAdmin.from('users').select('user_id, name, preferred_positions, avatar_url').in('role', ['player', 'coach', 'admin']).eq('is_active', true).order('name'),
+      // Include placeholder players so their backfilled history shows in stats;
+      // exclude merged tombstones. (Placeholders are excluded from the GET /
+      // selection roster instead — they can't be picked for future matches.)
+      supabaseAdmin.from('users').select('user_id, name, preferred_positions, avatar_url').in('role', ['player', 'coach', 'admin']).or('is_active.eq.true,is_placeholder.eq.true').is('merged_into', null).order('name'),
       supabaseAdmin.from('matches').select('match_date').in('status', ['completed', 'published']),
     ]);
 

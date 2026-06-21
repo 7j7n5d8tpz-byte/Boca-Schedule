@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import AppNav from '../../components/AppNav';
@@ -11,6 +12,7 @@ interface AdminUser {
   name: string;
   role: 'player' | 'coach' | 'admin';
   isActive: boolean;
+  isPlaceholder: boolean;
   canEnterResults: boolean;
   isFineAdmin: boolean;
   createdAt: string;
@@ -72,6 +74,9 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', role: 'player' as string });
   const [createError, setCreateError] = useState('');
+  const [mergeFor, setMergeFor] = useState<AdminUser | null>(null);
+  const [mergeTarget, setMergeTarget] = useState('');
+  const [mergeError, setMergeError] = useState('');
 
   const params = new URLSearchParams();
   if (search) params.set('search', search);
@@ -114,6 +119,26 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
       setConfirmDelete(null);
       qc.invalidateQueries({ queryKey: ['admin-users'] });
     },
+  });
+
+  // Candidate target accounts for a merge: real, active, registered users.
+  const { data: mergeCandidatesData } = useQuery<{ users: AdminUser[] }>({
+    queryKey: ['admin-users-merge-candidates'],
+    queryFn: () => api.get('/admin/users?limit=500').then(r => r.data.data),
+    enabled: !!mergeFor,
+  });
+  const mergeCandidates = (mergeCandidatesData?.users ?? [])
+    .filter(u => !u.isPlaceholder && u.isActive && u.userId !== mergeFor?.userId)
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const mergeMutation = useMutation({
+    mutationFn: ({ placeholderId, targetUserId }: { placeholderId: string; targetUserId: string }) =>
+      api.post(`/admin/users/${placeholderId}/merge`, { targetUserId }),
+    onSuccess: () => {
+      setMergeFor(null); setMergeTarget(''); setMergeError('');
+      qc.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+    onError: (err: any) => setMergeError(err.response?.data?.error?.message ?? 'Merge failed'),
   });
 
   const createMutation = useMutation({
@@ -258,10 +283,20 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
             <div key={u.userId} className={`bg-white rounded-xl border border-gray-200 p-4 space-y-3 ${u.isActive ? '' : 'opacity-50'}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium text-gray-900 truncate">{u.name}</p>
+                  <p className="font-medium text-gray-900 truncate flex items-center gap-2">
+                    {u.name}
+                    {u.isPlaceholder && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Placeholder</span>}
+                  </p>
                   <p className="text-xs text-gray-500 truncate">{u.email}</p>
                 </div>
-                {confirmDelete === u.userId ? (
+                {u.isPlaceholder ? (
+                  <button
+                    onClick={() => { setMergeFor(u); setMergeTarget(''); setMergeError(''); }}
+                    className="shrink-0 text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
+                  >
+                    Merge →
+                  </button>
+                ) : confirmDelete === u.userId ? (
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-xs text-red-600 font-medium">Delete?</span>
                     <button
@@ -364,23 +399,37 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Results</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fine admin</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Joined</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Results</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Fine admin</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Joined</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {users.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-6 text-center text-gray-400">No users found</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No users found</td></tr>
               )}
               {users.map(u => (
                 <tr key={u.userId} className={u.isActive ? '' : 'opacity-50'}>
-                  <td className="px-4 py-3 font-medium text-gray-900">{u.name}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{u.email}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2 font-medium text-gray-900">
+                      <span className="truncate">{u.name}</span>
+                      {u.isPlaceholder && (
+                        <>
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Placeholder</span>
+                          <button
+                            onClick={() => { setMergeFor(u); setMergeTarget(''); setMergeError(''); }}
+                            className="shrink-0 text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
+                          >
+                            Merge →
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400 truncate">{u.email}</div>
+                  </td>
                   <td className="px-4 py-3">
                     <select
                       value={u.role}
@@ -404,7 +453,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                       {u.isActive ? 'Active' : 'Inactive'}
                     </button>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 hidden md:table-cell">
                     {u.role === 'coach' || u.role === 'admin' ? (
                       <span className="text-xs text-gray-300">Always</span>
                     ) : (
@@ -421,7 +470,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                       </button>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 hidden md:table-cell">
                     {u.role === 'admin' ? (
                       <span className="text-xs text-gray-300">Always</span>
                     ) : (
@@ -438,9 +487,11 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                       </button>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-400">{fmtDate(u.createdAt)}</td>
+                  <td className="px-4 py-3 text-xs text-gray-400 hidden lg:table-cell">{fmtDate(u.createdAt)}</td>
                   <td className="px-4 py-3 text-right">
-                    {confirmDelete === u.userId ? (
+                    {u.isPlaceholder ? (
+                      <span className="text-xs text-gray-300">—</span>
+                    ) : confirmDelete === u.userId ? (
                       <div className="flex items-center gap-2 justify-end">
                         <span className="text-xs text-red-600 font-medium">Delete?</span>
                         <button
@@ -472,6 +523,58 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
           </table>
         </div>
         </>
+      )}
+
+      {/* Merge placeholder modal — portaled into <body> so it isn't anchored to
+          the transformed .boca-page main / #root (see index.css), which would
+          otherwise push it down the page instead of centering in the viewport. */}
+      {mergeFor && createPortal(
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[80] overflow-y-auto"
+          onClick={() => setMergeFor(null)}
+        >
+          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-gray-900">Merge placeholder</h3>
+            <p className="text-sm text-gray-600">
+              Move <span className="font-medium text-gray-900">{mergeFor.name}</span>'s match history
+              (goals, assists, cards, appearances, lineups) into a real account. The placeholder is then
+              retired — this can't be undone.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Merge into</label>
+              <select
+                value={mergeTarget}
+                onChange={e => setMergeTarget(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+              >
+                <option value="">Select an account…</option>
+                {mergeCandidates.map(c => (
+                  <option key={c.userId} value={c.userId}>{c.name} ({c.email})</option>
+                ))}
+              </select>
+              {mergeCandidates.length === 0 && (
+                <p className="text-xs text-gray-400 mt-1">No registered accounts available to merge into yet.</p>
+              )}
+            </div>
+            {mergeError && <p className="text-sm text-red-600">{mergeError}</p>}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setMergeFor(null)}
+                className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => mergeMutation.mutate({ placeholderId: mergeFor.userId, targetUserId: mergeTarget })}
+                disabled={!mergeTarget || mergeMutation.isPending}
+                className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                {mergeMutation.isPending ? 'Merging…' : 'Merge'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

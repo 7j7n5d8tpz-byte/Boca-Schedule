@@ -1,4 +1,5 @@
 import AppNav from '../../components/AppNav';
+import { Link } from 'react-router-dom';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -6,6 +7,15 @@ import {
   ResponsiveContainer, LineChart, Line, RadarChart, Radar,
   PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
+
+// Mirror of the backend season helper: futsal seasons run Jul→Jun (so Nov–Feb
+// fall in one season, keyed by the start year); outdoor = calendar year.
+function seasonStartYearClient(dateStr: string, matchType: string): number {
+  const d = new Date(dateStr);
+  const y = d.getFullYear();
+  if (matchType === 'futsal') return d.getMonth() + 1 >= 7 ? y : y - 1;
+  return y;
+}
 
 function RadarTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
@@ -79,6 +89,7 @@ interface Overview {
   totalCleanSheets: number;
   avgAttendanceRate: number;
   gamesWithResults: number;
+  teamGames: number;
   wins: number;
   draws: number;
   losses: number;
@@ -94,6 +105,12 @@ interface OpponentSummary {
   opponentId: string;
   name: string;
   matchesPlayed: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  lastResult: { date: string; goalsFor: number; goalsAgainst: number } | null;
 }
 
 interface OpponentMatch {
@@ -128,9 +145,11 @@ interface OpponentHistory {
 
 interface TeamStats {
   year: number;
-  availableYears: number[];
+  seasonLabel: string;
+  availableSeasons: { year: number; label: string }[];
   overview: Overview;
   prevYear: number;
+  prevSeasonLabel: string;
   prevOverview: Overview;
   players: PlayerStat[];
   matchHistory: MatchHistory[];
@@ -236,6 +255,15 @@ export default function Statistics() {
 
   const isCoach = user?.role === 'coach' || user?.role === 'admin';
 
+  // Whether to show the "Edit result" shortcut on highlight cards: coaches/admins
+  // always, plus players granted results permission.
+  const { data: myPermission } = useQuery<{ canEnterResults: boolean }>({
+    queryKey: ['my-permission'],
+    queryFn: () => api.get('/result-permissions/my').then(r => r.data.data),
+    enabled: !!user && !isCoach,
+  });
+  const canEditResults = isCoach || !!myPermission?.canEnterResults;
+
   const { data, isLoading } = useQuery<TeamStats>({
     queryKey: ['team-statistics', selectedYear, matchTypeFilter],
     queryFn: () => {
@@ -315,9 +343,10 @@ export default function Statistics() {
   }));
 
   // Drill into a match's highlights from the opponents view. The match may be
-  // from any year, so realign the year filter the highlights query reads from.
+  // from any season, so realign the season filter the highlights query reads
+  // from — futsal seasons cross the New Year, so use the season start year.
   function openHighlight(matchId: string, matchDate: string) {
-    setSelectedYear(new Date(matchDate).getFullYear());
+    setSelectedYear(seasonStartYearClient(matchDate, matchTypeFilter));
     setSelectedMatchId(matchId);
     setView('highlights');
   }
@@ -407,23 +436,24 @@ export default function Statistics() {
         <div className="hidden sm:flex items-center justify-between gap-4 flex-wrap mb-8">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-extrabold text-gray-900">Team Statistics</h1>
-            {(data?.availableYears ?? []).length > 0 && (
+            {(data?.availableSeasons ?? []).length > 0 && (
               <select
                 value={selectedYear ?? data?.year ?? ''}
                 onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedPlayer(''); }}
                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
               >
-                {(data?.availableYears ?? []).map(y => (
-                  <option key={y} value={y}>{y}</option>
+                {(data?.availableSeasons ?? []).map(s => (
+                  <option key={s.year} value={s.year}>{s.label}</option>
                 ))}
               </select>
             )}
-            {/* Match type filter */}
+            {/* Match type filter — switching competitions changes the season
+                calendar, so clear the picked season and fall back to the latest. */}
             <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
               {(['all', '7-player', 'futsal'] as const).map((type, i) => (
                 <button
                   key={type}
-                  onClick={() => setMatchTypeFilter(type)}
+                  onClick={() => { setMatchTypeFilter(type); setSelectedYear(null); }}
                   className={`px-3 py-1.5 transition-colors ${i > 0 ? 'border-l border-gray-200' : ''} ${
                     matchTypeFilter === type
                       ? 'bg-brand-green text-white'
@@ -457,22 +487,22 @@ export default function Statistics() {
         <div className="sm:hidden mb-8">
           <h1 className="text-2xl font-extrabold text-gray-900 mb-3">Team Statistics</h1>
           <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl p-2">
-            {(data?.availableYears ?? []).length > 0 && (
+            {(data?.availableSeasons ?? []).length > 0 && (
               <select
-                aria-label="Year"
+                aria-label="Season"
                 value={selectedYear ?? data?.year ?? ''}
                 onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedPlayer(''); }}
                 className="shrink-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
               >
-                {(data?.availableYears ?? []).map(y => (
-                  <option key={y} value={y}>{y}</option>
+                {(data?.availableSeasons ?? []).map(s => (
+                  <option key={s.year} value={s.year}>{s.label}</option>
                 ))}
               </select>
             )}
             <select
               aria-label="Match type"
               value={matchTypeFilter}
-              onChange={e => setMatchTypeFilter(e.target.value as 'all' | '7-player' | 'futsal')}
+              onChange={e => { setMatchTypeFilter(e.target.value as 'all' | '7-player' | 'futsal'); setSelectedYear(null); }}
               className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
             >
               <option value="all">All types</option>
@@ -675,6 +705,17 @@ export default function Statistics() {
                       )}
                     </div>
                   </details>
+
+                  {canEditResults && (
+                    <div className="pt-1">
+                      <Link
+                        to={`/matches/${h.matchId}/results`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
+                      >
+                        Edit result →
+                      </Link>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -684,25 +725,64 @@ export default function Statistics() {
         {/* ── Opponent breakdown view ── */}
         {view === 'opponents' && (
           <div className="space-y-6">
-            {/* Opponent picker — full-width select works on phone and desktop. */}
-            <select
-              aria-label="Opponent"
-              value={selectedOpponent}
-              onChange={e => setSelectedOpponent(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
-            >
-              <option value="">Select an opponent…</option>
-              {opponentsList.map(o => (
-                <option key={o.opponentId} value={o.opponentId}>
-                  {o.name} ({o.matchesPlayed})
-                </option>
-              ))}
-            </select>
-
-            {opponentsList.length === 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                No opponents recorded yet — add an opponent when creating a match.
-              </div>
+            {/* No opponent picked → list every opponent with head-to-head
+                highlights; click one to drill into its breakdown. */}
+            {!selectedOpponent ? (
+              opponentsList.length === 0 ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                  No opponents recorded yet — add an opponent when creating a match.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[...opponentsList]
+                    .sort((a, b) => b.matchesPlayed - a.matchesPlayed || a.name.localeCompare(b.name))
+                    .map(o => {
+                      const last = o.lastResult;
+                      const lastRes = last ? (last.goalsFor > last.goalsAgainst ? 'W' : last.goalsFor < last.goalsAgainst ? 'L' : 'D') : null;
+                      const lastColor = lastRes === 'W' ? 'bg-green-100 text-green-700' : lastRes === 'L' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600';
+                      return (
+                        <button
+                          key={o.opponentId}
+                          onClick={() => setSelectedOpponent(o.opponentId)}
+                          className="text-left bg-white rounded-xl border border-gray-200 hover:border-brand-green hover:shadow-sm transition-all p-4 flex flex-col gap-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-gray-900 truncate">{o.name}</span>
+                            <span className="text-gray-300 shrink-0">›</span>
+                          </div>
+                          {o.matchesPlayed === 0 ? (
+                            <span className="text-xs text-gray-400">No results yet</span>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-2 text-xs flex-wrap">
+                                <span className="text-gray-500">{o.matchesPlayed} {o.matchesPlayed === 1 ? 'game' : 'games'}</span>
+                                <span className="text-gray-300">·</span>
+                                <span className="font-medium"><span className="text-green-600">{o.wins}W</span> <span className="text-gray-500">{o.draws}D</span> <span className="text-red-500">{o.losses}L</span></span>
+                                <span className="text-gray-300">·</span>
+                                <span className="text-gray-500 font-numeric">{o.goalsFor}–{o.goalsAgainst}</span>
+                              </div>
+                              {last && (
+                                <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                                  <span>Last:</span>
+                                  <span className={`font-bold px-1.5 py-0.5 rounded-full ${lastColor}`}>{lastRes}</span>
+                                  <span className="font-numeric text-gray-600">{last.goalsFor}–{last.goalsAgainst}</span>
+                                  <span>· {new Date(last.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              )
+            ) : (
+              <button
+                onClick={() => setSelectedOpponent('')}
+                className="text-sm font-medium text-brand-green hover:text-brand-green-700 transition-colors"
+              >
+                ← All opponents
+              </button>
             )}
 
             {selectedOpponent && opponentLoading && (
@@ -925,7 +1005,7 @@ export default function Statistics() {
             {data && (
               <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h2 className="text-sm font-semibold text-gray-700 mb-4">
-                  {data.year} vs {data.prevYear}
+                  {data.seasonLabel} vs {data.prevSeasonLabel}
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   {[
@@ -1095,7 +1175,9 @@ export default function Statistics() {
                       </div>
                       <div className="grid grid-cols-4 gap-2 text-center">
                         <div>
-                          <p className="text-sm font-semibold text-gray-900">{p.totalPlayed}</p>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {p.totalPlayed}<span className="text-gray-400 font-normal text-[11px]">/{overview?.teamGames ?? 0}</span>
+                          </p>
                           <p className="text-[11px] text-gray-400">Games</p>
                         </div>
                         <div>
@@ -1136,7 +1218,7 @@ export default function Statistics() {
                       {[
                         { label: 'Player',       cls: '' },
                         ...(isCoach ? [{ label: 'Signed up', cls: 'hidden sm:table-cell' }] : []),
-                        { label: 'Games',        cls: '' },
+                        { label: `Games (of ${overview?.teamGames ?? 0})`, cls: '' },
                         { label: 'Attendance',   cls: '' },
                         { label: 'Goals',        cls: '' },
                         { label: 'Assists',      cls: '' },
@@ -1227,7 +1309,7 @@ export default function Statistics() {
             {/* Player stat cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {(isCoach || focusPlayer.userId === user?.userId) && <StatCard label="Signed up" value={focusPlayer.totalSignups} />}
-              <StatCard label="Games"      value={focusPlayer.totalPlayed} />
+              <StatCard label="Games"      value={focusPlayer.totalPlayed} sub={overview && overview.teamGames > 0 ? `of ${overview.teamGames} · ${Math.round(focusPlayer.attendanceRate)}%` : undefined} />
               <StatCard label="Goals"      value={focusPlayer.totalGoals}        sub={focusPlayer.totalPlayed > 0 ? `${(focusPlayer.totalGoals        / focusPlayer.totalPlayed).toFixed(2)}/game` : undefined} />
               <StatCard label="Assists"    value={focusPlayer.totalAssists}      sub={focusPlayer.totalPlayed > 0 ? `${(focusPlayer.totalAssists      / focusPlayer.totalPlayed).toFixed(2)}/game` : undefined} />
               <StatCard label="Clean sheets" value={focusPlayer.totalCleanSheets} sub={focusPlayer.totalPlayed > 0 ? `${(focusPlayer.totalCleanSheets / focusPlayer.totalPlayed).toFixed(2)}/game` : undefined} />

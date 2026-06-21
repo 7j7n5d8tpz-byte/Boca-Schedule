@@ -16,25 +16,45 @@ router.get('/', authenticate, async (_req, res, next) => {
       supabaseAdmin.from('opponents').select('opponent_id, name').order('name'),
       supabaseAdmin
         .from('match_results')
-        .select('matches!inner(opponent_id, status)')
+        .select('goals_for, goals_against, matches!inner(opponent_id, status, match_date)')
         .eq('matches.status', 'completed'),
     ]);
     if (oppErr) throw oppErr;
     if (resErr) throw resErr;
 
-    const playedCount = new Map<string, number>();
+    // Per-opponent head-to-head highlights: played, W/D/L, goal totals and the
+    // most recent result — enough to render an opponent list with stats.
+    type Agg = { played: number; wins: number; draws: number; losses: number; goalsFor: number; goalsAgainst: number; last: { date: string; goalsFor: number; goalsAgainst: number } | null };
+    const agg = new Map<string, Agg>();
     for (const r of (results ?? []) as any[]) {
       const oid = r.matches?.opponent_id;
-      if (oid) playedCount.set(oid, (playedCount.get(oid) ?? 0) + 1);
+      if (!oid) continue;
+      const a = agg.get(oid) ?? { played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0, last: null };
+      const gf = Number(r.goals_for), ga = Number(r.goals_against);
+      a.played++;
+      a.goalsFor += gf; a.goalsAgainst += ga;
+      if (gf > ga) a.wins++; else if (gf < ga) a.losses++; else a.draws++;
+      const date = r.matches?.match_date ?? '';
+      if (!a.last || date > a.last.date) a.last = { date, goalsFor: gf, goalsAgainst: ga };
+      agg.set(oid, a);
     }
 
     res.json({
       success: true,
-      data: (opponents ?? []).map(o => ({
-        opponentId: o.opponent_id,
-        name: o.name,
-        matchesPlayed: playedCount.get(o.opponent_id) ?? 0,
-      })),
+      data: (opponents ?? []).map(o => {
+        const a = agg.get(o.opponent_id);
+        return {
+          opponentId: o.opponent_id,
+          name: o.name,
+          matchesPlayed: a?.played ?? 0,
+          wins: a?.wins ?? 0,
+          draws: a?.draws ?? 0,
+          losses: a?.losses ?? 0,
+          goalsFor: a?.goalsFor ?? 0,
+          goalsAgainst: a?.goalsAgainst ?? 0,
+          lastResult: a?.last ?? null,
+        };
+      }),
     });
   } catch (err) {
     next(err);

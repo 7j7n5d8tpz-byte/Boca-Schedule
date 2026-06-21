@@ -48,7 +48,12 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     const offset = parseInt(req.query.offset as string) || 0;
 
     const { role } = req.user!;
-    const isCoachView = (role === 'coach' || role === 'admin') && (!statusParam || statusParam === 'all');
+    // Coach-view (which also surfaces recently-completed matches for results entry)
+    // requires an EXPLICIT status=all — the coach dashboard passes it. A bare
+    // /matches/upcoming (the shared player home, used by every role) must never
+    // return completed matches, otherwise an admin/coach opening the home sees
+    // past matches under "Upcoming".
+    const isCoachView = (role === 'coach' || role === 'admin') && statusParam === 'all';
 
     // Auto-complete any published match whose date+time has passed.
     // Runs only on the coach/admin 'all' view to avoid affecting player queries.

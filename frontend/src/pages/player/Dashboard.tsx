@@ -478,17 +478,25 @@ export default function PlayerDashboard() {
         {/* Stats */}
         {stats && (() => {
           const played   = stats.total_played  ?? 0;
+          const teamGames = stats.total_team_games ?? 0;
           const signups  = stats.total_signups ?? 0;
           const goals    = stats.total_goals     ?? 0;
           const assists  = stats.total_assists   ?? 0;
           const sheets   = stats.total_clean_sheets ?? 0;
           const attend   = stats.attendance_rate ?? 0;
+          const season   = stats.season_year;
 
           return (
             <div className="space-y-4">
+              {season && (
+                <div className="flex items-baseline justify-between">
+                  <h2 className="text-sm font-semibold text-gray-700">Your season</h2>
+                  <span className="text-xs text-gray-400">{season}</span>
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: 'Played',        value: played },
+                  { label: 'Played',        value: played, suffix: ` / ${teamGames}` },
                   { label: 'Goals',         value: goals },
                   { label: 'Assists',       value: assists },
                   { label: 'Signed up',     value: signups },

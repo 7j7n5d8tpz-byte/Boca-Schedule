@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { storeAvatar, AvatarTooLargeError, AVATAR_DATA_URL_RE } from '../lib/avatar.js';
+import { seasonStartYear, seasonRange, seasonLabel } from '../lib/season.js';
 
 const router = Router();
 
@@ -38,22 +39,28 @@ router.get('/', authenticate, async (req, res, next) => {
 // GET /api/players/statistics/team — year-filtered stats + comparison with previous year
 router.get('/statistics/team', authenticate, async (req, res, next) => {
   try {
-    // Fetch all players and available years in parallel
+    const matchTypeFilter = (req.query.matchType as string | undefined) ?? 'all';
+
+    // Fetch all players and available seasons in parallel
     const [{ data: allUsers }, { data: allMatchDates }] = await Promise.all([
       // Include placeholder players so their backfilled history shows in stats;
       // exclude merged tombstones. (Placeholders are excluded from the GET /
       // selection roster instead — they can't be picked for future matches.)
       supabaseAdmin.from('users').select('user_id, name, preferred_positions, avatar_url').in('role', ['player', 'coach', 'admin']).or('is_active.eq.true,is_placeholder.eq.true').is('merged_into', null).order('name'),
-      supabaseAdmin.from('matches').select('match_date').in('status', ['completed', 'published']),
+      supabaseAdmin.from('matches').select('match_date, match_type').in('status', ['completed', 'published']),
     ]);
 
+    // Available seasons depend on the competition: futsal seasons cross the New
+    // Year ("2025/26"); outdoor seasons are calendar years. A season is keyed by
+    // its start year (a number), labelled per the selected match type.
     const availableYears = [...new Set(
-      (allMatchDates ?? []).map((m: any) => new Date(m.match_date).getFullYear())
+      (allMatchDates ?? [])
+        .filter((m: any) => matchTypeFilter === 'all' || m.match_type === matchTypeFilter)
+        .map((m: any) => seasonStartYear(m.match_date, matchTypeFilter))
     )].sort((a, b) => b - a);
 
     const defaultYear = availableYears[0] ?? new Date().getFullYear();
     const year = req.query.year ? parseInt(req.query.year as string) : defaultYear;
-    const matchTypeFilter = (req.query.matchType as string | undefined) ?? 'all';
 
     type PlayerRow = {
       userId: string; name: string; preferredPositions: string[]; avatarUrl: string | null;
@@ -64,10 +71,11 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
     };
     type MatchRow = { matchId: string; matchDate: string; location: string; opponent: string | null; goalsFor: number; goalsAgainst: number };
 
-    async function getYearData(y: number): Promise<{ players: PlayerRow[]; matchHistory: MatchRow[] }> {
+    async function getYearData(y: number): Promise<{ players: PlayerRow[]; matchHistory: MatchRow[]; teamGames: number }> {
+      const { start, end } = seasonRange(y, matchTypeFilter);
       let yearMatchQuery = supabaseAdmin
         .from('matches').select('match_id')
-        .gte('match_date', `${y}-01-01`).lte('match_date', `${y}-12-31`);
+        .gte('match_date', start).lte('match_date', end);
       if (matchTypeFilter !== 'all') yearMatchQuery = yearMatchQuery.eq('match_type', matchTypeFilter);
       const { data: yearMatches } = await yearMatchQuery;
 
@@ -83,7 +91,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
           totalYellowCards: 0, totalRedCards: 0, totalManOfMatch: 0,
           avgRating: 0, attendanceRate: 0, gkAppearances: 0,
         }));
-        return { players, matchHistory: [] };
+        return { players, matchHistory: [], teamGames: 0 };
       }
 
       const [{ data: perfData }, { data: signupData }, { data: selectionData }, { data: historyData }, { data: completedMatchData }, { data: gkData }] = await Promise.all([
@@ -143,7 +151,9 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
           totalGoals: perf.goals, totalAssists: perf.assists, totalCleanSheets: perf.cleanSheets,
           totalYellowCards: perf.yellowCards, totalRedCards: perf.redCards, totalManOfMatch: perf.motmCount,
           avgRating: perf.ratingCount > 0 ? +(perf.ratingSum / perf.ratingCount).toFixed(2) : 0,
-          attendanceRate: signups > 0 ? +((played / signups) * 100).toFixed(2) : 0,
+          // Attendance = share of the team's completed matches this player featured
+          // in (played / total team games), so it reads "X of N games".
+          attendanceRate: completedIds.size > 0 ? +((played / completedIds.size) * 100).toFixed(2) : 0,
           gkAppearances: gkAppearanceMap.get(u.user_id) ?? 0,
         };
       });
@@ -159,10 +169,10 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
         goalsAgainst: Number(r.goals_against),
       }));
 
-      return { players, matchHistory };
+      return { players, matchHistory, teamGames: completedIds.size };
     }
 
-    function buildOverview(players: PlayerRow[], matchHistory: MatchRow[]) {
+    function buildOverview(players: PlayerRow[], matchHistory: MatchRow[], teamGames: number) {
       const totalGoals        = players.reduce((s, p) => s + p.totalGoals, 0);
       const totalAssists      = players.reduce((s, p) => s + p.totalAssists, 0);
       const totalCleanSheets  = players.reduce((s, p) => s + p.totalCleanSheets, 0);
@@ -179,7 +189,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       const topMotm     = players.reduce((b, p) => p.totalManOfMatch   > (b?.totalManOfMatch ?? -1)   ? p : b, null as PlayerRow | null);
       return {
         totalPlayers: active.length, totalGoals, totalGoalsAgainst, totalAssists, totalCleanSheets,
-        avgAttendanceRate: avgAttendance, gamesWithResults, wins, draws, losses,
+        avgAttendanceRate: avgAttendance, gamesWithResults, teamGames, wins, draws, losses,
         avgGoalsFor:     gamesWithResults ? +(totalGoals / gamesWithResults).toFixed(2) : 0,
         avgGoalsAgainst: gamesWithResults ? +(totalGoalsAgainst / gamesWithResults).toFixed(2) : 0,
         topScorer:   topScorer?.totalGoals        ? { name: topScorer.name,   value: topScorer.totalGoals }         : null,
@@ -195,10 +205,12 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       success: true,
       data: {
         year,
-        availableYears: availableYears.length > 0 ? availableYears : [year],
-        overview: buildOverview(current.players, current.matchHistory),
+        seasonLabel: seasonLabel(year, matchTypeFilter),
+        availableSeasons: (availableYears.length > 0 ? availableYears : [year]).map(y => ({ year: y, label: seasonLabel(y, matchTypeFilter) })),
+        overview: buildOverview(current.players, current.matchHistory, current.teamGames),
         prevYear: year - 1,
-        prevOverview: buildOverview(prev.players, prev.matchHistory),
+        prevSeasonLabel: seasonLabel(year - 1, matchTypeFilter),
+        prevOverview: buildOverview(prev.players, prev.matchHistory, prev.teamGames),
         players: current.players.sort((a, b) => b.totalSignups - a.totalSignups),
         matchHistory: current.matchHistory,
       },
@@ -213,13 +225,14 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
   try {
     const y = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
     const matchTypeFilter = (req.query.matchType as string | undefined) ?? 'all';
+    const { start, end } = seasonRange(y, matchTypeFilter);
 
     let q = supabaseAdmin
       .from('match_results')
       .select('match_id, goals_for, goals_against, game_assessment, goal_events, long_read, gk_first_half, gk_second_half, matches!inner(match_date, match_time, location, opponent, match_type, status)')
       .eq('matches.status', 'completed')
-      .gte('matches.match_date', `${y}-01-01`)
-      .lte('matches.match_date', `${y}-12-31`);
+      .gte('matches.match_date', start)
+      .lte('matches.match_date', end);
     if (matchTypeFilter !== 'all') q = q.eq('matches.match_type', matchTypeFilter);
     const { data: results, error } = await q.order('match_id');
     if (error) throw error;
@@ -353,12 +366,15 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
       return;
     }
 
-    const [{ data: profile }, { data: recent }, { data: perfRows }, { data: signupRows }, { data: selectionMatchRows }] = await Promise.all([
+    const yearParam = req.query.year ? parseInt(req.query.year as string) : undefined;
+
+    const [{ data: profile }, { data: recent }, { data: perfRows }, { data: signupRows }, { data: selectionMatchRows }, { data: completedMatches }] = await Promise.all([
       supabaseAdmin.from('users').select('user_id, name, preferred_positions').eq('user_id', playerId).single(),
       supabaseAdmin.from('match_performance').select('*, matches(match_date)').eq('player_id', playerId).order('submitted_at', { ascending: false }).limit(10),
-      supabaseAdmin.from('match_performance').select('goals, assists, saves, clean_sheet, self_rating, man_of_match').eq('player_id', playerId),
-      supabaseAdmin.from('signups').select('signup_id').eq('player_id', playerId).eq('is_active', true),
+      supabaseAdmin.from('match_performance').select('match_id, goals, assists, saves, clean_sheet, self_rating, man_of_match').eq('player_id', playerId),
+      supabaseAdmin.from('signups').select('match_id').eq('player_id', playerId).eq('is_active', true),
       supabaseAdmin.from('selections').select('match_id').eq('player_id', playerId),
+      supabaseAdmin.from('matches').select('match_id, match_date').eq('status', 'completed'),
     ]);
 
     if (!profile) {
@@ -366,36 +382,40 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
       return;
     }
 
-    // Count played = selections for completed matches (attendance is assumed for selected players)
-    const selMatchIds = (selectionMatchRows ?? []).map((s: any) => s.match_id);
-    let playedCount = 0;
-    if (selMatchIds.length > 0) {
-      const { count } = await supabaseAdmin
-        .from('matches')
-        .select('*', { count: 'exact', head: true })
-        .in('match_id', selMatchIds)
-        .eq('status', 'completed');
-      playedCount = count ?? 0;
-    }
+    // Scope every figure to ONE season (calendar year). Default to the most recent
+    // season that has completed matches so a player's home shows their current run,
+    // not a lifetime total. Attendance & "games" use the team's games that season.
+    const seasonYears = [...new Set((completedMatches ?? []).map((m: any) => new Date(m.match_date).getFullYear()))].sort((a, b) => b - a);
+    const season = yearParam ?? seasonYears[0] ?? new Date().getFullYear();
+    const seasonMatchIds = new Set(
+      (completedMatches ?? []).filter((m: any) => new Date(m.match_date).getFullYear() === season).map((m: any) => m.match_id),
+    );
+    const teamGames = seasonMatchIds.size;
 
-    const rows = perfRows ?? [];
+    // Played = completed matches this season the player was selected for.
+    const playedCount = (selectionMatchRows ?? []).filter((s: any) => seasonMatchIds.has(s.match_id)).length;
+
+    const rows = (perfRows ?? []).filter((r: any) => seasonMatchIds.has(r.match_id));
     const goals       = rows.reduce((s: number, r: any) => s + (r.goals ?? 0), 0);
     const assists     = rows.reduce((s: number, r: any) => s + (r.assists ?? 0), 0);
     const saves       = rows.reduce((s: number, r: any) => s + (r.saves ?? 0), 0);
     const cleanSheets = rows.filter((r: any) => r.clean_sheet).length;
     const manOfMatch  = rows.filter((r: any) => r.man_of_match).length;
-    const totalSignups = signupRows?.length ?? 0;
+    const totalSignups = (signupRows ?? []).filter((s: any) => seasonMatchIds.has(s.match_id)).length;
     const ratedRows   = rows.filter((r: any) => r.self_rating != null);
     const avgRating   = ratedRows.length > 0 ? +(ratedRows.reduce((s: number, r: any) => s + r.self_rating, 0) / ratedRows.length).toFixed(2) : null;
 
     const stats = {
+      season_year: season,
+      total_team_games: teamGames,
       total_played: playedCount,
       total_goals: goals, total_assists: assists,
       total_saves: saves, total_clean_sheets: cleanSheets,
       total_man_of_match: manOfMatch,
       total_signups: totalSignups,
       avg_self_rating: avgRating,
-      attendance_rate: totalSignups > 0 ? +((playedCount / totalSignups) * 100).toFixed(2) : 0,
+      // Attendance = share of the team's games this season the player featured in.
+      attendance_rate: teamGames > 0 ? +((playedCount / teamGames) * 100).toFixed(2) : 0,
     };
 
     res.json({

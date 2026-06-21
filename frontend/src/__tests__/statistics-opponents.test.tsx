@@ -14,14 +14,18 @@ vi.mock('../api/client', () => ({ api: { get: mockGet } }));
 
 const EMPTY_OVERVIEW = {
   totalPlayers: 0, totalGoals: 0, totalGoalsAgainst: 0, totalAssists: 0, totalCleanSheets: 0,
-  avgAttendanceRate: 0, gamesWithResults: 0, wins: 0, draws: 0, losses: 0,
+  avgAttendanceRate: 0, gamesWithResults: 0, teamGames: 0, wins: 0, draws: 0, losses: 0,
   avgGoalsFor: 0, avgGoalsAgainst: 0, topScorer: null, topAssister: null, topKeeper: null, topMotm: null,
 };
 const TEAM_STATS = {
-  year: 2026, availableYears: [2026], overview: EMPTY_OVERVIEW,
-  prevYear: 2025, prevOverview: EMPTY_OVERVIEW, players: [], matchHistory: [],
+  year: 2026, seasonLabel: '2026', availableSeasons: [{ year: 2026, label: '2026' }], overview: EMPTY_OVERVIEW,
+  prevYear: 2025, prevSeasonLabel: '2025', prevOverview: EMPTY_OVERVIEW, players: [], matchHistory: [],
 };
-const OPPONENTS = [{ opponentId: 'opp-1', name: 'History Rovers', matchesPlayed: 3 }];
+const OPPONENTS = [{
+  opponentId: 'opp-1', name: 'History Rovers', matchesPlayed: 3,
+  wins: 1, draws: 1, losses: 1, goalsFor: 4, goalsAgainst: 3,
+  lastResult: { date: '2024-09-01', goalsFor: 1, goalsAgainst: 2 },
+}];
 const HISTORY = {
   opponentId: 'opp-1', name: 'History Rovers',
   summary: {
@@ -70,9 +74,9 @@ describe('Statistics — Opponents view', () => {
     const user = userEvent.setup();
     renderPage();
 
-    // Open the Opponents tab, then pick an opponent.
+    // Open the Opponents tab, then pick an opponent from the list.
     await user.click(await screen.findByRole('button', { name: /Opponent breakdown/ }));
-    await user.selectOptions(await screen.findByLabelText('Opponent'), 'opp-1');
+    await user.click(await screen.findByRole('button', { name: /History Rovers/ }));
 
     // Summary cards (record & goals) render from the mocked history.
     expect(await screen.findByText('Goals (for / against)')).toBeInTheDocument();

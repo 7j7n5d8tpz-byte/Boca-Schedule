@@ -97,7 +97,7 @@ interface Overview {
   avgGoalsAgainst: number;
   topScorer: { name: string; value: number } | null;
   topAssister: { name: string; value: number } | null;
-  topKeeper: { name: string; value: number } | null;
+  topGk: { name: string; halves: number; cleanSheets: number } | null;
   topMotm: { name: string; value: number } | null;
 }
 
@@ -388,9 +388,11 @@ export default function Statistics() {
       display: played > 0 ? `${(focusPlayer.totalAssists / played).toFixed(2)} per game` : '0 per game',
     },
     {
-      metric: 'Clean sheets',
-      value: played > 0 ? Math.round(focusPlayer.totalCleanSheets / played * 100) : 0,
-      display: played > 0 ? `${Math.round(focusPlayer.totalCleanSheets / played * 100)}% (${focusPlayer.totalCleanSheets} total)` : '0%',
+      // Share of the player's on-pitch half-slots spent in goal (2 halves per game).
+      // Replaces the old clean-sheets axis, which sat at ~0 for every outfield player.
+      metric: 'Time in goal',
+      value: played > 0 ? Math.min(100, Math.round(focusPlayer.gkAppearances / (played * 2) * 100)) : 0,
+      display: played > 0 ? `${Math.min(100, Math.round(focusPlayer.gkAppearances / (played * 2) * 100))}% (${focusPlayer.gkAppearances} halves)` : '0%',
     },
   ] : [];
 
@@ -958,9 +960,9 @@ export default function Statistics() {
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
                 <StatIcon name="glove" className="w-7 h-7" />
                 <div>
-                  <p className="text-xs text-gray-500">Most clean sheets</p>
-                  {overview.topKeeper
-                    ? <><p className="font-semibold text-gray-900">{overview.topKeeper.name}</p><p className="text-sm text-green-600">{overview.topKeeper.value} clean sheets</p></>
+                  <p className="text-xs text-gray-500">Most time in goal</p>
+                  {overview.topGk
+                    ? <><p className="font-semibold text-gray-900">{overview.topGk.name}</p><p className="text-sm text-green-600">{overview.topGk.halves} halves in goal{overview.topGk.cleanSheets > 0 && ` · ${overview.topGk.cleanSheets} clean sheet${overview.topGk.cleanSheets === 1 ? '' : 's'}`}</p></>
                     : <p className="text-sm text-gray-300">No data yet</p>}
                 </div>
               </div>

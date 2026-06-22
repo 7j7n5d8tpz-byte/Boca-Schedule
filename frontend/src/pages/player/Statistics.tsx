@@ -983,19 +983,19 @@ export default function Statistics() {
               <div className="bg-white rounded-xl border border-gray-200 p-5">
                 <h2 className="text-sm font-semibold text-gray-700 mb-4">Goals for vs against — per match</h2>
                 <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={goalsChartData} barCategoryGap="30%">
+                  <LineChart data={goalsChartData}
+                    onClick={(state: any) => { const matchId = state?.activePayload?.[0]?.payload?.matchId; if (matchId) { setSelectedMatchId(matchId); setView('highlights'); } }}
+                    style={{ cursor: 'pointer' }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip content={<ResultTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="Goals for"     fill={CHART_COLORS.goals}   radius={[3, 3, 0, 0]} cursor="pointer"
-                      onClick={(data: any) => { if (data?.matchId) { setSelectedMatchId(data.matchId); setView('highlights'); } }} />
-                    <Bar dataKey="Goals against" fill={CHART_COLORS.against} radius={[3, 3, 0, 0]} cursor="pointer"
-                      onClick={(data: any) => { if (data?.matchId) { setSelectedMatchId(data.matchId); setView('highlights'); } }} />
-                  </BarChart>
+                    <Line type="monotone" dataKey="Goals for"     stroke={CHART_COLORS.goals}   strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="Goals against" stroke={CHART_COLORS.against} strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
                 </ResponsiveContainer>
-                <p className="text-xs text-gray-400 mt-2 text-right">Click a bar to view match highlights</p>
+                <p className="text-xs text-gray-400 mt-2 text-right">Click a point to view match highlights</p>
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">

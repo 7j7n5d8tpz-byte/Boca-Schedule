@@ -15,7 +15,7 @@ vi.mock('../api/client', () => ({ api: { get: mockGet } }));
 const EMPTY_OVERVIEW = {
   totalPlayers: 0, totalGoals: 0, totalGoalsAgainst: 0, totalAssists: 0, totalCleanSheets: 0,
   avgAttendanceRate: 0, gamesWithResults: 0, teamGames: 0, wins: 0, draws: 0, losses: 0,
-  avgGoalsFor: 0, avgGoalsAgainst: 0, topScorer: null, topAssister: null, topKeeper: null, topMotm: null,
+  avgGoalsFor: 0, avgGoalsAgainst: 0, topScorer: null, topAssister: null, topGk: null, topMotm: null,
 };
 const TEAM_STATS = {
   year: 2026, seasonLabel: '2026', availableSeasons: [{ year: 2026, label: '2026' }], overview: EMPTY_OVERVIEW,

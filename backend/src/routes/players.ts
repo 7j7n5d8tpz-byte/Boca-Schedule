@@ -185,7 +185,9 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       const avgAttendance = active.length ? Math.round(active.reduce((s, p) => s + p.attendanceRate, 0) / active.length) : 0;
       const topScorer   = players.reduce((b, p) => p.totalGoals        > (b?.totalGoals ?? -1)        ? p : b, null as PlayerRow | null);
       const topAssister = players.reduce((b, p) => p.totalAssists      > (b?.totalAssists ?? -1)      ? p : b, null as PlayerRow | null);
-      const topKeeper   = players.reduce((b, p) => p.totalCleanSheets  > (b?.totalCleanSheets ?? -1)  ? p : b, null as PlayerRow | null);
+      // Goalkeepers are ranked by time in goal (halves kept), not clean sheets —
+      // clean sheets are too rare to rank by. Ties broken by clean sheets.
+      const topGk       = players.reduce((b, p) => (p.gkAppearances > (b?.gkAppearances ?? -1) || (p.gkAppearances === (b?.gkAppearances ?? -1) && p.totalCleanSheets > (b?.totalCleanSheets ?? -1))) ? p : b, null as PlayerRow | null);
       const topMotm     = players.reduce((b, p) => p.totalManOfMatch   > (b?.totalManOfMatch ?? -1)   ? p : b, null as PlayerRow | null);
       return {
         totalPlayers: active.length, totalGoals, totalGoalsAgainst, totalAssists, totalCleanSheets,
@@ -194,7 +196,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
         avgGoalsAgainst: gamesWithResults ? +(totalGoalsAgainst / gamesWithResults).toFixed(2) : 0,
         topScorer:   topScorer?.totalGoals        ? { name: topScorer.name,   value: topScorer.totalGoals }         : null,
         topAssister: topAssister?.totalAssists    ? { name: topAssister.name, value: topAssister.totalAssists }     : null,
-        topKeeper:   topKeeper?.totalCleanSheets  ? { name: topKeeper.name,   value: topKeeper.totalCleanSheets }   : null,
+        topGk:       topGk?.gkAppearances         ? { name: topGk.name, halves: topGk.gkAppearances, cleanSheets: topGk.totalCleanSheets } : null,
         topMotm:     topMotm?.totalManOfMatch     ? { name: topMotm.name,     value: topMotm.totalManOfMatch }      : null,
       };
     }

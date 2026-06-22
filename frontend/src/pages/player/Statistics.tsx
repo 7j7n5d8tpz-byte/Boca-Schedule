@@ -984,7 +984,13 @@ export default function Statistics() {
                 <h2 className="text-sm font-semibold text-gray-700 mb-4">Goals for vs against — per match</h2>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={goalsChartData}
-                    onClick={(state: any) => { const matchId = state?.activePayload?.[0]?.payload?.matchId; if (matchId) { setSelectedMatchId(matchId); setView('highlights'); } }}
+                    onClick={(state: any) => {
+                      // Recharts v3's chart onClick gives the active index (not the old
+                      // activePayload), so look the match up in goalsChartData by index.
+                      const idx = Number(state?.activeTooltipIndex ?? state?.activeIndex);
+                      const matchId = Number.isInteger(idx) && idx >= 0 ? goalsChartData[idx]?.matchId : undefined;
+                      if (matchId) { setSelectedMatchId(matchId); setView('highlights'); }
+                    }}
                     style={{ cursor: 'pointer' }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                     <XAxis dataKey="name" tick={{ fontSize: 11 }} />

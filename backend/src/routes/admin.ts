@@ -29,12 +29,13 @@ async function writeAudit(
 // GET /api/admin/users
 router.get('/users', async (req, res, next) => {
   try {
-    const { role, isActive, search, limit = '50', offset = '0' } = req.query;
+    const { role, isActive, isPlaceholder, search, limit = '50', offset = '0' } = req.query;
 
     // Hide merged tombstones — they're retired placeholders, not real accounts.
     let query = supabaseAdmin.from('users').select('*', { count: 'exact' }).is('merged_into', null);
     if (role) query = query.eq('role', role);
     if (isActive !== undefined) query = query.eq('is_active', isActive === 'true');
+    if (isPlaceholder !== undefined) query = query.eq('is_placeholder', isPlaceholder === 'true');
     if (search) {
       // Strip characters that could inject extra PostgREST filter clauses
       const safeSearch = String(search).replace(/[(),]/g, '');

@@ -70,6 +70,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [showInactiveOnly, setShowInactiveOnly] = useState(false);
+  const [showPlaceholdersOnly, setShowPlaceholdersOnly] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState({ name: '', email: '', password: '', role: 'player' as string });
@@ -82,10 +83,11 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
   if (search) params.set('search', search);
   if (roleFilter) params.set('role', roleFilter);
   if (showInactiveOnly) params.set('isActive', 'false');
-  params.set('limit', '100');
+  if (showPlaceholdersOnly) params.set('isPlaceholder', 'true');
+  params.set('limit', '200');
 
   const { data, isLoading } = useQuery<{ users: AdminUser[]; pagination: { total: number } }>({
-    queryKey: ['admin-users', search, roleFilter, showInactiveOnly],
+    queryKey: ['admin-users', search, roleFilter, showInactiveOnly, showPlaceholdersOnly],
     queryFn: () => api.get(`/admin/users?${params}`).then(r => r.data.data),
   });
 
@@ -121,14 +123,14 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
     },
   });
 
-  // Candidate target accounts for a merge: real, active, registered users.
+  // Candidate target accounts for a merge: real registered accounts only.
   const { data: mergeCandidatesData } = useQuery<{ users: AdminUser[] }>({
     queryKey: ['admin-users-merge-candidates'],
-    queryFn: () => api.get('/admin/users?limit=500').then(r => r.data.data),
+    queryFn: () => api.get('/admin/users?limit=500&isPlaceholder=false').then(r => r.data.data),
     enabled: !!mergeFor,
   });
   const mergeCandidates = (mergeCandidatesData?.users ?? [])
-    .filter(u => !u.isPlaceholder && u.isActive && u.userId !== mergeFor?.userId)
+    .filter(u => u.userId !== mergeFor?.userId)
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const mergeMutation = useMutation({
@@ -185,7 +187,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
           />
           <select
             value={roleFilter}
-            onChange={e => setRoleFilter(e.target.value)}
+            onChange={e => { setRoleFilter(e.target.value); setShowPlaceholdersOnly(false); }}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
           >
             <option value="">All roles</option>
@@ -193,6 +195,16 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
             <option value="coach">Coach</option>
             <option value="admin">Admin</option>
           </select>
+          <button
+            onClick={() => { setShowPlaceholdersOnly(v => !v); setRoleFilter(''); setShowInactiveOnly(false); }}
+            className={`shrink-0 text-xs font-medium px-3 py-2 rounded-lg border transition-colors ${
+              showPlaceholdersOnly
+                ? 'bg-amber-100 border-amber-300 text-amber-700'
+                : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Placeholders
+          </button>
         </div>
         <button
           onClick={() => setShowCreate(v => !v)}
@@ -536,8 +548,8 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
           <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
             <h3 className="font-semibold text-gray-900">Merge placeholder</h3>
             <p className="text-sm text-gray-600">
-              Move <span className="font-medium text-gray-900">{mergeFor.name}</span>'s match history
-              (goals, assists, cards, appearances, lineups) into a real account. The placeholder is then
+              Move <span className="font-medium text-gray-900">{mergeFor.name}</span>'s match history,
+              fines, and appearances into a real registered account. The placeholder is then
               retired — this can't be undone.
             </p>
             <div>

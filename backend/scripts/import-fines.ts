@@ -103,9 +103,11 @@ async function commit() {
 
   // Resolve canonical → user_id, creating placeholders as needed (reusing the
   // ones the match import already made, matched case-insensitively by name).
-  const { data: existingUsers } = await db.from('users').select('user_id, name, email');
+  // If a user is a merged tombstone, follow merged_into to the real account so
+  // fines are never created against a dead UUID.
+  const { data: existingUsers } = await db.from('users').select('user_id, name, email, merged_into');
   const byName = new Map<string, string>();
-  for (const u of existingUsers ?? []) byName.set(norm(u.name), u.user_id);
+  for (const u of existingUsers ?? []) byName.set(norm(u.name), u.merged_into ?? u.user_id);
   const usedEmails = new Set((existingUsers ?? []).map(u => norm(u.email)));
 
   const userId = new Map<string, string>();

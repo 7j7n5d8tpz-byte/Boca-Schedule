@@ -1,10 +1,10 @@
 import AppNav from '../../components/AppNav';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../api/client';
 import { formatLocation } from '../../components/LocationPicker';
-import MatchEditForm from '../../components/MatchEditForm';
+import MatchEditForm, { initialMatchFields, matchUpdatePayload, type MatchEditFields } from '../../components/MatchEditForm';
 import { meetingTime, mapsUrl } from '../../utils';
 import Icon, { Star } from '../../components/Icon';
 
@@ -49,12 +49,14 @@ const POS_COLOR: Record<string, string> = {
 export default function MatchDetail() {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const qc = useQueryClient();
 
   const [priorityMap, setPriorityMap] = useState<Record<string, boolean>>({});
   const [optimizeError, setOptimizeError] = useState('');
   const [fairnessWeight, setFairnessWeight] = useState(50); // 0 = positions, 100 = fairness
   const [showEdit, setShowEdit] = useState(false);
+  const [editFields, setEditFields] = useState<MatchEditFields | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const { data, isLoading } = useQuery<SignupsResponse>({
@@ -62,11 +64,34 @@ export default function MatchDetail() {
     queryFn: () => api.get(`/matches/${matchId}/signups`).then(r => r.data.data),
   });
 
+  // Re-optimize from the squad page deep-links here with #optimize — scroll the
+  // optimizer card into view so the coach lands on the action, not page top.
+  useEffect(() => {
+    if (location.hash === '#optimize') {
+      setTimeout(() => document.getElementById('optimize')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+    }
+  }, [location.hash, isLoading]);
+
   const priorityMutation = useMutation({
     mutationFn: ({ signupId, value }: { signupId: string; value: boolean }) =>
       api.put(`/signups/${signupId}/priority`, { isPriority: value }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['match-signups', matchId] }),
   });
+
+  const editMutation = useMutation({
+    mutationFn: () => api.put(`/matches/${matchId}`, matchUpdatePayload(editFields!)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['match-signups', matchId] });
+      qc.invalidateQueries({ queryKey: ['matches'] });
+      setShowEdit(false);
+      setEditFields(null);
+    },
+  });
+
+  function openEdit() {
+    setEditFields(initialMatchFields(match));
+    setShowEdit(true);
+  }
 
   const statusMutation = useMutation({
     mutationFn: (status: string) => api.put(`/matches/${matchId}`, { status }),
@@ -141,7 +166,7 @@ export default function MatchDetail() {
           </div>
           <div className="flex gap-2 shrink-0">
             <button
-              onClick={() => setShowEdit(true)}
+              onClick={openEdit}
               className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
             >
               Edit
@@ -194,32 +219,23 @@ export default function MatchDetail() {
         )}
         {match.status === 'optimized' && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
-            <p className="text-sm text-blue-700">Optimizer has selected players — review before publishing.</p>
-            <div className="flex gap-2 shrink-0">
-              <Link
-                to={`/coach/matches/${matchId}/selections`}
-                className="border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                View selections
-              </Link>
-              <button
-                onClick={() => statusMutation.mutate('published')}
-                disabled={statusMutation.isPending}
-                className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                Publish to players
-              </button>
-            </div>
+            <p className="text-sm text-blue-700">Optimizer has selected players — review the squad and publish.</p>
+            <Link
+              to={`/coach/matches/${matchId}/selections`}
+              className="shrink-0 bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Review &amp; publish squad
+            </Link>
           </div>
         )}
         {match.status === 'published' && (
           <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
-            <p className="text-sm text-green-700">Match is published — players can see the selection.</p>
+            <p className="text-sm text-green-700">Match is published — players can see the squad.</p>
             <Link
               to={`/coach/matches/${matchId}/selections`}
               className="shrink-0 border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              View selections
+              Manage squad
             </Link>
           </div>
         )}
@@ -230,16 +246,27 @@ export default function MatchDetail() {
         )}
 
         {/* Edit form */}
-        {showEdit && (
-          <MatchEditForm
-            match={match}
-            onSaved={() => {
-              qc.invalidateQueries({ queryKey: ['match-signups', matchId] });
-              qc.invalidateQueries({ queryKey: ['matches'] });
-              setShowEdit(false);
-            }}
-            onCancel={() => setShowEdit(false)}
-          />
+        {showEdit && editFields && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+            <h2 className="font-semibold text-gray-900">Edit match details</h2>
+            <MatchEditForm value={editFields} onChange={setEditFields} matchType={match.matchType} />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setShowEdit(false); setEditFields(null); }}
+                className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Discard
+              </button>
+              <button
+                onClick={() => editMutation.mutate()}
+                disabled={editMutation.isPending}
+                className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                {editMutation.isPending ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+            {editMutation.isError && <p className="text-sm text-red-500">Failed to save changes.</p>}
+          </div>
         )}
 
         {/* Cancel confirmation */}
@@ -266,7 +293,7 @@ export default function MatchDetail() {
         )}
 
         {/* Optimize card */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div id="optimize" className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 scroll-mt-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="font-semibold text-gray-900">Run optimizer</p>
@@ -308,17 +335,21 @@ export default function MatchDetail() {
 
           {optimizeError && <p className="text-sm text-red-500">{optimizeError}</p>}
 
-          <div className="border-t border-gray-100 pt-3">
-            <Link
-              to={`/coach/matches/${matchId}/selections`}
-              className="text-sm font-medium text-brand-green hover:text-brand-green-700"
-            >
-              Or pick the squad manually →
-            </Link>
-            <p className="text-xs text-gray-400 mt-0.5">
-              Choose players yourself instead of (or after) running the optimizer.
-            </p>
-          </div>
+          {/* Before optimizing, offer a direct route to build the squad by hand.
+              Once optimized/published the banner above already links to the squad. */}
+          {match.status !== 'optimized' && match.status !== 'published' && (
+            <div className="border-t border-gray-100 pt-3">
+              <Link
+                to={`/coach/matches/${matchId}/selections`}
+                className="text-sm font-medium text-brand-green hover:text-brand-green-700"
+              >
+                Or pick the squad manually →
+              </Link>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Choose players yourself instead of running the optimizer.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Sign-ups list */}

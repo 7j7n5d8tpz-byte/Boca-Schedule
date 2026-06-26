@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { PitchView, POS_TAG, type SelectionPlayer, type Guest } from '../../components/PitchView';
-import MatchEditForm from '../../components/MatchEditForm';
+import MatchEditForm, { initialMatchFields, matchUpdatePayload, type MatchEditFields } from '../../components/MatchEditForm';
 import { Star } from '../../components/Icon';
 
 interface FormationSlot { covered: boolean; required: number; filled: number }
@@ -133,9 +133,11 @@ export default function Selections() {
   const [guestPosition, setGuestPosition] = useState('');
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [editFields, setEditFields] = useState<MatchEditFields | null>(null);
   const [showWhy, setShowWhy] = useState(false);
   const [addFilter, setAddFilter] = useState('');
   const [showReoptConfirm, setShowReoptConfirm] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   const { data, isLoading } = useQuery<SelectionsResponse>({
     queryKey: ['match-selections', matchId],
@@ -176,16 +178,23 @@ export default function Selections() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['match-guests', matchId] }),
   });
 
-  const saveMutation = useMutation({
-    mutationFn: (ids: string[]) =>
-      api.put(`/matches/${matchId}/selections`, { selectedPlayerIds: ids }),
+  // One Save for the whole Edit view: persist match details and the squad
+  // together, then leave edit mode. Avoids the trap of two separate saves where
+  // a coach could lose one set of changes.
+  const saveAllMutation = useMutation({
+    mutationFn: async ({ fields, ids }: { fields: MatchEditFields; ids: string[] }) => {
+      await api.put(`/matches/${matchId}`, matchUpdatePayload(fields));
+      await api.put(`/matches/${matchId}/selections`, { selectedPlayerIds: ids });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['match-selections', matchId] });
+      qc.invalidateQueries({ queryKey: ['match-signups', matchId] });
       qc.invalidateQueries({ queryKey: ['matches'] });
       setSaveError('');
-      // Re-sync from the server (added non-signups are now signed up); leaves the
-      // squad un-dirty while staying in edit mode.
+      setEditMode(false);
       setSelectedIds(null);
+      setEditFields(null);
+      setShowDiscardConfirm(false);
     },
     onError: (err: any) => setSaveError(err.response?.data?.error?.message ?? 'Failed to save'),
   });
@@ -207,6 +216,23 @@ export default function Selections() {
     setSelectedIds(next);
   }
 
+  function enterEdit() {
+    setEditFields(initialMatchFields(data!.match));
+    setSelectedIds(null);
+    setSaveError('');
+    setShowDiscardConfirm(false);
+    setEditMode(true);
+  }
+
+  function exitEdit() {
+    setEditMode(false);
+    setSelectedIds(null);
+    setEditFields(null);
+    setSaveError('');
+    setShowDiscardConfirm(false);
+    setAddFilter('');
+  }
+
   if (isLoading) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
   if (!data) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
 
@@ -217,7 +243,9 @@ export default function Selections() {
   const selectedCount = ids.size + guests.length;
   const tooFew = selectedCount < match.minPlayers;
   const tooMany = selectedCount > match.maxPlayers;
-  const isDirty = players.some(p => p.isSelected !== ids.has(p.player.userId));
+  const selectionsDirty = players.some(p => p.isSelected !== ids.has(p.player.userId));
+  const matchDirty = editFields != null && JSON.stringify(editFields) !== JSON.stringify(initialMatchFields(match));
+  const dirty = selectionsDirty || matchDirty;
 
   const signedUpPlayers = players.filter(p => p.isSignedUp);
   const otherPlayers = players
@@ -279,31 +307,22 @@ export default function Selections() {
               {match.opponent && <span className="text-gray-700 font-medium"> · vs {match.opponent}</span>}
             </p>
           </div>
-          <div className="flex gap-2 shrink-0">
-            {editMode ? (
+          {!editMode && (
+            <div className="flex gap-2 shrink-0">
               <button
-                onClick={() => { setEditMode(false); setSelectedIds(null); setSaveError(''); }}
+                onClick={enterEdit}
                 className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
               >
-                Done
+                Edit
               </button>
-            ) : (
-              <>
-                <button
-                  onClick={() => { setSelectedIds(null); setEditMode(true); }}
-                  className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => isPublished ? setShowReoptConfirm(true) : navigate(`/coach/matches/${matchId}`)}
-                  className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  Re-optimize
-                </button>
-              </>
-            )}
-          </div>
+              <button
+                onClick={() => isPublished ? setShowReoptConfirm(true) : navigate(`/coach/matches/${matchId}#optimize`)}
+                className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Re-optimize
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Re-optimize confirmation (published squads only) */}
@@ -316,7 +335,7 @@ export default function Selections() {
             </p>
             <div className="flex gap-2">
               <button
-                onClick={() => navigate(`/coach/matches/${matchId}`)}
+                onClick={() => navigate(`/coach/matches/${matchId}#optimize`)}
                 className="text-sm bg-brand-green hover:bg-brand-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
               >
                 Continue to optimizer
@@ -419,33 +438,17 @@ export default function Selections() {
         {/* Pitch formation view */}
         {(ids.size > 0 || guests.length > 0) && <PitchView players={players} ids={ids} matchType={match.matchType} guests={guests} />}
 
-        {editMode ? (
+        {editMode && editFields ? (
           <>
             {/* Edit match details */}
-            <MatchEditForm
-              match={match}
-              onSaved={() => {
-                qc.invalidateQueries({ queryKey: ['match-selections', matchId] });
-                qc.invalidateQueries({ queryKey: ['matches'] });
-              }}
-              onCancel={() => { setEditMode(false); setSelectedIds(null); }}
-            />
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+              <h2 className="font-semibold text-gray-900">Match details</h2>
+              <MatchEditForm value={editFields} onChange={setEditFields} matchType={match.matchType} />
+            </div>
 
             {/* Squad editor */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-              <div className="flex items-center justify-between gap-4">
-                <h2 className="font-semibold text-gray-900">Squad</h2>
-                <button
-                  onClick={() => { setSaveError(''); saveMutation.mutate([...ids]); }}
-                  disabled={saveMutation.isPending || !isDirty || (isPublished && tooFew)}
-                  className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-                >
-                  {saveMutation.isPending ? 'Saving…' : isPublished ? 'Save & notify players' : 'Save squad'}
-                </button>
-              </div>
-              {saveError && <p className="text-sm text-red-500">{saveError}</p>}
-              {isPublished && <p className="text-xs text-gray-500">Saving emails and notifies anyone added or removed.</p>}
-              {isDirty && !isPublished && <p className="text-xs text-amber-600">Unsaved squad changes.</p>}
+              <h2 className="font-semibold text-gray-900">Squad</h2>
 
               {/* Signed-up players */}
               <div className="space-y-2 pt-1">
@@ -535,6 +538,39 @@ export default function Selections() {
                   </button>
                 </div>
               ))}
+              <p className="text-xs text-gray-400">Guests are added or removed immediately.</p>
+            </div>
+
+            {/* One save for the whole edit (match details + squad) */}
+            <div className="sticky bottom-0 bg-gray-50 -mx-4 px-4 py-3 border-t border-gray-200">
+              {saveError && <p className="text-sm text-red-500 mb-2">{saveError}</p>}
+              {isPublished && tooFew && <p className="text-xs text-red-500 mb-2">Squad is below the minimum of {match.minPlayers}.</p>}
+              {isPublished && !tooFew && <p className="text-xs text-gray-500 mb-2">Saving emails and notifies anyone added to or removed from the squad.</p>}
+              {showDiscardConfirm ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm text-amber-700">Discard unsaved changes?</p>
+                  <div className="flex gap-2 shrink-0">
+                    <button onClick={exitEdit} className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors">Discard</button>
+                    <button onClick={() => setShowDiscardConfirm(false)} className="text-sm bg-brand-green hover:bg-brand-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Keep editing</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => dirty ? setShowDiscardConfirm(true) : exitEdit()}
+                    className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => { setSaveError(''); saveAllMutation.mutate({ fields: editFields, ids: [...ids] }); }}
+                    disabled={saveAllMutation.isPending || !dirty || (isPublished && tooFew)}
+                    className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                  >
+                    {saveAllMutation.isPending ? 'Saving…' : isPublished ? 'Save & notify players' : 'Save changes'}
+                  </button>
+                </div>
+              )}
             </div>
           </>
         ) : (

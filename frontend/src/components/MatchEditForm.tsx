@@ -1,6 +1,3 @@
-import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { api } from '../api/client';
 import LocationPicker, { encodeLocation, decodeLocation } from './LocationPicker';
 import OpponentPicker from './OpponentPicker';
 
@@ -21,23 +18,30 @@ export interface EditableMatch {
   maxPlayers: number;
 }
 
-// Shared "edit match details" form — date/time, squad size, venue, opponent,
-// category/serie and the signup window. Extracted so MatchDetail and the squad
-// page can both edit a match without duplicating the form. The caller handles
-// query invalidation in `onSaved`.
-export default function MatchEditForm({
-  match,
-  onSaved,
-  onCancel,
-}: {
-  match: EditableMatch;
-  onSaved: () => void;
-  onCancel: () => void;
-}) {
-  const { venue: initialVenue, court: initialCourt } = decodeLocation(match.location);
-  const [fields, setFields] = useState({
+// Editable form values (venue/court split out of the encoded location string).
+export interface MatchEditFields {
+  matchDate: string;
+  matchTime: string;
+  venue: string;
+  court: string;
+  opponentId: string | null;
+  matchCategory: 'serie' | 'pokal';
+  serieLetter: string;
+  signupOpenDate: string;
+  signupCloseDate: string;
+  minPlayers: number;
+  maxPlayers: number;
+}
+
+// Seed form state from a match. Callers keep the returned object in their own
+// state so they control save semantics (one page saves match + squad together).
+export function initialMatchFields(match: EditableMatch): MatchEditFields {
+  const { venue, court } = decodeLocation(match.location);
+  return {
     matchDate: match.matchDate,
     matchTime: match.matchTime.slice(0, 5),
+    venue,
+    court,
     opponentId: match.opponentId ?? null,
     matchCategory: (match.matchCategory as 'serie' | 'pokal') ?? 'serie',
     serieLetter: match.serieLetter ?? 'A',
@@ -45,155 +49,147 @@ export default function MatchEditForm({
     signupCloseDate: match.signupCloseDate?.slice(0, 10) ?? '',
     minPlayers: match.minPlayers,
     maxPlayers: match.maxPlayers,
-  });
-  const [venue, setVenue] = useState(initialVenue);
-  const [court, setCourt] = useState(initialCourt);
+  };
+}
 
-  const editMutation = useMutation({
-    mutationFn: () =>
-      api.put(`/matches/${match.matchId}`, {
-        matchDate: fields.matchDate,
-        matchTime: fields.matchTime,
-        location: encodeLocation(venue, court),
-        opponentId: fields.opponentId,
-        matchCategory: fields.matchCategory,
-        serieLetter: fields.matchCategory === 'serie' ? fields.serieLetter : null,
-        // Local-time interpretation (00:00 open, 20:00 deadline) → UTC instant,
-        // matching NewMatch. A bare "…Z" treated these as UTC, an hour or two
-        // off for CET/CEST users.
-        signupOpenDate: new Date(fields.signupOpenDate + 'T00:00:00').toISOString(),
-        signupCloseDate: new Date(fields.signupCloseDate + 'T20:00:00').toISOString(),
-        minPlayers: fields.minPlayers,
-        maxPlayers: fields.maxPlayers,
-      }),
-    onSuccess: () => onSaved(),
-  });
+// Build the PUT /matches body from the form values.
+export function matchUpdatePayload(f: MatchEditFields) {
+  return {
+    matchDate: f.matchDate,
+    matchTime: f.matchTime,
+    location: encodeLocation(f.venue, f.court),
+    opponentId: f.opponentId,
+    matchCategory: f.matchCategory,
+    serieLetter: f.matchCategory === 'serie' ? f.serieLetter : null,
+    // Local-time interpretation (00:00 open, 20:00 deadline) → UTC instant,
+    // matching NewMatch. A bare "…Z" treated these as UTC, an hour or two off
+    // for CET/CEST users.
+    signupOpenDate: new Date(f.signupOpenDate + 'T00:00:00').toISOString(),
+    signupCloseDate: new Date(f.signupCloseDate + 'T20:00:00').toISOString(),
+    minPlayers: f.minPlayers,
+    maxPlayers: f.maxPlayers,
+  };
+}
+
+// Shared "edit match details" fields — date/time, squad size, venue, opponent,
+// category/serie and the signup window. Controlled and button-less so the host
+// page owns the Save/Cancel buttons and persistence (MatchDetail saves the match
+// alone; the squad page saves match + selections in one action).
+export default function MatchEditForm({
+  value,
+  onChange,
+  matchType,
+}: {
+  value: MatchEditFields;
+  onChange: (next: MatchEditFields) => void;
+  matchType: string;
+}) {
+  const set = (patch: Partial<MatchEditFields>) => onChange({ ...value, ...patch });
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-      <h2 className="font-semibold text-gray-900">Edit match details</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+        <input
+          type="date"
+          value={value.matchDate}
+          onChange={e => set({ matchDate: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Time</label>
+        <input
+          type="time"
+          value={value.matchTime}
+          onChange={e => set({ matchTime: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Min players</label>
+        <input
+          type="number"
+          min={1}
+          value={value.minPlayers}
+          onChange={e => set({ minPlayers: parseInt(e.target.value) || 0 })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Max players</label>
+        <input
+          type="number"
+          min={1}
+          value={value.maxPlayers}
+          onChange={e => set({ maxPlayers: parseInt(e.target.value) || 0 })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+        />
+      </div>
+      <div className="sm:col-span-2">
+        <label className="block text-xs font-medium text-gray-500 mb-1">
+          Venue <span className="text-gray-400 font-normal">
+            · {matchType === 'futsal' ? 'Hall (optional)' : 'Court (optional)'}
+          </span>
+        </label>
+        <LocationPicker
+          venue={value.venue}
+          court={value.court}
+          onVenueChange={v => set({ venue: v })}
+          onCourtChange={c => set({ court: c })}
+          matchType={matchType}
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Opponent <span className="text-gray-400">(optional)</span></label>
+        <OpponentPicker
+          opponentId={value.opponentId}
+          onChange={(id) => set({ opponentId: id })}
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+        <select
+          value={value.matchCategory}
+          onChange={e => set({ matchCategory: e.target.value as 'serie' | 'pokal' })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+        >
+          <option value="serie">Serie</option>
+          <option value="pokal">Pokal</option>
+        </select>
+      </div>
+      {value.matchCategory === 'serie' && (
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
-          <input
-            type="date"
-            value={fields.matchDate}
-            onChange={e => setFields(f => ({ ...f, matchDate: e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Time</label>
-          <input
-            type="time"
-            value={fields.matchTime}
-            onChange={e => setFields(f => ({ ...f, matchTime: e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Min players</label>
-          <input
-            type="number"
-            min={1}
-            value={fields.minPlayers}
-            onChange={e => setFields(f => ({ ...f, minPlayers: parseInt(e.target.value) || 0 }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Max players</label>
-          <input
-            type="number"
-            min={1}
-            value={fields.maxPlayers}
-            onChange={e => setFields(f => ({ ...f, maxPlayers: parseInt(e.target.value) || 0 }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-gray-500 mb-1">
-            Venue <span className="text-gray-400 font-normal">
-              · {match.matchType === 'futsal' ? 'Hall (optional)' : 'Court (optional)'}
-            </span>
-          </label>
-          <LocationPicker
-            venue={venue}
-            court={court}
-            onVenueChange={setVenue}
-            onCourtChange={setCourt}
-            matchType={match.matchType}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Opponent <span className="text-gray-400">(optional)</span></label>
-          <OpponentPicker
-            opponentId={fields.opponentId}
-            onChange={(id) => setFields(f => ({ ...f, opponentId: id }))}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Serie letter</label>
           <select
-            value={fields.matchCategory}
-            onChange={e => setFields(f => ({ ...f, matchCategory: e.target.value as 'serie' | 'pokal' }))}
+            value={value.serieLetter}
+            onChange={e => set({ serieLetter: e.target.value })}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
           >
-            <option value="serie">Serie</option>
-            <option value="pokal">Pokal</option>
+            {['Mester','A','B','C','D','E','F'].map(l => (
+              <option key={l} value={l}>{l}</option>
+            ))}
           </select>
         </div>
-        {fields.matchCategory === 'serie' && (
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Serie letter</label>
-            <select
-              value={fields.serieLetter}
-              onChange={e => setFields(f => ({ ...f, serieLetter: e.target.value }))}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-            >
-              {['Mester','A','B','C','D','E','F'].map(l => (
-                <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Signup opens</label>
-          <input
-            type="date"
-            value={fields.signupOpenDate}
-            onChange={e => setFields(f => ({ ...f, signupOpenDate: e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Signup deadline</label>
-          <input
-            type="date"
-            value={fields.signupCloseDate}
-            onChange={e => setFields(f => ({ ...f, signupCloseDate: e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-          />
-        </div>
-      </div>
-      <div className="flex gap-2 justify-end">
-        <button
-          onClick={onCancel}
-          className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          Discard
-        </button>
-        <button
-          onClick={() => editMutation.mutate()}
-          disabled={editMutation.isPending}
-          className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          {editMutation.isPending ? 'Saving…' : 'Save changes'}
-        </button>
-      </div>
-      {editMutation.isError && (
-        <p className="text-sm text-red-500">Failed to save changes.</p>
       )}
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Signup opens</label>
+        <input
+          type="date"
+          value={value.signupOpenDate}
+          onChange={e => set({ signupOpenDate: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1">Signup deadline</label>
+        <input
+          type="date"
+          value={value.signupCloseDate}
+          onChange={e => set({ signupCloseDate: e.target.value })}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+        />
+      </div>
     </div>
   );
 }

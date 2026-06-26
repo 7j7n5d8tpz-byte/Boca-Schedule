@@ -123,8 +123,8 @@ describe('Selections', () => {
       // signed-up stand-in the optimizer left in the squad alongside player1.
       await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
       await supabaseAdmin.from('selections').insert([
-        { match_id: matchId, player_id: player.userId },
-        { match_id: matchId, player_id: placeholderId },
+        { match_id: matchId, player_id: player.userId, selected_by: coach.userId },
+        { match_id: matchId, player_id: placeholderId, selected_by: coach.userId },
       ]);
 
       // Swap player1 → swapIn while the placeholder stays in the payload, exactly as

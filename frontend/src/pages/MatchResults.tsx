@@ -348,7 +348,10 @@ export default function MatchResults() {
       .map((p: any) => ({ userId: p.player.userId, name: p.player.name, preferredPositions: p.player.preferredPositions ?? [] }));
     if (fromSelections.length > 0) return fromSelections;
 
+    // GET /selections now returns the full roster (so the squad editor can add
+    // non-signups); restrict this fallback to players who actually signed up.
     const fromSignups = (selectionsData?.players ?? [])
+      .filter((p: any) => p.isSignedUp)
       .map((p: any) => ({ userId: p.player.userId, name: p.player.name, preferredPositions: p.player.preferredPositions ?? [] }));
     if (fromSignups.length > 0) return fromSignups;
 

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import { PitchView, POS_TAG, type SelectionPlayer, type Guest } from '../../components/PitchView';
+import MatchEditForm from '../../components/MatchEditForm';
 import { Star } from '../../components/Icon';
 
 interface FormationSlot { covered: boolean; required: number; filled: number }
@@ -24,9 +25,16 @@ interface MatchInfo {
   matchDate: string;
   matchTime: string;
   matchType: string;
+  location: string;
+  opponent: string | null;
+  opponentId: string | null;
+  matchCategory: string;
+  serieLetter: string | null;
   status: string;
   minPlayers: number;
   maxPlayers: number;
+  signupOpenDate: string;
+  signupCloseDate: string;
   optimizationResult: OptimizationResult | null;
 }
 
@@ -47,11 +55,8 @@ function WhySquad({ opt, minPlayers }: { opt: OptimizationResult; minPlayers: nu
   const slots = Object.entries(formation);
 
   return (
-    <details className="bg-white rounded-xl border border-gray-200 p-5 group" open>
-      <summary className="cursor-pointer list-none flex items-center justify-between">
-        <span className="font-semibold text-gray-900">Why this squad</span>
-        <span className="text-gray-400 text-sm transition-transform group-open:rotate-90">›</span>
-      </summary>
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <span className="font-semibold text-gray-900">Why this squad</span>
 
       <div className="mt-4 space-y-4">
         {/* Run summary */}
@@ -93,10 +98,10 @@ function WhySquad({ opt, minPlayers }: { opt: OptimizationResult; minPlayers: nu
             <li><span className="text-gray-700 font-medium">Priority (<Star className="inline w-3 h-3 -mt-0.5 text-amber-500" />):</span> players you starred are strongly favoured for a spot.</li>
             <li><span className="text-gray-700 font-medium">Balance:</span> the Fairness↔Positions slider tilts between even playing time and best formation fit. This run was <span className="text-gray-700">{fairnessLabel(opt.fairnessWeight).toLowerCase()}</span>.</li>
           </ul>
-          <p className="text-xs text-gray-400 pt-1">Reflects the last optimizer run — any manual changes below may differ.</p>
+          <p className="text-xs text-gray-400 pt-1">Reflects the last optimizer run — any manual changes may differ.</p>
         </div>
       </div>
-    </details>
+    </div>
   );
 }
 
@@ -127,6 +132,10 @@ export default function Selections() {
   const [guestName, setGuestName] = useState('');
   const [guestPosition, setGuestPosition] = useState('');
   const [showAddGuest, setShowAddGuest] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [showWhy, setShowWhy] = useState(false);
+  const [addFilter, setAddFilter] = useState('');
+  const [showReoptConfirm, setShowReoptConfirm] = useState(false);
 
   const { data, isLoading } = useQuery<SelectionsResponse>({
     queryKey: ['match-selections', matchId],
@@ -174,6 +183,9 @@ export default function Selections() {
       qc.invalidateQueries({ queryKey: ['match-selections', matchId] });
       qc.invalidateQueries({ queryKey: ['matches'] });
       setSaveError('');
+      // Re-sync from the server (added non-signups are now signed up); leaves the
+      // squad un-dirty while staying in edit mode.
+      setSelectedIds(null);
     },
     onError: (err: any) => setSaveError(err.response?.data?.error?.message ?? 'Failed to save'),
   });
@@ -207,17 +219,117 @@ export default function Selections() {
   const tooMany = selectedCount > match.maxPlayers;
   const isDirty = players.some(p => p.isSelected !== ids.has(p.player.userId));
 
+  const signedUpPlayers = players.filter(p => p.isSignedUp);
+  const otherPlayers = players
+    .filter(p => !p.isSignedUp)
+    .filter(p => p.player.name.toLowerCase().includes(addFilter.trim().toLowerCase()));
+
+  // A read-only / interactive player row, shared by view and edit modes.
+  function PlayerRow({ p, interactive }: { p: SelectionPlayer; interactive: boolean }) {
+    const { player, isPriority, isSignedUp, selectedByOptimization, manuallyAdjusted } = p;
+    const isSelected = ids.has(player.userId);
+    return (
+      <div
+        onClick={interactive ? () => togglePlayer(player.userId) : undefined}
+        className={`rounded-xl border p-4 flex items-center gap-4 transition-colors ${interactive ? 'cursor-pointer' : ''} ${
+          isSelected ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 opacity-60'
+        }`}
+      >
+        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+          isSelected ? 'bg-green-500 border-green-500' : 'border-gray-300'
+        }`}>
+          {isSelected && <span className="text-white text-xs">✓</span>}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-gray-900 truncate">{player.name}</p>
+            {isPriority && <Star className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+            {isSignedUp === false && <span className="text-xs text-gray-400 shrink-0">didn't sign up</span>}
+            {manuallyAdjusted && <span className="text-xs text-gray-400 shrink-0">manual</span>}
+            {selectedByOptimization && !manuallyAdjusted && <span className="text-xs text-blue-400 shrink-0">optimizer</span>}
+          </div>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {player.preferredPositions.map(pos => (
+              <span key={pos} className={`text-xs font-medium px-2 py-0.5 rounded-full ${POS_TAG[pos] ?? 'bg-gray-100 text-gray-500'}`}>
+                {pos}
+              </span>
+            ))}
+            <span className="text-xs text-gray-400">
+              {player.totalPlayed} played · {player.totalSignups} signed up
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref={`/coach/matches/${matchId}`} backLabel="Sign-ups" />
+      <AppNav backHref="/coach" backLabel="Matches" />
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">
-            {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </h1>
-          <p className="text-gray-500 mt-1">{match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) · Selections</p>
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900">
+              {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </h1>
+            <p className="text-gray-500 mt-1">
+              {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) · {editMode ? 'Editing squad' : 'Squad'}
+              {match.opponent && <span className="text-gray-700 font-medium"> · vs {match.opponent}</span>}
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            {editMode ? (
+              <button
+                onClick={() => { setEditMode(false); setSelectedIds(null); setSaveError(''); }}
+                className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Done
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => { setSelectedIds(null); setEditMode(true); }}
+                  className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => isPublished ? setShowReoptConfirm(true) : navigate(`/coach/matches/${matchId}`)}
+                  className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Re-optimize
+                </button>
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Re-optimize confirmation (published squads only) */}
+        {showReoptConfirm && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3">
+            <p className="font-semibold text-amber-800">Re-optimize this published squad?</p>
+            <p className="text-sm text-amber-700">
+              Running the optimizer replaces the current squad and returns the match to “optimized”.
+              You'll need to publish again afterwards.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate(`/coach/matches/${matchId}`)}
+                className="text-sm bg-brand-green hover:bg-brand-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Continue to optimizer
+              </button>
+              <button
+                onClick={() => setShowReoptConfirm(false)}
+                className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                Keep current squad
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Counter + publish */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
@@ -231,35 +343,19 @@ export default function Selections() {
               </p>
               {tooFew && <p className="text-sm text-red-500 mt-0.5">Need {match.minPlayers - selectedCount} more</p>}
             </div>
-            <div className="flex gap-2">
-              {isDirty && (
-                <button onClick={() => { setSaveError(''); saveMutation.mutate([...ids]); }}
-                  disabled={saveMutation.isPending || (isPublished && tooFew)}
-                  className={`text-sm font-medium px-3 py-2 rounded-lg transition-colors disabled:opacity-50 ${
-                    isPublished
-                      ? 'bg-brand-green hover:bg-brand-green-700 text-white'
-                      : 'border border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
-                  }`}>
-                  {saveMutation.isPending ? 'Saving…' : isPublished ? 'Save & notify players' : 'Save'}
-                </button>
-              )}
-              {!isPublished && (
-                <button onClick={() => { setPublishError(''); publishMutation.mutate(); }}
-                  disabled={publishMutation.isPending || tooFew || isDirty}
-                  className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                  {publishMutation.isPending ? 'Publishing…' : 'Publish'}
-                </button>
-              )}
-            </div>
+            {!editMode && !isPublished && (
+              <button onClick={() => { setPublishError(''); publishMutation.mutate(); }}
+                disabled={publishMutation.isPending || tooFew}
+                className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                {publishMutation.isPending ? 'Publishing…' : 'Publish'}
+              </button>
+            )}
           </div>
-          {saveError && <p className="text-sm text-red-500">{saveError}</p>}
           {publishError && <p className="text-sm text-red-500">{publishError}</p>}
-          {isPublished ? (
+          {isPublished && !editMode && (
             <p className="text-xs text-gray-500">
-              This match is published. Swapping players will email and notify anyone added or removed.
+              Published — players can see this squad. Use <span className="font-medium">Edit</span> to swap players; anyone added or removed is notified.
             </p>
-          ) : isDirty && (
-            <p className="text-xs text-amber-600">Unsaved changes — save before publishing.</p>
           )}
         </div>
 
@@ -307,116 +403,168 @@ export default function Selections() {
           </div>
         )}
 
-        {/* Why this squad */}
-        {match.optimizationResult && <WhySquad opt={match.optimizationResult} minPlayers={match.minPlayers} />}
+        {/* Why this squad — tucked behind a small toggle */}
+        {match.optimizationResult && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowWhy(v => !v)}
+              className="text-xs font-medium text-brand-green hover:text-brand-green-700"
+            >
+              {showWhy ? 'Hide explanation' : 'Why this squad?'}
+            </button>
+            {showWhy && <WhySquad opt={match.optimizationResult} minPlayers={match.minPlayers} />}
+          </div>
+        )}
 
         {/* Pitch formation view */}
         {(ids.size > 0 || guests.length > 0) && <PitchView players={players} ids={ids} matchType={match.matchType} guests={guests} />}
 
-        {/* Guest players */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-gray-700">Guest players</h2>
-            <button
-              onClick={() => setShowAddGuest(v => !v)}
-              className="text-xs font-medium text-brand-green hover:text-brand-green-700"
-            >
-              {showAddGuest ? 'Cancel' : '+ Add guest'}
-            </button>
-          </div>
+        {editMode ? (
+          <>
+            {/* Edit match details */}
+            <MatchEditForm
+              match={match}
+              onSaved={() => {
+                qc.invalidateQueries({ queryKey: ['match-selections', matchId] });
+                qc.invalidateQueries({ queryKey: ['matches'] });
+              }}
+              onCancel={() => { setEditMode(false); setSelectedIds(null); }}
+            />
 
-          {showAddGuest && (
-            <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-              <input
-                type="text"
-                placeholder="Guest name"
-                value={guestName}
-                onChange={e => setGuestName(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-                autoFocus
-              />
-              <select
-                value={guestPosition}
-                onChange={e => setGuestPosition(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
-              >
-                <option value="">Position (optional)</option>
-                {(match.matchType === 'futsal'
-                  ? ['GK', 'WIN', 'MID', 'STR']
-                  : ['GK', 'DEF', 'WIN', 'MID', 'STR']
-                ).map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <button
-                onClick={() => { if (guestName.trim()) addGuestMutation.mutate({ name: guestName.trim(), position: guestPosition }); }}
-                disabled={!guestName.trim() || addGuestMutation.isPending}
-                className="w-full bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
-              >
-                {addGuestMutation.isPending ? 'Adding…' : 'Add guest'}
-              </button>
+            {/* Squad editor */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="font-semibold text-gray-900">Squad</h2>
+                <button
+                  onClick={() => { setSaveError(''); saveMutation.mutate([...ids]); }}
+                  disabled={saveMutation.isPending || !isDirty || (isPublished && tooFew)}
+                  className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  {saveMutation.isPending ? 'Saving…' : isPublished ? 'Save & notify players' : 'Save squad'}
+                </button>
+              </div>
+              {saveError && <p className="text-sm text-red-500">{saveError}</p>}
+              {isPublished && <p className="text-xs text-gray-500">Saving emails and notifies anyone added or removed.</p>}
+              {isDirty && !isPublished && <p className="text-xs text-amber-600">Unsaved squad changes.</p>}
+
+              {/* Signed-up players */}
+              <div className="space-y-2 pt-1">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Signed up — {signedUpPlayers.length}</h3>
+                {signedUpPlayers.length === 0 && <p className="text-sm text-gray-400">No players signed up.</p>}
+                {signedUpPlayers.map(p => <PlayerRow key={p.player.userId} p={p} interactive />)}
+              </div>
+
+              {/* Add players who didn't sign up */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Add another player</h3>
+                <p className="text-xs text-gray-400 -mt-1">Players who didn't sign up. Adding one signs them up for this match.</p>
+                <input
+                  type="text"
+                  placeholder="Search players…"
+                  value={addFilter}
+                  onChange={e => setAddFilter(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+                {otherPlayers.length === 0 && <p className="text-sm text-gray-400">No matching players.</p>}
+                {otherPlayers.map(p => <PlayerRow key={p.player.userId} p={p} interactive />)}
+              </div>
             </div>
-          )}
 
-          {guests.length === 0 && !showAddGuest && (
-            <p className="text-sm text-gray-400">No guest players added.</p>
-          )}
+            {/* Guest players (external, non-registered) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-gray-700">Guest players</h2>
+                <button
+                  onClick={() => setShowAddGuest(v => !v)}
+                  className="text-xs font-medium text-brand-green hover:text-brand-green-700"
+                >
+                  {showAddGuest ? 'Cancel' : '+ Add guest'}
+                </button>
+              </div>
 
-          {guests.map(g => (
-            <div key={g.guest_id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center shrink-0">
-                <span className="text-white text-[9px] font-bold">GST</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 text-sm">{g.name}</p>
-                {g.position && <p className="text-xs text-gray-400">{g.position}</p>}
-              </div>
-              <button
-                onClick={() => removeGuestMutation.mutate(g.guest_id)}
-                disabled={removeGuestMutation.isPending}
-                className="text-xs text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
-              >
-                Remove
-              </button>
+              {showAddGuest && (
+                <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Guest name"
+                    value={guestName}
+                    onChange={e => setGuestName(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                    autoFocus
+                  />
+                  <select
+                    value={guestPosition}
+                    onChange={e => setGuestPosition(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
+                  >
+                    <option value="">Position (optional)</option>
+                    {(match.matchType === 'futsal'
+                      ? ['GK', 'WIN', 'MID', 'STR']
+                      : ['GK', 'DEF', 'WIN', 'MID', 'STR']
+                    ).map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <button
+                    onClick={() => { if (guestName.trim()) addGuestMutation.mutate({ name: guestName.trim(), position: guestPosition }); }}
+                    disabled={!guestName.trim() || addGuestMutation.isPending}
+                    className="w-full bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+                  >
+                    {addGuestMutation.isPending ? 'Adding…' : 'Add guest'}
+                  </button>
+                </div>
+              )}
+
+              {guests.length === 0 && !showAddGuest && (
+                <p className="text-sm text-gray-400">No guest players added.</p>
+              )}
+
+              {guests.map(g => (
+                <div key={g.guest_id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center shrink-0">
+                    <span className="text-white text-[9px] font-bold">GST</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 text-sm">{g.name}</p>
+                    {g.position && <p className="text-xs text-gray-400">{g.position}</p>}
+                  </div>
+                  <button
+                    onClick={() => removeGuestMutation.mutate(g.guest_id)}
+                    disabled={removeGuestMutation.isPending}
+                    className="text-xs text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        ) : (
+          <>
+            {/* Read-only squad list */}
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-gray-700">Signed-up players — {signedUpPlayers.length}</h2>
+              {signedUpPlayers.length === 0 && <p className="text-sm text-gray-400">No players signed up.</p>}
+              {signedUpPlayers.map(p => <PlayerRow key={p.player.userId} p={p} interactive={false} />)}
+            </div>
 
-        {/* Player list */}
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-gray-700">All signed-up players</h2>
-          {players.map(({ player, isPriority, selectedByOptimization, manuallyAdjusted }) => {
-            const isSelected = ids.has(player.userId);
-            return (
-              <div key={player.userId} onClick={() => togglePlayer(player.userId)}
-                className={`cursor-pointer rounded-xl border p-4 flex items-center gap-4 transition-colors ${
-                  isSelected ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 opacity-60'
-                }`}>
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                  isSelected ? 'bg-green-500 border-green-500' : 'border-gray-300'
-                }`}>
-                  {isSelected && <span className="text-white text-xs">✓</span>}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-900 truncate">{player.name}</p>
-                    {isPriority && <Star className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
-                    {manuallyAdjusted && <span className="text-xs text-gray-400 shrink-0">manual</span>}
-                    {selectedByOptimization && !manuallyAdjusted && <span className="text-xs text-blue-400 shrink-0">optimizer</span>}
+            {/* Guests (read-only) */}
+            {guests.length > 0 && (
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold text-gray-700">Guest players</h2>
+                {guests.map(g => (
+                  <div key={g.guest_id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center shrink-0">
+                      <span className="text-white text-[9px] font-bold">GST</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 text-sm">{g.name}</p>
+                      {g.position && <p className="text-xs text-gray-400">{g.position}</p>}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    {player.preferredPositions.map(pos => (
-                      <span key={pos} className={`text-xs font-medium px-2 py-0.5 rounded-full ${POS_TAG[pos] ?? 'bg-gray-100 text-gray-500'}`}>
-                        {pos}
-                      </span>
-                    ))}
-                    <span className="text-xs text-gray-400">
-                      {player.totalPlayed} played · {player.totalSignups} signed up
-                    </span>
-                  </div>
-                </div>
+                ))}
               </div>
-            );
-          })}
-        </div>
+            )}
+          </>
+        )}
       </main>
     </div>
   );

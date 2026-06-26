@@ -11,6 +11,7 @@ export interface SelectionPlayer {
   };
   isPriority: boolean;
   isSelected: boolean;
+  isSignedUp?: boolean;
   selectedByOptimization: boolean;
   manuallyAdjusted: boolean;
   optimizationScore: number | null;

@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import LocationPicker, { encodeLocation, decodeLocation, formatLocation } from '../../components/LocationPicker';
-import OpponentPicker from '../../components/OpponentPicker';
+import { formatLocation } from '../../components/LocationPicker';
+import MatchEditForm from '../../components/MatchEditForm';
 import { meetingTime, mapsUrl } from '../../utils';
 import Icon, { Star } from '../../components/Icon';
 
@@ -56,9 +56,6 @@ export default function MatchDetail() {
   const [fairnessWeight, setFairnessWeight] = useState(50); // 0 = positions, 100 = fairness
   const [showEdit, setShowEdit] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [editFields, setEditFields] = useState({ matchDate: '', matchTime: '', opponentId: null as string | null, matchCategory: 'serie' as 'serie' | 'pokal', serieLetter: 'A', signupOpenDate: '', signupCloseDate: '', minPlayers: 0, maxPlayers: 0 });
-  const [editVenue, setEditVenue] = useState('');
-  const [editCourt, setEditCourt] = useState('');
 
   const { data, isLoading } = useQuery<SignupsResponse>({
     queryKey: ['match-signups', matchId],
@@ -69,30 +66,6 @@ export default function MatchDetail() {
     mutationFn: ({ signupId, value }: { signupId: string; value: boolean }) =>
       api.put(`/signups/${signupId}/priority`, { isPriority: value }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['match-signups', matchId] }),
-  });
-
-  const editMutation = useMutation({
-    mutationFn: (fields: { matchDate: string; matchTime: string; location: string; opponentId: string | null; matchCategory: 'serie' | 'pokal'; serieLetter: string; signupOpenDate: string; signupCloseDate: string; minPlayers: number; maxPlayers: number }) =>
-      api.put(`/matches/${matchId}`, {
-        matchDate: fields.matchDate,
-        matchTime: fields.matchTime,
-        location: fields.location,
-        opponentId: fields.opponentId,
-        matchCategory: fields.matchCategory,
-        serieLetter: fields.matchCategory === 'serie' ? fields.serieLetter : null,
-        // Local-time interpretation (00:00 open, 20:00 deadline) → UTC instant,
-        // matching NewMatch. A bare "…Z" treated these as UTC, an hour or two
-        // off for CET/CEST users.
-        signupOpenDate: new Date(fields.signupOpenDate + 'T00:00:00').toISOString(),
-        signupCloseDate: new Date(fields.signupCloseDate + 'T20:00:00').toISOString(),
-        minPlayers: fields.minPlayers,
-        maxPlayers: fields.maxPlayers,
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['match-signups', matchId] });
-      qc.invalidateQueries({ queryKey: ['matches'] });
-      setShowEdit(false);
-    },
   });
 
   const statusMutation = useMutation({
@@ -122,24 +95,6 @@ export default function MatchDetail() {
       setOptimizeError(err.response?.data?.error?.message ?? 'Optimization failed');
     },
   });
-
-  function openEdit() {
-    const { venue, court } = decodeLocation(match.location);
-    setEditVenue(venue);
-    setEditCourt(court);
-    setEditFields({
-      matchDate: match.matchDate,
-      matchTime: match.matchTime.slice(0, 5),
-      opponentId: match.opponentId ?? null,
-      matchCategory: (match.matchCategory as 'serie' | 'pokal') ?? 'serie',
-      serieLetter: match.serieLetter ?? 'A',
-      signupOpenDate: match.signupOpenDate?.slice(0, 10) ?? '',
-      signupCloseDate: match.signupCloseDate?.slice(0, 10) ?? '',
-      minPlayers: match.minPlayers,
-      maxPlayers: match.maxPlayers,
-    });
-    setShowEdit(true);
-  }
 
   function togglePriority(signupId: string) {
     // Seed from server data if this signupId hasn't been toggled yet
@@ -186,7 +141,7 @@ export default function MatchDetail() {
           </div>
           <div className="flex gap-2 shrink-0">
             <button
-              onClick={openEdit}
+              onClick={() => setShowEdit(true)}
               className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
             >
               Edit
@@ -276,131 +231,15 @@ export default function MatchDetail() {
 
         {/* Edit form */}
         {showEdit && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-900">Edit match details</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
-                <input
-                  type="date"
-                  value={editFields.matchDate}
-                  onChange={e => setEditFields(f => ({ ...f, matchDate: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Time</label>
-                <input
-                  type="time"
-                  value={editFields.matchTime}
-                  onChange={e => setEditFields(f => ({ ...f, matchTime: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Min players</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={editFields.minPlayers}
-                  onChange={e => setEditFields(f => ({ ...f, minPlayers: parseInt(e.target.value) || 0 }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Max players</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={editFields.maxPlayers}
-                  onChange={e => setEditFields(f => ({ ...f, maxPlayers: parseInt(e.target.value) || 0 }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  Venue <span className="text-gray-400 font-normal">
-                    · {match.matchType === 'futsal' ? 'Hall (optional)' : 'Court (optional)'}
-                  </span>
-                </label>
-                <LocationPicker
-                  venue={editVenue}
-                  court={editCourt}
-                  onVenueChange={setEditVenue}
-                  onCourtChange={setEditCourt}
-                  matchType={match.matchType}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Opponent <span className="text-gray-400">(optional)</span></label>
-                <OpponentPicker
-                  opponentId={editFields.opponentId}
-                  onChange={(id) => setEditFields(f => ({ ...f, opponentId: id }))}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
-                <select
-                  value={editFields.matchCategory}
-                  onChange={e => setEditFields(f => ({ ...f, matchCategory: e.target.value as 'serie' | 'pokal' }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-                >
-                  <option value="serie">Serie</option>
-                  <option value="pokal">Pokal</option>
-                </select>
-              </div>
-              {editFields.matchCategory === 'serie' && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Serie letter</label>
-                  <select
-                    value={editFields.serieLetter}
-                    onChange={e => setEditFields(f => ({ ...f, serieLetter: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-                  >
-                    {['Mester','A','B','C','D','E','F'].map(l => (
-                      <option key={l} value={l}>{l}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Signup opens</label>
-                <input
-                  type="date"
-                  value={editFields.signupOpenDate}
-                  onChange={e => setEditFields(f => ({ ...f, signupOpenDate: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Signup deadline</label>
-                <input
-                  type="date"
-                  value={editFields.signupCloseDate}
-                  onChange={e => setEditFields(f => ({ ...f, signupCloseDate: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setShowEdit(false)}
-                className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                Discard
-              </button>
-              <button
-                onClick={() => editMutation.mutate({ ...editFields, location: encodeLocation(editVenue, editCourt), matchCategory: editFields.matchCategory, serieLetter: editFields.serieLetter })}
-                disabled={editMutation.isPending}
-                className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                {editMutation.isPending ? 'Saving…' : 'Save changes'}
-              </button>
-            </div>
-            {editMutation.isError && (
-              <p className="text-sm text-red-500">Failed to save changes.</p>
-            )}
-          </div>
+          <MatchEditForm
+            match={match}
+            onSaved={() => {
+              qc.invalidateQueries({ queryKey: ['match-signups', matchId] });
+              qc.invalidateQueries({ queryKey: ['matches'] });
+              setShowEdit(false);
+            }}
+            onCancel={() => setShowEdit(false)}
+          />
         )}
 
         {/* Cancel confirmation */}

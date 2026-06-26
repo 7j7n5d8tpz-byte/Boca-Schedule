@@ -104,6 +104,53 @@ describe('Selections', () => {
     }
   });
 
+  it('PUT selections grandfathers a placeholder already in the squad so an unrelated swap is not blocked', async () => {
+    // A placeholder the optimizer kept in the squad, plus two real players to swap.
+    const placeholderId = randomUUID();
+    await supabaseAdmin.from('users').insert({
+      user_id: placeholderId,
+      email: `placeholder-${placeholderId}@bocatest.internal`,
+      name: 'Placeholder Stand-in',
+      role: 'player',
+      is_active: true,
+      is_placeholder: true,
+      preferred_positions: [],
+    });
+    const swapIn = await createTestUser('player', '-sel-grand-in');
+    await signupPlayer(matchId, swapIn.userId);
+    try {
+      // Seed selections directly (the API would reject adding the placeholder), as a
+      // signed-up stand-in the optimizer left in the squad alongside player1.
+      await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
+      await supabaseAdmin.from('selections').insert([
+        { match_id: matchId, player_id: player.userId },
+        { match_id: matchId, player_id: placeholderId },
+      ]);
+
+      // Swap player1 → swapIn while the placeholder stays in the payload, exactly as
+      // the frontend sends the whole squad. The placeholder is grandfathered in.
+      const res = await request(app)
+        .put(`/api/matches/${matchId}/selections`)
+        .set('Authorization', `Bearer ${coach.token}`)
+        .send({ selectedPlayerIds: [swapIn.userId, placeholderId] });
+      expect(res.status).toBe(200);
+      expect(res.body.data.selectedCount).toBe(2);
+
+      // Both the swapped-in player and the retained placeholder are persisted.
+      const { data: sel } = await supabaseAdmin
+        .from('selections').select('player_id').eq('match_id', matchId);
+      const ids = new Set((sel ?? []).map((s: any) => s.player_id));
+      expect(ids.has(swapIn.userId)).toBe(true);
+      expect(ids.has(placeholderId)).toBe(true);
+      expect(ids.has(player.userId)).toBe(false);
+    } finally {
+      await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
+      await supabaseAdmin.from('signups').delete().eq('match_id', matchId).eq('player_id', swapIn.userId);
+      await deleteTestUser(swapIn.userId);
+      await supabaseAdmin.from('users').delete().eq('user_id', placeholderId);
+    }
+  });
+
   it('PUT selections rejects a fabricated UUID', async () => {
     const res = await request(app)
       .put(`/api/matches/${matchId}/selections`)

@@ -189,21 +189,30 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
       return;
     }
 
-    // Validate all supplied IDs are real, selectable players (active, not a
-    // placeholder stand-in, not a merged tombstone). The coach may select players
-    // who didn't sign up — they get a signup created below — so we validate against
-    // the user roster rather than this match's signups. Done before any writes, so
-    // a bad payload leaves the existing squad untouched.
-    if (selectedPlayerIds.length > 0) {
+    // Capture the current squad up front, so we can validate against it and later
+    // diff added/removed players. Selections aren't mutated until the delete below,
+    // so this snapshot stays accurate for both uses.
+    const { data: prior } = await supabaseAdmin.from('selections').select('player_id').eq('match_id', matchId);
+    const priorIds = new Set((prior ?? []).map((s: any) => s.player_id));
+
+    // Validate only the players being *added* (not already in the squad) against the
+    // selectable roster: active, not a placeholder stand-in, not a merged tombstone.
+    // Players already selected are grandfathered in — a placeholder the optimizer
+    // legitimately kept in the squad must not block an unrelated swap of two valid
+    // players. The coach may add players who didn't sign up — they get a signup
+    // created below — so we validate against the user roster rather than this match's
+    // signups. Done before any writes, so a bad payload leaves the existing squad untouched.
+    const addedIds = selectedPlayerIds.filter(id => !priorIds.has(id));
+    if (addedIds.length > 0) {
       const { data: validUsers } = await supabaseAdmin
         .from('users')
         .select('user_id')
         .eq('is_active', true)
         .eq('is_placeholder', false)
         .is('merged_into', null)
-        .in('user_id', selectedPlayerIds);
+        .in('user_id', addedIds);
       const validIds = new Set((validUsers ?? []).map((u: any) => u.user_id));
-      const invalid = selectedPlayerIds.filter(id => !validIds.has(id));
+      const invalid = addedIds.filter(id => !validIds.has(id));
       if (invalid.length > 0) {
         res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'One or more player IDs are not selectable players.' } });
         return;
@@ -238,11 +247,6 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
       }
     }
 
-    // Capture the prior squad so we can tell who was added/removed when the
-    // match is already published (a manual swap on a live squad).
-    const { data: prior } = await supabaseAdmin.from('selections').select('player_id').eq('match_id', matchId);
-    const priorIds = new Set((prior ?? []).map((s: any) => s.player_id));
-
     await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
 
     const rows = selectedPlayerIds.map(playerId => ({
@@ -270,7 +274,6 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
     // Swapping players on a published squad → notify the affected players.
     if (match.status === 'published') {
       const newIds = new Set(selectedPlayerIds);
-      const addedIds = selectedPlayerIds.filter(id => !priorIds.has(id));
       const removedIds = [...priorIds].filter(id => !newIds.has(id)) as string[];
       notifyPublishedSquadChange(match, addedIds, removedIds, String(matchId));
     }

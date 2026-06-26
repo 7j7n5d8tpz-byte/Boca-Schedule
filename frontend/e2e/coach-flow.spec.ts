@@ -94,11 +94,13 @@ test.describe('Coach flow', () => {
       data: JSON.stringify({ selectedPlayerIds: [playerId] }),
     });
 
-    // Navigate to the match detail page and publish via UI
-    await page.goto(`/coach/matches/${matchId}`);
+    // Publishing happens on the squad page (the match detail page links here via
+    // "Review & publish squad"). Go straight there and publish via the UI.
+    await page.goto(`/coach/matches/${matchId}/selections`);
     await page.getByRole('button', { name: /publish/i }).click();
 
-    // The status badge should update to "published"
+    // On success the coach is returned to the dashboard, where the match now
+    // shows a "Published" status badge.
     await expect(page.getByText(/published/i).first()).toBeVisible({ timeout: 10_000 });
   });
 });

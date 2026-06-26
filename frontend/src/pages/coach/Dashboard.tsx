@@ -99,12 +99,21 @@ function MatchRow({ match }: { match: Match }) {
 
       {/* Actions */}
       <div className="mt-4 flex gap-2">
-        <Link
-          to={`/coach/matches/${match.matchId}`}
-          className="text-sm text-brand-green hover:underline"
-        >
-          View signups
-        </Link>
+        {match.status === 'published' ? (
+          <Link
+            to={`/coach/matches/${match.matchId}/selections`}
+            className="text-sm text-brand-green hover:underline"
+          >
+            Manage squad
+          </Link>
+        ) : (
+          <Link
+            to={`/coach/matches/${match.matchId}`}
+            className="text-sm text-brand-green hover:underline"
+          >
+            View signups
+          </Link>
+        )}
         {match.status === 'signup_closed' && (
           <span className="text-sm text-gray-400">· Ready to optimize</span>
         )}

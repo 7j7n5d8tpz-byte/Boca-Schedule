@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import app from '../src/app.js';
 import { createTestUser, deleteTestUser, supabaseAdmin, type TestUser } from './helpers/users.js';
@@ -51,16 +52,55 @@ describe('Selections', () => {
     expect(entry.isSelected).toBe(true);
   });
 
-  it('PUT selections rejects a player not signed up for this match (security fix)', async () => {
+  it('PUT selections accepts a registered player who did not sign up and creates a signup', async () => {
     const notSignedUp = await createTestUser('player', '-sel-not');
     try {
       const res = await request(app)
         .put(`/api/matches/${matchId}/selections`)
         .set('Authorization', `Bearer ${coach.token}`)
-        .send({ selectedPlayerIds: [notSignedUp.userId] });
+        .send({ selectedPlayerIds: [player.userId, notSignedUp.userId] });
+      expect(res.status).toBe(200);
+      expect(res.body.data.selectedCount).toBe(2);
+
+      // A signup row was created for the manually-added player…
+      const { data: signup } = await supabaseAdmin
+        .from('signups').select('signup_id, withdrawn_at')
+        .eq('match_id', matchId).eq('player_id', notSignedUp.userId).maybeSingle();
+      expect(signup).toBeTruthy();
+      expect(signup!.withdrawn_at).toBeNull();
+
+      // …and GET now reports them as signed up + selected.
+      const check = await request(app)
+        .get(`/api/matches/${matchId}/selections`)
+        .set('Authorization', `Bearer ${coach.token}`);
+      const entry = check.body.data.players.find((p: any) => p.player.userId === notSignedUp.userId);
+      expect(entry.isSignedUp).toBe(true);
+      expect(entry.isSelected).toBe(true);
+    } finally {
+      // Deleting the user cascades their signup + selection (ON DELETE CASCADE).
+      await deleteTestUser(notSignedUp.userId);
+    }
+  });
+
+  it('PUT selections rejects a placeholder (non-selectable) user', async () => {
+    const placeholderId = randomUUID();
+    await supabaseAdmin.from('users').insert({
+      user_id: placeholderId,
+      email: `placeholder-${placeholderId}@bocatest.internal`,
+      name: 'Placeholder Player',
+      role: 'player',
+      is_active: true,
+      is_placeholder: true,
+      preferred_positions: [],
+    });
+    try {
+      const res = await request(app)
+        .put(`/api/matches/${matchId}/selections`)
+        .set('Authorization', `Bearer ${coach.token}`)
+        .send({ selectedPlayerIds: [placeholderId] });
       expect(res.status).toBe(422);
     } finally {
-      await deleteTestUser(notSignedUp.userId);
+      await supabaseAdmin.from('users').delete().eq('user_id', placeholderId);
     }
   });
 

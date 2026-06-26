@@ -75,7 +75,9 @@ router.get('/selections', authenticate, async (req, res, next) => {
 
     const { matchId } = req.params;
 
-    const [{ data: match }, { data: signups }, { data: selections }] = await Promise.all([
+    // Full candidate roster so the Edit picker can offer players who did NOT sign
+    // up (real people only — placeholders and merged tombstones aren't selectable).
+    const [{ data: match }, { data: signups }, { data: selections }, { data: roster }] = await Promise.all([
       supabaseAdmin.from('matches').select('*').eq('match_id', matchId).single(),
       supabaseAdmin
         .from('signups')
@@ -86,6 +88,12 @@ router.get('/selections', authenticate, async (req, res, next) => {
         .from('selections')
         .select('player_id, selected_by_optimization, manually_adjusted, is_priority_selection, optimization_score')
         .eq('match_id', matchId),
+      supabaseAdmin
+        .from('users')
+        .select('user_id, name, preferred_positions')
+        .eq('is_active', true)
+        .eq('is_placeholder', false)
+        .is('merged_into', null),
     ]);
 
     if (!match) {
@@ -93,29 +101,44 @@ router.get('/selections', authenticate, async (req, res, next) => {
       return;
     }
 
-    const playerIds = (signups ?? []).map((s: any) => s.player_id);
-    const { data: statsData } = playerIds.length > 0
-      ? await supabaseAdmin.from('player_statistics').select('user_id, total_played, total_signups').in('user_id', playerIds)
-      : { data: [] };
-    const statsMap = new Map((statsData ?? []).map((s: any) => [s.user_id, s]));
-
+    const signedUpIds = new Set((signups ?? []).map((s: any) => s.player_id));
+    const priorityMap = new Map((signups ?? []).map((s: any) => [s.player_id, s.is_priority ?? false]));
     const selectedIds = new Set((selections ?? []).map((s: any) => s.player_id));
     const selectionDetails = new Map((selections ?? []).map((s: any) => [s.player_id, s]));
 
-    const players = (signups ?? []).map((s: any) => ({
+    // Candidate set = active roster ∪ everyone signed up ∪ everyone selected, so a
+    // signed-up placeholder or an already-selected player is never dropped.
+    const userMap = new Map<string, { user_id: string; name: string; preferred_positions: string[] }>();
+    for (const u of (roster ?? []) as any[]) userMap.set(u.user_id, u);
+    for (const s of (signups ?? []) as any[]) if (s.users) userMap.set(s.users.user_id, s.users);
+    const missingIds = [...selectedIds].filter(id => !userMap.has(id));
+    if (missingIds.length > 0) {
+      const { data: extra } = await supabaseAdmin
+        .from('users').select('user_id, name, preferred_positions').in('user_id', missingIds);
+      for (const u of (extra ?? [])) userMap.set(u.user_id, u);
+    }
+
+    const allIds = [...userMap.keys()];
+    const { data: statsData } = allIds.length > 0
+      ? await supabaseAdmin.from('player_statistics').select('user_id, total_played, total_signups').in('user_id', allIds)
+      : { data: [] };
+    const statsMap = new Map((statsData ?? []).map((s: any) => [s.user_id, s]));
+
+    const players = [...userMap.values()].map((u: any) => ({
       player: {
-        userId: s.users.user_id,
-        name: s.users.name,
-        preferredPositions: s.users.preferred_positions,
-        totalPlayed: Number(statsMap.get(s.users.user_id)?.total_played ?? 0),
-        totalSignups: Number(statsMap.get(s.users.user_id)?.total_signups ?? 0),
+        userId: u.user_id,
+        name: u.name,
+        preferredPositions: u.preferred_positions ?? [],
+        totalPlayed: Number(statsMap.get(u.user_id)?.total_played ?? 0),
+        totalSignups: Number(statsMap.get(u.user_id)?.total_signups ?? 0),
       },
-      isPriority: s.is_priority ?? false,
-      isSelected: selectedIds.has(s.player_id),
-      selectedByOptimization: selectionDetails.get(s.player_id)?.selected_by_optimization ?? false,
-      manuallyAdjusted: selectionDetails.get(s.player_id)?.manually_adjusted ?? false,
-      optimizationScore: selectionDetails.get(s.player_id)?.optimization_score ?? null,
-    }));
+      isSignedUp: signedUpIds.has(u.user_id),
+      isPriority: priorityMap.get(u.user_id) ?? false,
+      isSelected: selectedIds.has(u.user_id),
+      selectedByOptimization: selectionDetails.get(u.user_id)?.selected_by_optimization ?? false,
+      manuallyAdjusted: selectionDetails.get(u.user_id)?.manually_adjusted ?? false,
+      optimizationScore: selectionDetails.get(u.user_id)?.optimization_score ?? null,
+    })).sort((a, b) => a.player.name.localeCompare(b.player.name));
 
     res.json({
       success: true,
@@ -125,15 +148,21 @@ router.get('/selections', authenticate, async (req, res, next) => {
           matchDate: match.match_date,
           matchTime: match.match_time,
           matchType: match.match_type,
+          location: match.location,
           opponent: match.opponent ?? null,
+          opponentId: match.opponent_id ?? null,
+          matchCategory: match.match_category ?? 'serie',
+          serieLetter: match.serie_letter ?? null,
           status: match.status,
           minPlayers: match.min_players,
           maxPlayers: match.max_players,
+          signupOpenDate: match.signup_open_date,
+          signupCloseDate: match.signup_close_date,
           optimizationResult: match.optimization_result ?? null,
         },
         players,
         summary: {
-          totalSignups: players.length,
+          totalSignups: players.filter(p => p.isSignedUp).length,
           totalSelected: players.filter(p => p.isSelected).length,
         },
       },
@@ -160,20 +189,52 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
       return;
     }
 
-    // Validate all supplied IDs are active signups for this match (before we
-    // delete anything, so a bad payload leaves the existing squad untouched).
+    // Validate all supplied IDs are real, selectable players (active, not a
+    // placeholder stand-in, not a merged tombstone). The coach may select players
+    // who didn't sign up — they get a signup created below — so we validate against
+    // the user roster rather than this match's signups. Done before any writes, so
+    // a bad payload leaves the existing squad untouched.
     if (selectedPlayerIds.length > 0) {
-      const { data: validSignups } = await supabaseAdmin
-        .from('signups')
-        .select('player_id')
-        .eq('match_id', matchId)
+      const { data: validUsers } = await supabaseAdmin
+        .from('users')
+        .select('user_id')
         .eq('is_active', true)
-        .in('player_id', selectedPlayerIds);
-      const validIds = new Set((validSignups ?? []).map((s: any) => s.player_id));
+        .eq('is_placeholder', false)
+        .is('merged_into', null)
+        .in('user_id', selectedPlayerIds);
+      const validIds = new Set((validUsers ?? []).map((u: any) => u.user_id));
       const invalid = selectedPlayerIds.filter(id => !validIds.has(id));
       if (invalid.length > 0) {
-        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'One or more player IDs are not active signups for this match.' } });
+        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'One or more player IDs are not selectable players.' } });
         return;
+      }
+    }
+
+    // Any selected player without an active signup gets one created (or a withdrawn
+    // signup re-activated), mirroring the historical-backfill flow — so manually
+    // added players are signed up and counted consistently in stats.
+    if (selectedPlayerIds.length > 0) {
+      const { data: existingSignups } = await supabaseAdmin
+        .from('signups')
+        .select('signup_id, player_id, withdrawn_at')
+        .eq('match_id', matchId)
+        .in('player_id', selectedPlayerIds);
+      const activeSignedUp = new Set((existingSignups ?? []).filter((s: any) => s.withdrawn_at === null).map((s: any) => s.player_id));
+      const withdrawnByPlayer = new Map((existingSignups ?? []).filter((s: any) => s.withdrawn_at !== null).map((s: any) => [s.player_id, s.signup_id]));
+
+      const toInsert: { match_id: string; player_id: string }[] = [];
+      for (const playerId of selectedPlayerIds) {
+        if (activeSignedUp.has(playerId)) continue;
+        const withdrawnId = withdrawnByPlayer.get(playerId);
+        if (withdrawnId) {
+          await supabaseAdmin.from('signups').update({ withdrawn_at: null }).eq('signup_id', withdrawnId);
+        } else {
+          toInsert.push({ match_id: String(matchId), player_id: playerId });
+        }
+      }
+      if (toInsert.length > 0) {
+        const { error: signupErr } = await supabaseAdmin.from('signups').insert(toInsert);
+        if (signupErr) throw signupErr;
       }
     }
 

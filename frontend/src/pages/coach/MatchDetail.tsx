@@ -468,6 +468,18 @@ export default function MatchDetail() {
           </div>
 
           {optimizeError && <p className="text-sm text-red-500">{optimizeError}</p>}
+
+          <div className="border-t border-gray-100 pt-3">
+            <Link
+              to={`/coach/matches/${matchId}/selections`}
+              className="text-sm font-medium text-brand-green hover:text-brand-green-700"
+            >
+              Or pick the squad manually →
+            </Link>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Choose players yourself instead of (or after) running the optimizer.
+            </p>
+          </div>
         </div>
 
         {/* Sign-ups list */}

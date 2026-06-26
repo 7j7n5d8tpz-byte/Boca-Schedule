@@ -47,6 +47,33 @@ export async function sendSelectionNotifications(
   )));
 }
 
+// ─── Removed from squad ───────────────────────────────────────────────────────
+
+// Sent when a coach manually drops a player from an already-published squad.
+export async function sendDeselectionNotifications(
+  players: { name: string; email: string }[],
+  match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
+) {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const timeStr = match.matchTime.slice(0, 5);
+  const opponent = match.opponent ? ` vs ${match.opponent}` : '';
+
+  await Promise.allSettled(players.map(p => send(
+    p.email,
+    `Squad change — ${dateStr}`,
+    `<p>Hi <strong>${p.name}</strong>,</p>
+     <p>The coach has updated the squad and you're no longer selected for this match.</p>
+     <table style="border-collapse:collapse;margin:16px 0">
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+     </table>`,
+    `Hi ${p.name},\n\nThe coach has updated the squad and you're no longer selected for this match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}`,
+  )));
+}
+
 // ─── Match cancellation ───────────────────────────────────────────────────────
 
 export async function sendCancellationNotifications(

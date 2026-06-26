@@ -81,6 +81,38 @@ describe('Selections', () => {
     expect(res.body.data.selectedCount).toBe(0);
   });
 
+  it('PUT selections on a published match keeps it published (manual swap)', async () => {
+    // A second signed-up player to swap in.
+    const player2 = await createTestUser('player', '-sel-swap');
+    await signupPlayer(matchId, player2.userId);
+    try {
+      // Start from a published squad containing player1.
+      await request(app)
+        .put(`/api/matches/${matchId}/selections`)
+        .set('Authorization', `Bearer ${coach.token}`)
+        .send({ selectedPlayerIds: [player.userId] });
+      await supabaseAdmin.from('matches').update({ status: 'published' }).eq('match_id', matchId);
+
+      // Swap player1 out for player2.
+      const res = await request(app)
+        .put(`/api/matches/${matchId}/selections`)
+        .set('Authorization', `Bearer ${coach.token}`)
+        .send({ selectedPlayerIds: [player2.userId] });
+      expect(res.status).toBe(200);
+      expect(res.body.data.status).toBe('published');
+
+      // Match stays published rather than reverting to 'optimized'.
+      const { data: m } = await supabaseAdmin.from('matches').select('status').eq('match_id', matchId).single();
+      expect(m!.status).toBe('published');
+    } finally {
+      // Reset state for later tests and clean up.
+      await supabaseAdmin.from('matches').update({ status: 'signup_open' }).eq('match_id', matchId);
+      await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
+      await supabaseAdmin.from('signups').delete().eq('match_id', matchId).eq('player_id', player2.userId);
+      await deleteTestUser(player2.userId);
+    }
+  });
+
   it('GET selections surfaces the persisted optimizationResult', async () => {
     // No Julia in tests — write the run summary directly, as the optimizer would.
     const optimizationResult = {

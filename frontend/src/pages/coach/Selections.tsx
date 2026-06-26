@@ -199,6 +199,7 @@ export default function Selections() {
   if (!data) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
 
   const { match, players } = data;
+  const isPublished = match.status === 'published';
   const date = new Date(`${match.matchDate}T${match.matchTime}`);
   const ids = selectedIds ?? new Set(players.filter(p => p.isSelected).map(p => p.player.userId));
   const selectedCount = ids.size + guests.length;
@@ -233,21 +234,33 @@ export default function Selections() {
             <div className="flex gap-2">
               {isDirty && (
                 <button onClick={() => { setSaveError(''); saveMutation.mutate([...ids]); }}
-                  disabled={saveMutation.isPending}
-                  className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50">
-                  {saveMutation.isPending ? 'Saving…' : 'Save'}
+                  disabled={saveMutation.isPending || (isPublished && tooFew)}
+                  className={`text-sm font-medium px-3 py-2 rounded-lg transition-colors disabled:opacity-50 ${
+                    isPublished
+                      ? 'bg-brand-green hover:bg-brand-green-700 text-white'
+                      : 'border border-gray-300 bg-white hover:bg-gray-50 text-gray-700'
+                  }`}>
+                  {saveMutation.isPending ? 'Saving…' : isPublished ? 'Save & notify players' : 'Save'}
                 </button>
               )}
-              <button onClick={() => { setPublishError(''); publishMutation.mutate(); }}
-                disabled={publishMutation.isPending || tooFew || isDirty}
-                className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                {publishMutation.isPending ? 'Publishing…' : 'Publish'}
-              </button>
+              {!isPublished && (
+                <button onClick={() => { setPublishError(''); publishMutation.mutate(); }}
+                  disabled={publishMutation.isPending || tooFew || isDirty}
+                  className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                  {publishMutation.isPending ? 'Publishing…' : 'Publish'}
+                </button>
+              )}
             </div>
           </div>
           {saveError && <p className="text-sm text-red-500">{saveError}</p>}
           {publishError && <p className="text-sm text-red-500">{publishError}</p>}
-          {isDirty && <p className="text-xs text-amber-600">Unsaved changes — save before publishing.</p>}
+          {isPublished ? (
+            <p className="text-xs text-gray-500">
+              This match is published. Swapping players will email and notify anyone added or removed.
+            </p>
+          ) : isDirty && (
+            <p className="text-xs text-amber-600">Unsaved changes — save before publishing.</p>
+          )}
         </div>
 
         {/* Spot claimants — players asking to take an open spot */}

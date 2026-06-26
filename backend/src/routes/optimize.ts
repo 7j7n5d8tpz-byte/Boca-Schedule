@@ -3,8 +3,62 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { optimizeMatch } from '../lib/optimizer.js';
+import { sendSelectionNotifications, sendDeselectionNotifications } from '../lib/mailer.js';
+import { createNotifications } from '../lib/notifications.js';
 
 const router = Router({ mergeParams: true });
+
+// Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
+function matchLabel(m: { match_date: string; match_time?: string; opponent?: string | null }): string {
+  const d = new Date(`${m.match_date}T${m.match_time ?? '00:00'}`);
+  const date = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  return m.opponent ? `${date} vs ${m.opponent}` : date;
+}
+
+// Fire-and-forget: notify players added to / removed from an already-published
+// squad after a manual coach swap. Mirrors the publish/cancellation pattern.
+function notifyPublishedSquadChange(
+  match: { match_date: string; match_time: string; location: string; opponent: string | null },
+  addedIds: string[],
+  removedIds: string[],
+  matchId: string,
+) {
+  if (addedIds.length === 0 && removedIds.length === 0) return;
+  const matchInfo = { matchDate: match.match_date, matchTime: match.match_time, location: match.location, opponent: match.opponent ?? null };
+  const label = matchLabel(match);
+
+  supabaseAdmin
+    .from('users')
+    .select('user_id, name, email')
+    .in('user_id', [...addedIds, ...removedIds])
+    .then(({ data: users }) => {
+      const byId = new Map((users ?? []).map((u: any) => [u.user_id, u]));
+
+      if (addedIds.length > 0) {
+        const added = addedIds.map(id => byId.get(id)).filter(Boolean);
+        const withEmail = added.filter((u: any) => u.email);
+        if (withEmail.length > 0) {
+          sendSelectionNotifications(withEmail.map((u: any) => ({ name: u.name, email: u.email })), matchInfo)
+            .catch(err => console.error('Failed to send selection notifications:', err));
+        }
+        createNotifications(added.map((u: any) => u.user_id), {
+          type: 'selected', title: "You're selected", body: label, link: '/dashboard', matchId,
+        });
+      }
+
+      if (removedIds.length > 0) {
+        const removed = removedIds.map(id => byId.get(id)).filter(Boolean);
+        const withEmail = removed.filter((u: any) => u.email);
+        if (withEmail.length > 0) {
+          sendDeselectionNotifications(withEmail.map((u: any) => ({ name: u.name, email: u.email })), matchInfo)
+            .catch(err => console.error('Failed to send deselection notifications:', err));
+        }
+        createNotifications(removed.map((u: any) => u.user_id), {
+          type: 'deselected', title: 'Removed from squad', body: label, link: '/dashboard', matchId,
+        });
+      }
+    });
+}
 
 // GET /api/matches/:matchId/selections
 // Accessible to coach/admin OR players with can_enter_results (for result entry page)
@@ -106,9 +160,8 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
       return;
     }
 
-    await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
-
-    // Validate all supplied IDs are active signups for this match
+    // Validate all supplied IDs are active signups for this match (before we
+    // delete anything, so a bad payload leaves the existing squad untouched).
     if (selectedPlayerIds.length > 0) {
       const { data: validSignups } = await supabaseAdmin
         .from('signups')
@@ -124,6 +177,13 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
       }
     }
 
+    // Capture the prior squad so we can tell who was added/removed when the
+    // match is already published (a manual swap on a live squad).
+    const { data: prior } = await supabaseAdmin.from('selections').select('player_id').eq('match_id', matchId);
+    const priorIds = new Set((prior ?? []).map((s: any) => s.player_id));
+
+    await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
+
     const rows = selectedPlayerIds.map(playerId => ({
       match_id: matchId,
       player_id: playerId,
@@ -137,9 +197,24 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
       if (error) throw error;
     }
 
-    await supabaseAdmin.from('matches').update({ status: 'optimized' }).eq('match_id', matchId);
+    // A live (published) or completed squad keeps its state on a manual edit —
+    // only pre-publish edits land in 'optimized'. Reverting a published squad to
+    // 'optimized' would hide it from players (the squad endpoint requires
+    // published/completed) and silently un-publish the match.
+    const newStatus = match.status === 'published' ? 'published'
+      : match.status === 'completed' ? 'completed'
+      : 'optimized';
+    await supabaseAdmin.from('matches').update({ status: newStatus }).eq('match_id', matchId);
 
-    res.json({ success: true, data: { matchId, selectedCount: selectedPlayerIds.length } });
+    // Swapping players on a published squad → notify the affected players.
+    if (match.status === 'published') {
+      const newIds = new Set(selectedPlayerIds);
+      const addedIds = selectedPlayerIds.filter(id => !priorIds.has(id));
+      const removedIds = [...priorIds].filter(id => !newIds.has(id)) as string[];
+      notifyPublishedSquadChange(match, addedIds, removedIds, String(matchId));
+    }
+
+    res.json({ success: true, data: { matchId, selectedCount: selectedPlayerIds.length, status: newStatus } });
   } catch (err) {
     next(err);
   }

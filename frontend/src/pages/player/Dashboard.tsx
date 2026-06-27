@@ -437,7 +437,7 @@ export default function PlayerDashboard() {
   const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
   const canEnterResults = isCoachOrAdmin || myPermission?.canEnterResults;
 
-  const { data: resultMatches } = useQuery<{ matchId: string; matchDate: string; matchTime: string; location: string; status: string; matchType: string; opponent: string | null }[]>({
+  const { data: resultMatches } = useQuery<{ matchId: string; matchDate: string; matchTime: string; location: string; status: string; matchType: string; opponent: string | null; hasResult: boolean }[]>({
     queryKey: ['result-matches'],
     queryFn: () => api.get('/matches/upcoming?status=published,completed').then(r => r.data.data.matches ?? []),
     enabled: !!canEnterResults,
@@ -584,8 +584,8 @@ export default function PlayerDashboard() {
           </div>
         )}
         {canEnterResults && (() => {
-          const pending  = (resultMatches ?? []).filter(m => m.status === 'published');
-          const recorded = (resultMatches ?? []).filter(m => m.status === 'completed');
+          const pending  = (resultMatches ?? []).filter(m => !m.hasResult);
+          const recorded = (resultMatches ?? []).filter(m =>  m.hasResult);
           if (!resultMatches || (!pending.length && !recorded.length)) return null;
           return (
             <ResultMatchesList pending={pending} recorded={recorded} />

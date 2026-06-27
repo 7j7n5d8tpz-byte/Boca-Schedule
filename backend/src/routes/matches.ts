@@ -71,7 +71,7 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     // Fetch matches (left join signups so matches with 0 sign-ups still appear)
     let matchQuery = supabaseAdmin
       .from('matches')
-      .select('*, signups(signup_id, player_id, is_active), selections(player_id)', { count: 'exact' })
+      .select('*, signups(signup_id, player_id, is_active), selections(player_id), match_results(result_id)', { count: 'exact' })
       .order('match_date', { ascending: true })
       .range(offset, offset + limit - 1);
 
@@ -134,6 +134,7 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
         signupDeadlinePassed: new Date(m.signup_close_date) < new Date(),
         isSelected,
         openSpot,
+        hasResult: (m.match_results ?? []).length > 0,
         myClaim: myClaim ? { claimId: myClaim.claim_id, status: myClaim.status } : null,
       };
     });

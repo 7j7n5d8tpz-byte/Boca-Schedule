@@ -87,7 +87,17 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     } else if (!statusParam || statusParam === 'all') {
       matchQuery = matchQuery.neq('status', 'completed').neq('status', 'cancelled');
     } else if (statusParam.includes(',')) {
-      matchQuery = matchQuery.in('status', statusParam.split(','));
+      const statuses = statusParam.split(',');
+      matchQuery = matchQuery.in('status', statuses);
+      // The result-recording view (status=published,completed) only cares about
+      // recent matches — bound completed matches to the last 60 days so the list
+      // doesn't fill with old, long-since-recorded history.
+      if (statuses.includes('completed')) {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 60);
+        const cutoffStr = cutoff.toISOString().slice(0, 10);
+        matchQuery = matchQuery.or(`status.neq.completed,and(status.eq.completed,match_date.gte.${cutoffStr})`);
+      }
     } else {
       matchQuery = matchQuery.eq('status', statusParam);
     }
@@ -134,7 +144,9 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
         signupDeadlinePassed: new Date(m.signup_close_date) < new Date(),
         isSelected,
         openSpot,
-        hasResult: (m.match_results ?? []).length > 0,
+        // match_results.match_id is UNIQUE, so PostgREST embeds it as a to-one
+        // object (or null), not an array.
+        hasResult: Array.isArray(m.match_results) ? m.match_results.length > 0 : !!m.match_results,
         myClaim: myClaim ? { claimId: myClaim.claim_id, status: myClaim.status } : null,
       };
     });

@@ -71,11 +71,13 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
   const showBottomSection = hasGoalDetails || hasCleanSheets || hasCards;
 
   return (
-    <div ref={cardRef} style={{ fontFamily: 'Archivo, system-ui, sans-serif', background: '#0f1f0f', width: 480, padding: 32, borderRadius: 16 }}>
-      {/* Kit stripe — green/crimson/green, full-bleed top accent */}
+    <div ref={cardRef} style={{ fontFamily: 'Archivo, system-ui, sans-serif', background: '#0f1f0f', width: 480, padding: 32, borderRadius: 16, position: 'relative', overflow: 'hidden' }}>
+      {/* Kit stripe — green/crimson/green, full-bleed top accent. Positioned
+          absolutely against the card's rounded box (which clips via overflow:hidden)
+          so it lines up with the top edge identically across browsers — a negative
+          top margin landed a hair too high in Safari's export. */}
       <div style={{
-        height: 6, marginLeft: -32, marginRight: -32, marginTop: -32, marginBottom: 26,
-        borderTopLeftRadius: 16, borderTopRightRadius: 16,
+        position: 'absolute', top: 0, left: 0, right: 0, height: 6,
         background: 'linear-gradient(to right, #205B3B 0 38%, #c41230 38% 62%, #205B3B 62% 100%)',
       }} />
       {/* Header */}

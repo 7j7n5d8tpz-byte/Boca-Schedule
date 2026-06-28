@@ -424,10 +424,25 @@ export default function MatchResults() {
     if (!cardRef.current) return;
     setDownloading(true);
     try {
-      // Render at 2× via the browser's own layout engine (SVG foreignObject) so the
-      // PNG matches the on-screen preview exactly — html2canvas mis-positioned the
-      // flexbox score digits.
-      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true });
+      // Make sure the Archivo weights the card uses are loaded before capturing —
+      // otherwise the big score digits rasterize in a fallback font with
+      // mismatched metrics.
+      if (document.fonts) {
+        await Promise.all(
+          ['600 16px Archivo', '700 16px Archivo', '800 16px Archivo', '900 66px Archivo']
+            .map(f => document.fonts.load(f)),
+        ).catch(() => {});
+        await document.fonts.ready;
+      }
+      // Render at 2× via the browser's own layout engine (SVG foreignObject).
+      // Safari/WebKit captures the first pass before embedded resources (the crest
+      // <img>, fonts) finish loading into the cloned SVG, producing a broken card
+      // with a missing logo and shifted header. Rendering a few passes lets those
+      // resources settle so the final capture is complete. See html-to-image #361.
+      let dataUrl = '';
+      for (let i = 0; i < 3; i++) {
+        dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true });
+      }
       const link = document.createElement('a');
       const dateLabel = match
         ? new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).replace(' ', '-')

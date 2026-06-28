@@ -2,7 +2,7 @@ import AppNav from './../components/AppNav';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { api } from '../api/client';
 import StatIcon, { CardChip } from '../components/StatIcon';
 
@@ -424,13 +424,16 @@ export default function MatchResults() {
     if (!cardRef.current) return;
     setDownloading(true);
     try {
-      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true, backgroundColor: null });
+      // Render at 2× via the browser's own layout engine (SVG foreignObject) so the
+      // PNG matches the on-screen preview exactly — html2canvas mis-positioned the
+      // flexbox score digits.
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true });
       const link = document.createElement('a');
       const dateLabel = match
         ? new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).replace(' ', '-')
         : 'match';
       link.download = `boca-${dateLabel}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = dataUrl;
       link.click();
     } finally {
       setDownloading(false);

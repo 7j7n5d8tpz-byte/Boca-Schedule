@@ -35,12 +35,18 @@ const BASE = 6.0;
 const MIN = 1.0;
 const MAX = 10.0;
 
-// Per-goal / per-assist value by position group: rarer for a role ⇒ worth more,
-// so a defender's goal counts for more than a striker's expected one.
-const GOAL_WEIGHT:   Record<PositionGroup, number> = { GK: 2.0, DEF: 1.6, MID: 1.1, FWD: 0.8 };
-const ASSIST_WEIGHT: Record<PositionGroup, number> = { GK: 1.6, DEF: 1.3, MID: 0.9, FWD: 0.8 };
-// Clean sheet is the core reward for defensive roles, a minor bonus for the rest.
-const CLEAN_SHEET_BONUS: Record<PositionGroup, number> = { GK: 1.5, DEF: 1.2, MID: 0.4, FWD: 0.2 };
+interface GroupWeights { goal: number; assist: number; cleanSheet: number; }
+
+// Value of a goal / assist / clean sheet by position group. Rarer for a role ⇒
+// worth more, so a defender's goal counts for more than a striker's expected one,
+// and a clean sheet is the core reward for defensive roles, a minor bonus for the
+// rest.
+const WEIGHTS: Record<PositionGroup, GroupWeights> = {
+  GK:  { goal: 2.0, assist: 1.6, cleanSheet: 1.5 },
+  DEF: { goal: 1.6, assist: 1.3, cleanSheet: 1.2 },
+  MID: { goal: 1.1, assist: 0.9, cleanSheet: 0.4 },
+  FWD: { goal: 0.8, assist: 0.8, cleanSheet: 0.2 },
+};
 
 const GK_HALF_BONUS = 0.25; // baseline credit for the thankless job of keeping goal
 const MOTM_BONUS    = 1.0;  // the one position-neutral human judgement we capture
@@ -61,22 +67,41 @@ export function positionGroup(position: string | null | undefined): PositionGrou
   }
 }
 
-/** A player's primary position is the first of their preferred positions. */
-export function primaryPosition(preferredPositions: string[] | null | undefined): string | null {
-  return preferredPositions && preferredPositions.length > 0 ? preferredPositions[0] : null;
+const avg = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+
+// Decide how to weight a match. Preferred positions are an unordered *set* (the
+// order players tick them in carries no meaning, and the rest of the app treats
+// them as a set), so we never single one out. Goalkeeping is the one role we can
+// observe per match: if the player actually kept goal, weight the whole match as a
+// keeper. Otherwise blend their preferred outfield roles by averaging the weights
+// — a DEF/STR player sits halfway between the two — and ignore a GK preference for
+// matches they didn't keep goal in.
+function effectiveWeights(positions: string[] | null | undefined, keptGoal: boolean): GroupWeights {
+  if (keptGoal) return WEIGHTS.GK;
+  const groups = [...new Set((positions ?? []).map(positionGroup).filter((g) => g !== 'GK'))];
+  const outfield: PositionGroup[] = groups.length > 0 ? groups : ['MID'];
+  return {
+    goal:       avg(outfield.map((g) => WEIGHTS[g].goal)),
+    assist:     avg(outfield.map((g) => WEIGHTS[g].assist)),
+    cleanSheet: avg(outfield.map((g) => WEIGHTS[g].cleanSheet)),
+  };
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
-/** Score a single match performance on a 1–10 scale. */
-export function computeMatchRating(perf: MatchPerformance, position: string | null | undefined): number {
-  const group = positionGroup(position);
+/**
+ * Score a single match performance on a 1–10 scale.
+ * `positions` is the player's full set of preferred positions (order-insensitive).
+ */
+export function computeMatchRating(perf: MatchPerformance, positions: string[] | null | undefined): number {
+  const halves = perf.gkHalves ?? 0;
+  const w = effectiveWeights(positions, halves > 0);
   let r = BASE;
 
-  r += (perf.goals   ?? 0) * GOAL_WEIGHT[group];
-  r += (perf.assists ?? 0) * ASSIST_WEIGHT[group];
-  if (perf.cleanSheet) r += CLEAN_SHEET_BONUS[group];
-  r += (perf.gkHalves ?? 0) * GK_HALF_BONUS;
+  r += (perf.goals   ?? 0) * w.goal;
+  r += (perf.assists ?? 0) * w.assist;
+  if (perf.cleanSheet) r += w.cleanSheet;
+  r += halves * GK_HALF_BONUS;
   if (perf.manOfMatch) r += MOTM_BONUS;
   if (perf.result) r += RESULT_BONUS[perf.result];
   r -= (perf.yellowCards ?? 0) * YELLOW_PENALTY;

@@ -4,7 +4,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { storeAvatar, AvatarTooLargeError, AVATAR_DATA_URL_RE } from '../lib/avatar.js';
 import { seasonStartYear, seasonRange, seasonLabel } from '../lib/season.js';
-import { computeMatchRating, averageRating, primaryPosition, matchResult, type MatchResult } from '../lib/rating.js';
+import { computeMatchRating, averageRating, matchResult, type MatchResult } from '../lib/rating.js';
 
 const router = Router();
 
@@ -147,7 +147,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
           gkHalves: gkHalvesMap.get(`${p.match_id}:${p.player_id}`) ?? 0,
           manOfMatch: p.man_of_match, yellowCards: p.yellow_cards, redCards: p.red_cards,
           result: resultMap.get(p.match_id) ?? null,
-        }, primaryPosition(positionMap.get(p.player_id)));
+        }, positionMap.get(p.player_id));
         perfMap.set(p.player_id, {
           goals: c.goals + (p.goals ?? 0),
           assists: c.assists + (p.assists ?? 0),
@@ -427,7 +427,7 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
 
     // Computed performance rating: score each match the player featured in from the
     // recorded events (position-aware) and average across the season.
-    const position = primaryPosition(profile.preferred_positions);
+    const positions = profile.preferred_positions ?? [];
     const resultMap = new Map<string, MatchResult>();
     const gkHalvesMap = new Map<string, number>();
     (resultRows ?? []).forEach((r: any) => {
@@ -441,7 +441,7 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
       gkHalves: gkHalvesMap.get(r.match_id) ?? 0,
       manOfMatch: r.man_of_match, yellowCards: r.yellow_cards, redCards: r.red_cards,
       result: resultMap.get(r.match_id) ?? null,
-    }, position)));
+    }, positions)));
 
     const stats = {
       season_year: season,

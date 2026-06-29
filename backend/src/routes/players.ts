@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { storeAvatar, AvatarTooLargeError, AVATAR_DATA_URL_RE } from '../lib/avatar.js';
 import { seasonStartYear, seasonRange, seasonLabel } from '../lib/season.js';
+import { computeMatchRating, averageRating, primaryPosition, matchResult, type MatchResult } from '../lib/rating.js';
 
 const router = Router();
 
@@ -95,22 +96,35 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       }
 
       const [{ data: perfData }, { data: signupData }, { data: selectionData }, { data: historyData }, { data: completedMatchData }, { data: gkData }] = await Promise.all([
-        supabaseAdmin.from('match_performance').select('player_id, goals, assists, clean_sheet, self_rating, yellow_cards, red_cards, man_of_match').in('match_id', matchIds),
+        supabaseAdmin.from('match_performance').select('match_id, player_id, goals, assists, clean_sheet, yellow_cards, red_cards, man_of_match').in('match_id', matchIds),
         supabaseAdmin.from('signups').select('player_id').eq('is_active', true).in('match_id', matchIds),
         supabaseAdmin.from('selections').select('player_id, match_id').in('match_id', matchIds),
         supabaseAdmin.from('match_results')
           .select('match_id, goals_for, goals_against, matches(match_date, location, opponent)')
           .in('match_id', matchIds).order('recorded_at', { ascending: true }),
         supabaseAdmin.from('matches').select('match_id').eq('status', 'completed').in('match_id', matchIds),
-        supabaseAdmin.from('match_results').select('gk_first_half, gk_second_half').in('match_id', matchIds),
+        supabaseAdmin.from('match_results').select('match_id, gk_first_half, gk_second_half').in('match_id', matchIds),
       ]);
 
       const completedIds = new Set((completedMatchData ?? []).map((m: any) => m.match_id));
 
+      // Position lookup (for position-aware ratings) and team result per match.
+      const positionMap = new Map<string, string[]>();
+      (allUsers ?? []).forEach((u: any) => positionMap.set(u.user_id, u.preferred_positions ?? []));
+      const resultMap = new Map<string, MatchResult>();
+      (historyData ?? []).forEach((r: any) => resultMap.set(r.match_id, matchResult(Number(r.goals_for), Number(r.goals_against))));
+
+      // Halves in goal, both as a season total (gkAppearanceMap) and per match+player
+      // (gkHalvesMap, used to credit goalkeeping in the per-match rating).
       const gkAppearanceMap = new Map<string, number>();
+      const gkHalvesMap = new Map<string, number>();
       for (const r of (gkData ?? [])) {
-        if (r.gk_first_half)  gkAppearanceMap.set(r.gk_first_half,  (gkAppearanceMap.get(r.gk_first_half)  ?? 0) + 1);
-        if (r.gk_second_half) gkAppearanceMap.set(r.gk_second_half, (gkAppearanceMap.get(r.gk_second_half) ?? 0) + 1);
+        for (const id of [r.gk_first_half, r.gk_second_half]) {
+          if (!id) continue;
+          gkAppearanceMap.set(id, (gkAppearanceMap.get(id) ?? 0) + 1);
+          const key = `${r.match_id}:${id}`;
+          gkHalvesMap.set(key, (gkHalvesMap.get(key) ?? 0) + 1);
+        }
       }
 
       const signupMap = new Map<string, number>();
@@ -125,9 +139,15 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
         }
       });
 
-      const perfMap = new Map<string, { goals: number; assists: number; cleanSheets: number; yellowCards: number; redCards: number; motmCount: number; ratingSum: number; ratingCount: number }>();
+      const perfMap = new Map<string, { goals: number; assists: number; cleanSheets: number; yellowCards: number; redCards: number; motmCount: number; ratings: number[] }>();
       (perfData ?? []).forEach((p: any) => {
-        const c = perfMap.get(p.player_id) ?? { goals: 0, assists: 0, cleanSheets: 0, yellowCards: 0, redCards: 0, motmCount: 0, ratingSum: 0, ratingCount: 0 };
+        const c = perfMap.get(p.player_id) ?? { goals: 0, assists: 0, cleanSheets: 0, yellowCards: 0, redCards: 0, motmCount: 0, ratings: [] };
+        const rating = computeMatchRating({
+          goals: p.goals, assists: p.assists, cleanSheet: p.clean_sheet,
+          gkHalves: gkHalvesMap.get(`${p.match_id}:${p.player_id}`) ?? 0,
+          manOfMatch: p.man_of_match, yellowCards: p.yellow_cards, redCards: p.red_cards,
+          result: resultMap.get(p.match_id) ?? null,
+        }, primaryPosition(positionMap.get(p.player_id)));
         perfMap.set(p.player_id, {
           goals: c.goals + (p.goals ?? 0),
           assists: c.assists + (p.assists ?? 0),
@@ -135,13 +155,12 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
           yellowCards: c.yellowCards + (p.yellow_cards ?? 0),
           redCards: c.redCards + (p.red_cards ?? 0),
           motmCount: c.motmCount + (p.man_of_match ? 1 : 0),
-          ratingSum: c.ratingSum + (p.self_rating ?? 0),
-          ratingCount: c.ratingCount + (p.self_rating != null ? 1 : 0),
+          ratings: [...c.ratings, rating],
         });
       });
 
       const players: PlayerRow[] = (allUsers ?? []).map((u: any) => {
-        const perf = perfMap.get(u.user_id) ?? { goals: 0, assists: 0, cleanSheets: 0, yellowCards: 0, redCards: 0, motmCount: 0, ratingSum: 0, ratingCount: 0 };
+        const perf = perfMap.get(u.user_id) ?? { goals: 0, assists: 0, cleanSheets: 0, yellowCards: 0, redCards: 0, motmCount: 0, ratings: [] };
         const signups = signupMap.get(u.user_id) ?? 0;
         const selected = selectedMap.get(u.user_id) ?? 0;
         const played = playedMap.get(u.user_id) ?? 0;
@@ -150,7 +169,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
           totalSignups: signups, totalSelected: selected, totalPlayed: played,
           totalGoals: perf.goals, totalAssists: perf.assists, totalCleanSheets: perf.cleanSheets,
           totalYellowCards: perf.yellowCards, totalRedCards: perf.redCards, totalManOfMatch: perf.motmCount,
-          avgRating: perf.ratingCount > 0 ? +(perf.ratingSum / perf.ratingCount).toFixed(2) : 0,
+          avgRating: averageRating(perf.ratings) ?? 0,
           // Attendance = share of the team's completed matches this player featured
           // in (played / total team games), so it reads "X of N games".
           attendanceRate: completedIds.size > 0 ? +((played / completedIds.size) * 100).toFixed(2) : 0,
@@ -370,13 +389,14 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
 
     const yearParam = req.query.year ? parseInt(req.query.year as string) : undefined;
 
-    const [{ data: profile }, { data: recent }, { data: perfRows }, { data: signupRows }, { data: selectionMatchRows }, { data: completedMatches }] = await Promise.all([
+    const [{ data: profile }, { data: recent }, { data: perfRows }, { data: signupRows }, { data: selectionMatchRows }, { data: completedMatches }, { data: resultRows }] = await Promise.all([
       supabaseAdmin.from('users').select('user_id, name, preferred_positions').eq('user_id', playerId).single(),
       supabaseAdmin.from('match_performance').select('*, matches(match_date)').eq('player_id', playerId).order('submitted_at', { ascending: false }).limit(10),
-      supabaseAdmin.from('match_performance').select('match_id, goals, assists, saves, clean_sheet, self_rating, man_of_match').eq('player_id', playerId),
+      supabaseAdmin.from('match_performance').select('match_id, goals, assists, saves, clean_sheet, yellow_cards, red_cards, man_of_match').eq('player_id', playerId),
       supabaseAdmin.from('signups').select('match_id').eq('player_id', playerId).eq('is_active', true),
       supabaseAdmin.from('selections').select('match_id').eq('player_id', playerId),
       supabaseAdmin.from('matches').select('match_id, match_date').eq('status', 'completed'),
+      supabaseAdmin.from('match_results').select('match_id, goals_for, goals_against, gk_first_half, gk_second_half'),
     ]);
 
     if (!profile) {
@@ -404,8 +424,24 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
     const cleanSheets = rows.filter((r: any) => r.clean_sheet).length;
     const manOfMatch  = rows.filter((r: any) => r.man_of_match).length;
     const totalSignups = (signupRows ?? []).filter((s: any) => seasonMatchIds.has(s.match_id)).length;
-    const ratedRows   = rows.filter((r: any) => r.self_rating != null);
-    const avgRating   = ratedRows.length > 0 ? +(ratedRows.reduce((s: number, r: any) => s + r.self_rating, 0) / ratedRows.length).toFixed(2) : null;
+
+    // Computed performance rating: score each match the player featured in from the
+    // recorded events (position-aware) and average across the season.
+    const position = primaryPosition(profile.preferred_positions);
+    const resultMap = new Map<string, MatchResult>();
+    const gkHalvesMap = new Map<string, number>();
+    (resultRows ?? []).forEach((r: any) => {
+      resultMap.set(r.match_id, matchResult(Number(r.goals_for), Number(r.goals_against)));
+      for (const id of [r.gk_first_half, r.gk_second_half]) {
+        if (id === playerId) gkHalvesMap.set(r.match_id, (gkHalvesMap.get(r.match_id) ?? 0) + 1);
+      }
+    });
+    const avgRating = averageRating(rows.map((r: any) => computeMatchRating({
+      goals: r.goals, assists: r.assists, cleanSheet: r.clean_sheet,
+      gkHalves: gkHalvesMap.get(r.match_id) ?? 0,
+      manOfMatch: r.man_of_match, yellowCards: r.yellow_cards, redCards: r.red_cards,
+      result: resultMap.get(r.match_id) ?? null,
+    }, position)));
 
     const stats = {
       season_year: season,
@@ -415,7 +451,7 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
       total_saves: saves, total_clean_sheets: cleanSheets,
       total_man_of_match: manOfMatch,
       total_signups: totalSignups,
-      avg_self_rating: avgRating,
+      avg_rating: avgRating,
       // Attendance = share of the team's games this season the player featured in.
       attendance_rate: teamGames > 0 ? +((playedCount / teamGames) * 100).toFixed(2) : 0,
     };

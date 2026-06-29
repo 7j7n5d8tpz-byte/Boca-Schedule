@@ -118,13 +118,23 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
 
     // Upsert individual performances
     if (Array.isArray(players) && players.length > 0) {
+      // A shutout is a defensive achievement for the whole back line, not just the
+      // keeper: when the team conceded nothing, credit a clean sheet to every
+      // attended defensive player (GK/DEF), so defenders get a real positive
+      // signal in their stats and performance rating — not only goalscorers.
+      const teamCleanSheet = goalsAgainst === 0;
+      const { data: posRows } = await supabaseAdmin
+        .from('users').select('user_id, preferred_positions').in('user_id', players.map(p => p.playerId));
+      const isDefensive = new Map<string, boolean>(
+        (posRows ?? []).map((u: any) => [u.user_id, (u.preferred_positions ?? []).some((pos: string) => pos === 'GK' || pos === 'DEF')]),
+      );
       const rows = players.map(p => ({
         match_id: matchId,
         player_id: p.playerId,
         attended: p.attended ?? false,
         goals: p.goals ?? 0,
         assists: p.assists ?? 0,
-        clean_sheet: p.cleanSheet ?? false,
+        clean_sheet: (p.cleanSheet ?? false) || (teamCleanSheet && (p.attended ?? false) && (isDefensive.get(p.playerId) ?? false)),
         yellow_cards: p.yellowCards ?? 0,
         red_cards: p.redCards ?? 0,
         minutes_played: p.minutesPlayed ?? null,

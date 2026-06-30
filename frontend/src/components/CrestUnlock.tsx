@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Crest, { TIER_META } from './Crest';
 import { useCatalog, type EarnedCrest } from '../api/achievements';
 
@@ -34,7 +35,7 @@ export default function CrestUnlock({ userId, earned }: { userId: string; earned
 
   const lookup = (code: string) => [...catalog.individual, ...catalog.team].find(c => c.code === code);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setFresh([])}>
       <div className="boca-pop bg-white rounded-2xl border border-gray-200 max-w-sm w-full p-6 text-center" onClick={e => e.stopPropagation()}>
         <p className="text-xs font-semibold uppercase tracking-wider text-brand-green">
@@ -59,6 +60,7 @@ export default function CrestUnlock({ userId, earned }: { userId: string; earned
           Nice!
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

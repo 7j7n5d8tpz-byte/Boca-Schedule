@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import Crest, { TIER_META, tierRank } from './Crest';
 import Avatar from './Avatar';
 import RankBar from './RankBar';
@@ -19,7 +20,7 @@ export default function PlayerCrestsModal({ player, onClose }: { player: WallPla
   const { tier } = overallRank(points);
   const crests = [...player.crests].sort((a, b) => tierRank(b.tier) - tierRank(a.tier));
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div className="boca-pop bg-white rounded-2xl border border-gray-200 max-w-sm w-full max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-gray-100">
@@ -58,6 +59,7 @@ export default function PlayerCrestsModal({ player, onClose }: { player: WallPla
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

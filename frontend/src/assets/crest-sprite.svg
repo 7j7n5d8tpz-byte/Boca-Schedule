@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="emblem-football" viewBox="0 0 24 24">
+    <g fill="none" stroke="#ffffff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8.6"/>
+      <path d="M12 7.3l4 2.9-1.5 4.6h-5l-1.5-4.6z"/>
+      <path d="M12 7.3V3.7M16 10.2l3.4-1.2M14.5 14.8l2.1 3.1M9.5 14.8l-2.1 3.1M8 10.2L4.6 9"/>
+    </g>
+  </symbol>
+  <symbol id="emblem-boot" viewBox="0 0 24 24">
+    <path fill="#ffffff" d="M3.2 14.8c2.1.8 3.9 1.1 5.7 1.1h4.6c1 0 1.7-.4 2.3-1.1l1.6-2.1c.4-.5.9-.6 1.5-.3l1.6.8c.6.3.9.9.8 1.6l-.5 2.4c-.2.8-.8 1.3-1.6 1.3H6.8c-2 0-3.6-.7-4.6-1.9-.4-.5-.3-1.4.2-1.7.2-.2.5-.2.8-.1zM6.1 7.3h5.3c1 0 1.8.5 2.3 1.3l1 1.9-1.3 1.8c-.3.4-.8.7-1.4.7H8.6c-1.4 0-2.9-.3-4.4-.9l.5-3.3c.1-.9.6-1.5 1.4-1.5zm1.7 2.1-.3 1.5h2.2l.3-1.5H7.8zm4 0-.4 1.5h2l-.7-1.5h-.9zm-5.7 10h2.1l.9 1.7H6.8l-.7-1.7zm4.8 0H13l.8 1.7h-2.2l-.7-1.7zm4.7 0h2.1l.5 1.7H16l-.4-1.7z"/>
+  </symbol>
+  <symbol id="emblem-glove" viewBox="0 0 24 24">
+    <path fill="#ffffff" d="M6.2 3.4c.8 0 1.4.6 1.4 1.4v6.4h.8V3.8c0-.8.6-1.4 1.4-1.4s1.4.6 1.4 1.4v7.4h.8V4c0-.8.6-1.4 1.4-1.4s1.4.6 1.4 1.4v7.2h.8V5.6c0-.8.6-1.4 1.4-1.4s1.4.6 1.4 1.4v8.6c0 4.1-2.5 6.6-6.5 6.6h-1.2c-3.7 0-6.4-2.2-7.5-5.9l-.9-3.1c-.2-.8.2-1.6 1-1.8.8-.2 1.5.2 1.8 1l.8 2.2h.7V4.8c0-.8.6-1.4 1.4-1.4zm-.3 12.2c.8 1.7 2.3 2.6 4.3 2.6h2.5c1.7 0 3-.8 3.5-2.1H9.5c-1.3 0-2.4-.2-3.6-.5z"/>
+  </symbol>
+  <symbol id="emblem-medal" viewBox="0 0 24 24">
+    <g fill="#ffffff">
+      <path d="M7 2.8h4.2l1.5 5.1c-1.7.1-3.2.7-4.4 1.7L7 2.8zm5.8 0H17l-1.3 6.8c-1.2-1-2.7-1.6-4.4-1.7l1.5-5.1z"/>
+      <path d="M12 9.3a5.9 5.9 0 1 0 0 11.8 5.9 5.9 0 0 0 0-11.8zm0 2.6 1 2 2.2.3-1.6 1.5.4 2.2-2-1.1-2 1.1.4-2.2-1.6-1.5 2.2-.3 1-2z"/>
+    </g>
+  </symbol>
+  <symbol id="emblem-calendar" viewBox="0 0 24 24">
+    <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="5.2" width="16" height="15" rx="2.1"/>
+      <path d="M8 3.3v4M16 3.3v4M4 9.4h16M8.1 15l2.4 2.4 5.3-5.4"/>
+    </g>
+  </symbol>
+  <symbol id="emblem-clipboard" viewBox="0 0 24 24">
+    <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8.4 4.4H6.8c-1 0-1.8.8-1.8 1.8v13c0 1 .8 1.8 1.8 1.8h10.4c1 0 1.8-.8 1.8-1.8v-13c0-1-.8-1.8-1.8-1.8h-1.6"/>
+      <path d="M8.5 5.6c0-1 .8-1.8 1.8-1.8h3.4c1 0 1.8.8 1.8 1.8v1.1h-7z"/>
+      <path d="M8.1 14.7l2.4 2.4 5.4-5.6"/>
+    </g>
+  </symbol>
+  <symbol id="emblem-chain" viewBox="0 0 24 24">
+    <g fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9.9 7.8 8.2 6.1a3.9 3.9 0 0 0-5.5 5.5l2.7 2.7a3.9 3.9 0 0 0 5.5 0l1.1-1.1"/>
+      <path d="m14.1 16.2 1.7 1.7a3.9 3.9 0 0 0 5.5-5.5l-2.7-2.7a3.9 3.9 0 0 0-5.5 0L12 10.8"/>
+      <path d="m8.8 15.2 6.4-6.4"/>
+    </g>
+  </symbol>
+  <symbol id="emblem-flame" viewBox="0 0 24 24">
+    <path fill="#ffffff" d="M12.4 2.4c2.7 3 2.7 5.4 1.2 7.7 1.6-.5 2.8-1.8 3.3-3.5 2.1 2 3.3 4.5 3.3 7.2 0 4.5-3.3 7.8-8.2 7.8-4.7 0-8.2-3.1-8.2-7.5 0-3.1 1.7-5.4 4-7.6.5 2 1.2 3.4 2.3 4.2.9-2.2.9-4.8 2.3-8.3zm-.5 10.2c-.6 1.6-2.4 2.8-2.4 5 0 1.6 1.1 2.8 2.6 2.8 1.7 0 2.8-1.2 2.8-2.9 0-1.8-1.3-3.2-3-4.9z"/>
+  </symbol>
+  <symbol id="emblem-bolt" viewBox="0 0 24 24">
+    <path fill="#ffffff" d="M13.8 2.4 4.7 13.5h6l-1.5 8.1 10.1-12.5h-6.2z"/>
+  </symbol>
+  <symbol id="emblem-trophy" viewBox="0 0 24 24">
+    <path fill="#ffffff" d="M7.1 3.3h9.8v2h3.4c.7 0 1.2.5 1.2 1.2v1.6c0 3.2-1.9 5.4-5 5.9-.7 1.5-1.9 2.5-3.4 2.8v2h3.4c.6 0 1.1.5 1.1 1.1v1H6.4v-1c0-.6.5-1.1 1.1-1.1h3.4v-2c-1.5-.3-2.7-1.3-3.4-2.8-3.1-.5-5-2.7-5-5.9V6.5c0-.7.5-1.2 1.2-1.2h3.4v-2zm0 4.1H4.6v.9c0 1.7.8 2.9 2.5 3.5V7.4zm12.3 0h-2.5v4.4c1.7-.6 2.5-1.8 2.5-3.5v-.9z"/>
+  </symbol>
+  <symbol id="emblem-fortress" viewBox="0 0 24 24">
+    <path fill="#ffffff" d="M4 4h3v3h2.5V4h5v3H17V4h3v7.2l-1.6 1.2V21H5.6v-8.6L4 11.2V4zm4 9.6V19h2.7v-5.4H8zm5.3 0V19H16v-5.4h-2.7zM6.4 9.1v1.1l1.1.8h9l1.1-.8V9.1H6.4z"/>
+  </symbol>
+  <symbol id="emblem-swords" viewBox="0 0 24 24">
+    <g fill="#ffffff">
+      <path d="m4.2 2.9 7.2 6.4-2 2.1-6.5-7.1c-.6-.7.6-2 1.3-1.4zm10.4 9.7 6.3 6.3c.5.5.5 1.2 0 1.7l-.4.4c-.5.5-1.2.5-1.7 0l-6.3-6.3 2.1-2.1z"/>
+      <path d="m19.8 2.9-7.2 6.4 2 2.1 6.5-7.1c.6-.7-.6-2-1.3-1.4zM9.4 12.6l-6.3 6.3c-.5.5-.5 1.2 0 1.7l.4.4c.5.5 1.2.5 1.7 0l6.3-6.3-2.1-2.1z"/>
+      <path d="M8 10.4 6.2 12.2l5.6 5.6 1.8-1.8L8 10.4zm8 0-5.6 5.6 1.8 1.8 5.6-5.6-1.8-1.8z"/>
+    </g>
+  </symbol>
+
+  <defs>
+    <path id="boca-path-shield" d="M14 8h72v21c0 34-13.8 58.3-36 77C27.8 87.3 14 63 14 29V8z"/>
+    <path id="boca-path-gold" d="M 50 106 C 27.8 87.3 14 63 14 29 V 18 L 6 10 L 18 13 L 26 6 L 50 13 L 74 6 L 82 13 L 94 10 L 86 18 V 29 C 86 63 72.2 87.3 50 106 Z"/>
+    <path id="boca-path-plat" d="M 50 106 C 27.8 87.3 14 63 14 29 V 22 L 6 12 L 14 15 L 14 7 L 28 11 L 34 7 L 50 14 L 66 7 L 72 11 L 86 7 L 86 15 L 94 12 L 86 22 V 29 C 86 63 72.2 87.3 50 106 Z"/>
+    <path id="boca-path-dia" d="M 50 106 C 27.8 87.3 14 63 14 29 V 22 L 6 12 L 12 16 L 9 8 L 22 12 L 30 6 L 38 10 L 50 16 L 62 10 L 70 6 L 78 12 L 91 8 L 88 16 L 94 12 L 86 22 V 29 C 86 63 72.2 87.3 50 106 Z"/>
+    <path id="boca-path-champ" d="M 50 106 C 27.8 87.3 14 63 14 30 L 6 18 L 12 21 L 9 8 L 20 12 L 28 6 L 38 12 L 50 20 L 62 12 L 72 6 L 80 12 L 91 8 L 88 21 L 94 18 L 86 30 C 86 63 72.2 87.3 50 106 Z"/>
+    <path id="boca-path-leg" d="M 50 106 C 27.8 87.3 14 63 14 34 L 6 22 L 10 24 L 7 9 L 16 14 L 20 6 L 30 10 L 40 6 L 50 16 L 60 6 L 70 10 L 80 6 L 84 14 L 93 9 L 90 24 L 94 22 L 86 34 C 86 63 72.2 87.3 50 106 Z"/>
+    <path id="boca-path-inner-shield" d="M22 17h56v14c0 27.5-10.4 47.9-28 64-17.6-16.1-28-36.5-28-64V17z"/>
+    <path id="boca-path-top-shine" d="M26 22h48v12c0 10-1.7 19.3-5.1 28H31.1C27.7 53.3 26 44 26 34V22z"/>
+
+    <linearGradient id="boca-grad-bronze-fill" x1="22" y1="17" x2="78" y2="96" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#c98950"/><stop offset=".55" stop-color="#8b4d2e"/><stop offset="1" stop-color="#3b2218"/></linearGradient>
+    <linearGradient id="boca-grad-bronze-rim" x1="10" y1="6" x2="90" y2="108" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#f0a463"/><stop offset=".28" stop-color="#6b351f"/><stop offset=".55" stop-color="#cc7640"/><stop offset="1" stop-color="#2d1710"/></linearGradient>
+    <linearGradient id="boca-grad-silver-fill" x1="22" y1="16" x2="78" y2="98" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#f3f7f9"/><stop offset=".48" stop-color="#9ca8b2"/><stop offset="1" stop-color="#3d4852"/></linearGradient>
+    <linearGradient id="boca-grad-silver-rim" x1="8" y1="4" x2="92" y2="110" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffffff"/><stop offset=".26" stop-color="#7e8a95"/><stop offset=".55" stop-color="#e8eef2"/><stop offset="1" stop-color="#53606b"/></linearGradient>
+    <linearGradient id="boca-grad-gold-fill" x1="20" y1="14" x2="80" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff0a3"/><stop offset=".42" stop-color="#d69b1e"/><stop offset="1" stop-color="#6c4007"/></linearGradient>
+    <linearGradient id="boca-grad-gold-rim" x1="6" y1="2" x2="94" y2="112" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff6b8"/><stop offset=".26" stop-color="#bd7b09"/><stop offset=".55" stop-color="#ffd85e"/><stop offset="1" stop-color="#8f5600"/></linearGradient>
+    <linearGradient id="boca-grad-platinum-fill" x1="20" y1="12" x2="80" y2="100" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffffff"/><stop offset=".34" stop-color="#a5fff5"/><stop offset="1" stop-color="#2c6c72"/></linearGradient>
+    <linearGradient id="boca-grad-platinum-rim" x1="5" y1="2" x2="95" y2="112" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffffff"/><stop offset=".25" stop-color="#86fff4"/><stop offset=".58" stop-color="#dce9ef"/><stop offset="1" stop-color="#4aa9b0"/></linearGradient>
+    <linearGradient id="boca-grad-diamond-fill" x1="18" y1="12" x2="82" y2="102" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#f9fdff"/><stop offset=".3" stop-color="#73dfff"/><stop offset="1" stop-color="#1556ad"/></linearGradient>
+    <linearGradient id="boca-grad-diamond-rim" x1="2" y1="0" x2="98" y2="114" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffffff"/><stop offset=".24" stop-color="#8ef0ff"/><stop offset=".55" stop-color="#e8fbff"/><stop offset="1" stop-color="#1859b8"/></linearGradient>
+    <linearGradient id="boca-grad-champion-fill" x1="18" y1="7" x2="82" y2="104" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffb3be"/><stop offset=".32" stop-color="#c41230"/><stop offset="1" stop-color="#56101b"/></linearGradient>
+    <linearGradient id="boca-grad-champion-rim" x1="2" y1="0" x2="98" y2="114" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff3a6"/><stop offset=".26" stop-color="#c41230"/><stop offset=".55" stop-color="#ffd65a"/><stop offset="1" stop-color="#7b0719"/></linearGradient>
+    <linearGradient id="boca-grad-legend-fill" x1="14" y1="2" x2="86" y2="108" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff6a3"/><stop offset=".2" stop-color="#63f3d2"/><stop offset=".45" stop-color="#647dff"/><stop offset=".7" stop-color="#e96bff"/><stop offset="1" stop-color="#2f254c"/></linearGradient>
+    <linearGradient id="boca-grad-legend-rim" x1="-4" y1="0" x2="104" y2="116" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffffff"/><stop offset=".16" stop-color="#ffe65c"/><stop offset=".34" stop-color="#4ef1d5"/><stop offset=".54" stop-color="#7aa1ff"/><stop offset=".74" stop-color="#ff74e8"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+    <radialGradient id="boca-grad-legend-aura" cx="50" cy="57" r="70" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ffffff" stop-opacity=".42"/><stop offset=".48" stop-color="#ffcf4d" stop-opacity=".18"/><stop offset="1" stop-color="#63f3d2" stop-opacity="0"/></radialGradient>
+
+    <filter id="boca-filter-gold-glow" x="-22%" y="-22%" width="144%" height="144%"><feGaussianBlur in="SourceAlpha" stdDeviation="1.7" result="boca-gold-blur"/><feFlood flood-color="#ffd65a" flood-opacity=".35" result="boca-gold-flood"/><feComposite in="boca-gold-flood" in2="boca-gold-blur" operator="in" result="boca-gold-glow"/><feMerge><feMergeNode in="boca-gold-glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="boca-filter-cool-glow" x="-24%" y="-24%" width="148%" height="148%"><feGaussianBlur in="SourceAlpha" stdDeviation="1.9" result="boca-cool-blur"/><feFlood flood-color="#8eefff" flood-opacity=".34" result="boca-cool-flood"/><feComposite in="boca-cool-flood" in2="boca-cool-blur" operator="in" result="boca-cool-glow"/><feMerge><feMergeNode in="boca-cool-glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="boca-filter-legend-glow" x="-28%" y="-28%" width="156%" height="156%"><feGaussianBlur in="SourceAlpha" stdDeviation="2.2" result="boca-legend-blur"/><feFlood flood-color="#ffe65c" flood-opacity=".35" result="boca-legend-flood"/><feComposite in="boca-legend-flood" in2="boca-legend-blur" operator="in" result="boca-legend-glow"/><feMerge><feMergeNode in="boca-legend-glow"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <symbol id="shield-base" viewBox="0 0 100 116"><use href="#boca-path-shield" fill="none"/></symbol>
+
+  <symbol id="tier-bronze" viewBox="0 0 100 116">
+    <use href="#boca-path-shield" fill="#1A1D22"/>
+    <use href="#boca-path-shield" fill="url(#boca-grad-bronze-fill)"/>
+    <use href="#boca-path-top-shine" fill="#ffffff" opacity=".13"/>
+    <use href="#boca-path-shield" fill="none" stroke="#1A1D22" stroke-width="7" stroke-linejoin="round"/>
+    <use href="#boca-path-shield" fill="none" stroke="url(#boca-grad-bronze-rim)" stroke-width="4.6" stroke-linejoin="round"/>
+    <path d="M18 15h64" stroke="#f0a463" stroke-width="1.5" stroke-linecap="round" opacity=".55"/>
+    <use href="#boca-path-inner-shield" fill="none" stroke="#ffd0a0" stroke-width="1.1" opacity=".42"/>
+  </symbol>
+
+  <symbol id="tier-silver" viewBox="0 0 100 116">
+    <use href="#boca-path-shield" fill="#1A1D22"/>
+    <use href="#boca-path-shield" fill="url(#boca-grad-silver-fill)"/>
+    <use href="#boca-path-top-shine" fill="#ffffff" opacity=".2"/>
+    <use href="#boca-path-shield" fill="none" stroke="#1A1D22" stroke-width="7" stroke-linejoin="bevel"/>
+    <use href="#boca-path-shield" fill="none" stroke="url(#boca-grad-silver-rim)" stroke-width="4.5" stroke-linejoin="bevel"/>
+    <!-- Slight inner details instead of massive clipped flat blocks -->
+    <path d="M50 8 55.4 13.4 50 18.8 44.6 13.4z" fill="#ffffff" opacity=".78"/>
+    <use href="#boca-path-inner-shield" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".5"/>
+  </symbol>
+
+  <symbol id="tier-gold" viewBox="0 0 100 116">
+    <g filter="url(#boca-filter-gold-glow)">
+      <use href="#boca-path-gold" fill="#1A1D22"/>
+      <use href="#boca-path-gold" fill="url(#boca-grad-gold-fill)"/>
+      <use href="#boca-path-top-shine" fill="#ffffff" opacity=".22"/>
+      <use href="#boca-path-gold" fill="none" stroke="#1A1D22" stroke-width="7" stroke-linejoin="bevel"/>
+      <use href="#boca-path-gold" fill="none" stroke="url(#boca-grad-gold-rim)" stroke-width="4.5" stroke-linejoin="bevel"/>
+      <path d="M50 6 57 15 50 22 43 15z" fill="#fff4ad" opacity=".92"/>
+      <use href="#boca-path-inner-shield" fill="none" stroke="#fff4ad" stroke-width="1.4" opacity=".62"/>
+    </g>
+  </symbol>
+
+  <symbol id="tier-platinum" viewBox="0 0 100 116">
+    <g filter="url(#boca-filter-cool-glow)">
+      <use href="#boca-path-plat" fill="#102b31"/>
+      <use href="#boca-path-plat" fill="url(#boca-grad-platinum-fill)"/>
+      <use href="#boca-path-top-shine" fill="#ffffff" opacity=".26"/>
+      <use href="#boca-path-plat" fill="none" stroke="#102b31" stroke-width="7.5" stroke-linejoin="bevel"/>
+      <use href="#boca-path-plat" fill="none" stroke="url(#boca-grad-platinum-rim)" stroke-width="4.5" stroke-linejoin="bevel"/>
+      <path d="M21 29 9 16l6 14z M79 29 91 16l-6 14z" fill="#ffffff" opacity=".62"/>
+      <use href="#boca-path-plat" fill="none" stroke="#5fe3db" stroke-width="1.5" stroke-linejoin="bevel" opacity=".8"/>
+      <path d="M50 8 57 17 50 24 43 17zM19 34 24 29l5 5-5 5zM71 34l5-5 5 5-5 5z" fill="#ffffff" opacity=".78"/>
+      <use href="#boca-path-inner-shield" fill="none" stroke="#ffffff" stroke-width="1.5" opacity=".6"/>
+    </g>
+  </symbol>
+
+  <symbol id="tier-diamond" viewBox="0 0 100 116">
+    <g filter="url(#boca-filter-cool-glow)">
+      <use href="#boca-path-dia" fill="#0d244f"/>
+      <use href="#boca-path-dia" fill="url(#boca-grad-diamond-fill)"/>
+      <use href="#boca-path-top-shine" fill="#ffffff" opacity=".28"/>
+      <use href="#boca-path-dia" fill="none" stroke="#0d244f" stroke-width="7.5" stroke-linejoin="bevel"/>
+      <use href="#boca-path-dia" fill="none" stroke="url(#boca-grad-diamond-rim)" stroke-width="4.5" stroke-linejoin="bevel"/>
+      <path d="M18 28 9 14l6 16zM82 28 91 14l-6 16z" fill="#ffffff" opacity="0.75"/>
+      <path d="M50 5 59 17 50 27 41 17zM20 30 26 24l6 6-6 6zM68 30l6-6 6 6-6 6z" fill="#ffffff" opacity=".82"/>
+      <use href="#boca-path-inner-shield" fill="none" stroke="#ffffff" stroke-width="1.7" opacity=".7"/>
+    </g>
+  </symbol>
+
+  <symbol id="tier-champion" viewBox="0 0 100 116">
+    <g filter="url(#boca-filter-gold-glow)">
+      <use href="#boca-path-champ" fill="#1A1D22"/>
+      <use href="#boca-path-champ" fill="url(#boca-grad-champion-fill)"/>
+      <use href="#boca-path-top-shine" fill="#ffffff" opacity=".2"/>
+      <use href="#boca-path-champ" fill="none" stroke="#1A1D22" stroke-width="8" stroke-linejoin="bevel"/>
+      <use href="#boca-path-champ" fill="none" stroke="url(#boca-grad-champion-rim)" stroke-width="5" stroke-linejoin="bevel"/>
+      <path d="M21 31 9 13l10 21z M79 31 91 13l-10 21z" fill="#ffd65a" opacity="0.9"/>
+      <path d="M50 6 59 18 50 29 41 18z" fill="#fff3a6" opacity=".9"/>
+      <use href="#boca-path-inner-shield" fill="none" stroke="#ffd65a" stroke-width="1.7" opacity=".75"/>
+    </g>
+    <path d="M28 15h44" stroke="#ffd65a" stroke-width="3" stroke-linecap="round" opacity=".9"/>
+  </symbol>
+
+  <symbol id="tier-legend" viewBox="0 0 100 116">
+    <circle cx="50" cy="58" r="66" fill="url(#boca-grad-legend-aura)" opacity=".9"/>
+    <g filter="url(#boca-filter-legend-glow)">
+      <use href="#boca-path-leg" fill="#1A1D22"/>
+      <use href="#boca-path-leg" fill="url(#boca-grad-legend-fill)"/>
+      <use href="#boca-path-top-shine" fill="#ffffff" opacity=".26"/>
+      <use href="#boca-path-leg" fill="none" stroke="#1A1D22" stroke-width="8" stroke-linejoin="bevel"/>
+      <use href="#boca-path-leg" fill="none" stroke="url(#boca-grad-legend-rim)" stroke-width="5" stroke-linejoin="bevel"/>
+      <path d="M24 29 7 7l15 25z M76 29 93 7l-15 25z" fill="#ffffff" opacity="0.9"/>
+      <path d="M50 2 61 18 50 31 39 18zM20 28 28 18l8 10-8 8zM64 28l8-10 8 10-8 8z" fill="#ffffff" opacity=".82"/>
+      <use href="#boca-path-inner-shield" fill="none" stroke="#ffffff" stroke-width="1.9" opacity=".72"/>
+    </g>
+  </symbol>
+</svg>

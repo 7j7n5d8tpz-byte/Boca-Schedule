@@ -20,6 +20,7 @@ import announcementRoutes from './routes/announcements.js';
 import notificationRoutes from './routes/notifications.js';
 import fineRoutes from './routes/fines.js';
 import opponentRoutes from './routes/opponents.js';
+import achievementRoutes from './routes/achievements.js';
 
 const app = express();
 
@@ -81,6 +82,7 @@ app.use('/api/matches', playerRoutes); // performance endpoint lives under /api/
 app.use('/api/admin', adminRoutes);
 app.use('/api', claimRoutes);
 app.use('/api', resultRoutes);
+app.use('/api', achievementRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/opponents', opponentRoutes);
 app.use('/api/optimize', batchOptimizeRoutes);

@@ -9,6 +9,9 @@ import { meetingTime, mapsUrl, buildMatchIcs, downloadIcs } from '../../utils';
 import { CardListSkeleton } from '../../components/Skeleton';
 import Icon from '../../components/Icon';
 import CountUp from '../../components/CountUp';
+import Crest, { tierRank } from '../../components/Crest';
+import CrestUnlock from '../../components/CrestUnlock';
+import { useCatalog, type PlayerAchievements } from '../../api/achievements';
 
 interface Match {
   matchId: string;
@@ -434,6 +437,15 @@ export default function PlayerDashboard() {
     enabled: !!user,
   });
 
+  const { data: achievements } = useQuery<PlayerAchievements>({
+    queryKey: ['achievements', user?.userId],
+    queryFn: () => api.get(`/players/${user!.userId}/achievements`).then(r => r.data.data),
+    enabled: !!user,
+  });
+  const { data: achCatalog } = useCatalog(); // also warms the cache for the unlock modal
+  const glyphFor = (code: string) =>
+    achCatalog?.individual.find(c => c.code === code)?.glyph ?? 'medal';
+
   const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
   const canEnterResults = isCoachOrAdmin || myPermission?.canEnterResults;
 
@@ -453,6 +465,7 @@ export default function PlayerDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
       <AppNav />
+      {user && achievements && <CrestUnlock userId={user.userId} earned={achievements.earned} />}
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         <div>
@@ -525,6 +538,25 @@ export default function PlayerDashboard() {
                     <p className="text-xs text-gray-400 mt-0.5">Positions &amp; account info</p>
                   </div>
                   <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
+                </Link>
+                <Link to="/achievements" className="col-span-2 bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900">Achievements</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {achievements && achievements.earned.length > 0
+                        ? `${achievements.earned.length} crest tier${achievements.earned.length > 1 ? 's' : ''} earned`
+                        : 'Earn crests, climb the tiers'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {achievements && [...achievements.earned]
+                      .sort((a, b) => tierRank(b.tier) - tierRank(a.tier))
+                      .slice(0, 3)
+                      .map(e => (
+                        <Crest key={`${e.code}:${e.tier}`} glyph={glyphFor(e.code)} tier={e.tier} size={34} showRibbon={false} />
+                      ))}
+                    <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
+                  </div>
                 </Link>
               </div>
             </div>

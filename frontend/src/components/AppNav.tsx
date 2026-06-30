@@ -280,6 +280,7 @@ export default function AppNav({ backHref, backLabel = 'Back', onBack }: AppNavP
                 : navLink('/dashboard', 'Dashboard')
               }
               {navLink('/statistics', 'Team stats')}
+              {navLink('/achievements', 'Achievements')}
               {navLink('/fines', 'Fines')}
               {isFineAdmin && navLink('/fines/manage', 'Manage fines')}
               {isCoach && navLink('/coach', 'Coach view')}

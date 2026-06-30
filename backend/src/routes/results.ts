@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { createNotifications } from '../lib/notifications.js';
+import { recomputeForMatch } from '../lib/achievementsStore.js';
 
 const router = Router();
 
@@ -151,6 +152,13 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
     if (match?.status === 'published') {
       await supabaseAdmin.from('matches').update({ status: 'completed' }).eq('match_id', matchId);
     }
+
+    // Recompute achievements/streaks for every player in this result. Fire-and-
+    // forget: a gamification hiccup must never fail recording the result.
+    const affectedPlayers = Array.isArray(players) ? players.map(p => p.playerId) : [];
+    recomputeForMatch(String(matchId), affectedPlayers).catch(err =>
+      console.error('[achievements] recompute failed for match', matchId, err),
+    );
 
     res.json({ success: true, data: { matchId, goalsFor, goalsAgainst } });
   } catch (err) {

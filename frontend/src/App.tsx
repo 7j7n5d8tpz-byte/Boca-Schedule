@@ -12,6 +12,8 @@ import Selections from './pages/coach/Selections';
 import NewMatch from './pages/coach/NewMatch';
 import PlayerProfile from './pages/player/Profile';
 import Statistics from './pages/player/Statistics';
+import Achievements from './pages/player/Achievements';
+import CrestSprite from './components/CrestSprite';
 import FinesPage from './pages/player/Fines';
 import ManageFinesPage from './pages/player/ManageFines';
 import MatchResults from './pages/MatchResults';
@@ -35,6 +37,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <CrestSprite />
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -44,6 +47,7 @@ export default function App() {
             <Route path="/dashboard" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerDashboard /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerProfile /></ProtectedRoute>} />
             <Route path="/statistics" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><Statistics /></ProtectedRoute>} />
+            <Route path="/achievements" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><Achievements /></ProtectedRoute>} />
             <Route path="/fines" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><FinesPage /></ProtectedRoute>} />
             <Route path="/fines/manage" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><ManageFinesPage /></ProtectedRoute>} />
             <Route path="/matches/:matchId/results" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><MatchResults /></ProtectedRoute>} />

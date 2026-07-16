@@ -122,9 +122,10 @@ describe('Fines', () => {
       const mine = await request(app).get('/api/fines/my').set(auth(target.token));
       expect(mine.body.data.fines.some((f: any) => f.fineId === fineId)).toBe(true);
 
-      // claim paid
-      const claim = await request(app).post(`/api/fines/${fineId}/claim-paid`).set(auth(target.token));
+      // claim paid (bulk pay-outstanding is the product path)
+      const claim = await request(app).post('/api/fines/pay-outstanding').set(auth(target.token));
       expect(claim.status).toBe(200);
+      expect(claim.body.data.claimed).toBeGreaterThanOrEqual(1);
       expect(await fineStatus(fineId)).toBe('payment_claimed');
       expect(await waitForNotification(admin.userId, 'fine_payment_claimed')).toBe(true);
 
@@ -139,7 +140,7 @@ describe('Fines', () => {
       const issued = await request(app).post('/api/fines').set(auth(admin.token))
         .send({ playerId: target.userId, fineTypeId, matchId });
       const fineId = issued.body.data.fineId;
-      await request(app).post(`/api/fines/${fineId}/claim-paid`).set(auth(target.token));
+      await request(app).post('/api/fines/pay-outstanding').set(auth(target.token));
       const res = await request(app).put(`/api/fines/${fineId}/reject-claim`).set(auth(admin.token));
       expect(res.status).toBe(200);
       expect(await fineStatus(fineId)).toBe('approved');

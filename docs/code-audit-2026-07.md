@@ -28,6 +28,11 @@ but the old standalone service was still in the repo:
   existed only for that endpoint, and silently exposed shadow duplicates of every
   players route under `/api/matches/*` (e.g. `GET /api/matches/statistics/team`).
   Both removed.
+- `POST /api/fines/:id/claim-paid` (`backend/src/routes/fines.ts`) — the per-fine
+  "I paid" route. The app only ever uses the bulk `POST /api/fines/pay-outstanding`;
+  no UI, workflow, or script called this. Removed after sign-off; the two lifecycle
+  tests that used it to reach the claimed state now go through `pay-outstanding`,
+  so confirm-paid/reject-claim coverage is unchanged.
 
 ### Dead frontend code
 
@@ -74,10 +79,6 @@ Used only inside their own file: `MAX_AVATAR_BYTES` (`backend/lib/avatar.ts`);
 
 ## Flagged, not touched — needs a product decision
 
-- **`POST /api/fines/:id/claim-paid`** (`backend/src/routes/fines.ts`): the frontend
-  never calls it — players use the bulk `POST /api/fines/pay-outstanding` instead.
-  Only backend tests exercise it. If per-fine claiming is not a planned feature,
-  the endpoint and its two tests in `backend/tests/fines.test.ts` can go.
 - **Root binaries/docs**: `BocaLogo.png` (970 KB), `BocaBoldischShirt.jpg`,
   `Boca Boldisch History.xlsx`, `Fines_history.xlsx` (plausible source inputs for
   the import scripts), and `Football_Team_Player_Selection_System_Technical_Specification.md`

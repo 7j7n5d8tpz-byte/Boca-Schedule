@@ -453,38 +453,6 @@ router.post('/fines/pay-outstanding', authenticate, async (req, res, next) => {
   }
 });
 
-// POST /api/fines/:id/claim-paid — player claims one approved fine paid.
-router.post('/fines/:id/claim-paid', authenticate, async (req, res, next) => {
-  try {
-    const { data: fine } = await supabaseAdmin.from('fines').select('player_id, status, amount_dkk').eq('fine_id', req.params.id).single();
-    if (!fine || fine.player_id !== req.user!.userId) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Fine not found' } });
-      return;
-    }
-    if (fine.status !== 'approved') {
-      res.status(400).json({ success: false, error: { code: 'INVALID_STATE', message: 'Only an outstanding fine can be marked paid' } });
-      return;
-    }
-    await supabaseAdmin.from('fines')
-      .update({ status: 'payment_claimed', paid_claimed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('fine_id', req.params.id);
-
-    supabaseAdmin.from('users').select('name').eq('user_id', req.user!.userId).single().then(({ data: u }) => {
-      fineAdminIds().then(ids => createNotifications(ids, {
-        type: 'fine_payment_claimed',
-        title: 'Fine payment claimed',
-        body: `${u?.name ?? 'A player'} says they paid ${fine.amount_dkk} DKK`,
-        link: '/fines/manage',
-        refId: String(req.params.id),
-      }));
-    });
-
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-});
-
 // POST /api/fines/:id/dispute — player disputes one of their own fines.
 router.post('/fines/:id/dispute', authenticate, async (req, res, next) => {
   try {

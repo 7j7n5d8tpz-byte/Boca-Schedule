@@ -1,7 +1,8 @@
 # Historical match import
 
 These four CSVs hold the backfill of already-played matches (M1–M9) plus one
-upcoming fixture (M10), exported from `Boca Boldisch History.xlsx`. They feed
+upcoming fixture (M10), exported from `Boca Boldisch History.xlsx` (source
+spreadsheet no longer kept in the repo). They feed
 `backend/scripts/import-history.ts`, which writes them into the database.
 
 The sheets are linked by `match_ref` (M1, M2…).

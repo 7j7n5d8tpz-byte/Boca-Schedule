@@ -76,15 +76,16 @@ Used only inside their own file: `MAX_AVATAR_BYTES` (`backend/lib/avatar.ts`);
 - `.claude/skills/{start,stop,test}` — hardcoded a machine-specific macOS path
   (`/Users/asb/…/Boca Schedule`); now use `$(git rev-parse --show-toplevel)` so the
   skills work in any checkout, including remote sessions.
+- Root binaries/docs (removed after sign-off, follow-up to the merged audit PR):
+  `BocaLogo.png` (970 KB; the live logo is `frontend/public/boca-logo.png`),
+  `BocaBoldischShirt.jpg`, `Boca Boldisch History.xlsx` and `Fines_history.xlsx`
+  (raw sources for the history/fines backfills — the derived CSVs remain in
+  `templates/`), and `Football_Team_Player_Selection_System_Technical_Specification.md`
+  (75 KB spec that had drifted from the implementation).
 
-## Flagged, not touched — needs a product decision
+## Flagged, kept deliberately
 
-- **Root binaries/docs**: `BocaLogo.png` (970 KB), `BocaBoldischShirt.jpg`,
-  `Boca Boldisch History.xlsx`, `Fines_history.xlsx` (plausible source inputs for
-  the import scripts), and `Football_Team_Player_Selection_System_Technical_Specification.md`
-  (75 KB spec; describes the now-removed performance endpoint among other drift).
-  Left in place — deleting historical source data is not the audit's call.
-- **Manual utility scripts, kept deliberately**:
+- **Manual utility scripts, kept by decision**:
   `backend/scripts/{import-fines,import-history,restore-player,seed}.ts`,
   `frontend/seed-avatars.mjs`, `scripts/create-admin.mjs`. Not wired to npm scripts
   or CI, but they are ad-hoc admin/import tools (`import-*` are referenced by

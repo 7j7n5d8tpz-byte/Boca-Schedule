@@ -9,7 +9,7 @@ Start all services for Boca Schedule in this order:
 Run from the project root (the directory containing `supabase/`):
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule"
+cd "$(git rev-parse --show-toplevel)"
 npx supabase start
 ```
 
@@ -20,7 +20,7 @@ The squad optimizer runs in-process in the backend (HiGHS-WASM) — there is no 
 ## 2. Backend + Frontend
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule"
+cd "$(git rev-parse --show-toplevel)"
 npm run dev > /tmp/nodedev.log 2>&1 &
 ```
 

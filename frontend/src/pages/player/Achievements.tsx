@@ -162,6 +162,9 @@ function MyCrests({ userId, onOpen }: { userId: string; onOpen: (code: string) =
     <>
       <CrestUnlock userId={userId} earned={data.earned} />
       <OverallHero earned={data.earned} />
+      <p className="text-xs text-gray-400">
+        Season {data.seasonYear} — every competition counts (calendar year).
+      </p>
 
       {categories.map(cat => {
         const all = badgeDefs.filter(c => c.category === cat.key);
@@ -249,7 +252,7 @@ function TeamWallView({ onOpen }: { onOpen: (code: string) => void }) {
 
   return (
     <>
-      <p className="text-xs text-gray-400">Players ranked by overall tier · {data.seasonYear} — tap a player for their crests.</p>
+      <p className="text-xs text-gray-400">Players ranked by overall tier · {data.seasonYear} season, all competitions — tap a player for their crests.</p>
 
       {buckets.map(({ tier, players }) => (
         <section key={tier ?? 'unranked'}>

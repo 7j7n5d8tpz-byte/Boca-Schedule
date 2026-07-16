@@ -29,6 +29,8 @@ function RadarTooltip({ active, payload }: any) {
 }
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { useCatalog, type PlayerAchievements } from '../../api/achievements';
+import Crest, { tierRank } from '../../components/Crest';
 import { Skeleton } from '../../components/Skeleton';
 import StatIcon, { CardChip } from '../../components/StatIcon';
 import Icon, { Star } from '../../components/Icon';
@@ -241,6 +243,46 @@ function LeaderBar({ name, value, max, color, isMe }: {
   );
 }
 
+// ─── Player crest strip ───────────────────────────────────────────────────────
+// The player's earned crests (highest tier per group) on their stats view,
+// linking to the Achievements page — stitches the two pages together without
+// merging them. Note the achievement season is club-wide (all competitions,
+// calendar year), so it may span more matches than the filters above.
+
+function PlayerCrestStrip({ playerId }: { playerId: string }) {
+  const { data: catalog } = useCatalog();
+  const { data } = useQuery<PlayerAchievements>({
+    queryKey: ['achievements', playerId],
+    queryFn: () => api.get(`/players/${playerId}/achievements`).then(r => r.data.data),
+  });
+  if (!catalog?.individual || !data?.groups) return null;
+
+  const lookup = (code: string) => [...catalog.individual, ...catalog.team].find(c => c.code === code);
+  const earned = data.groups
+    .filter(g => g.highestTier)
+    .sort((a, b) => tierRank(b.highestTier!) - tierRank(a.highestTier!));
+  if (earned.length === 0) return null;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h2 className="text-sm font-semibold text-gray-700">Crests · {data.seasonYear} (all competitions)</h2>
+        <Link to="/achievements" className="text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors shrink-0">
+          All achievements →
+        </Link>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-3">
+        {earned.map(g => (
+          <div key={g.code} className="flex flex-col items-center text-center w-16">
+            <Crest glyph={lookup(g.code)?.glyph ?? 'medal'} tier={g.highestTier!} size={48} showRibbon={false} />
+            <p className="mt-1 text-[10px] font-medium text-gray-700 leading-tight">{lookup(g.code)?.name ?? g.code}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Statistics() {
@@ -276,9 +318,18 @@ export default function Statistics() {
     staleTime: 60_000,
   });
 
+  // Player detail follows the page's season + match-type filters, so the
+  // per-match chart shows the same season as the totals around it.
+  const detailYear = selectedYear ?? data?.year ?? null;
   const { data: playerDetail } = useQuery({
-    queryKey: ['player-stats', selectedPlayer],
-    queryFn: () => api.get(`/players/${selectedPlayer}/statistics`).then(r => r.data.data),
+    queryKey: ['player-stats', selectedPlayer, detailYear, matchTypeFilter],
+    queryFn: () => {
+      const params = new URLSearchParams();
+      if (detailYear) params.set('year', String(detailYear));
+      if (matchTypeFilter !== 'all') params.set('matchType', matchTypeFilter);
+      const qs = params.toString();
+      return api.get(`/players/${selectedPlayer}/statistics${qs ? `?${qs}` : ''}`).then(r => r.data.data);
+    },
     enabled: !!selectedPlayer,
   });
 
@@ -1326,6 +1377,8 @@ export default function Statistics() {
               {focusPlayer.totalYellowCards > 0 && <StatCard label="Yellow cards" value={focusPlayer.totalYellowCards} color="text-amber-500" />}
               {focusPlayer.totalRedCards > 0 && <StatCard label="Red cards" value={focusPlayer.totalRedCards} color="text-red-600" />}
             </div>
+
+            <PlayerCrestStrip playerId={focusPlayer.userId} />
 
             {/* Radar chart */}
             {radarData.length > 0 && (

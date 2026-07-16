@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { storeAvatar, AvatarTooLargeError, AVATAR_DATA_URL_RE } from '../lib/avatar.js';
 import { seasonStartYear, seasonRange, seasonLabel } from '../lib/season.js';
+import { playedMatch } from '../lib/participation.js';
 import { computeMatchRating, averageRating, matchResult, type MatchResult } from '../lib/rating.js';
 
 const router = Router();
@@ -96,7 +97,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       }
 
       const [{ data: perfData }, { data: signupData }, { data: selectionData }, { data: historyData }, { data: completedMatchData }, { data: gkData }] = await Promise.all([
-        supabaseAdmin.from('match_performance').select('match_id, player_id, goals, assists, clean_sheet, yellow_cards, red_cards, man_of_match').in('match_id', matchIds),
+        supabaseAdmin.from('match_performance').select('match_id, player_id, attended, goals, assists, clean_sheet, yellow_cards, red_cards, man_of_match').in('match_id', matchIds),
         supabaseAdmin.from('signups').select('player_id').eq('is_active', true).in('match_id', matchIds),
         supabaseAdmin.from('selections').select('player_id, match_id').in('match_id', matchIds),
         supabaseAdmin.from('match_results')
@@ -130,14 +131,29 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       const signupMap = new Map<string, number>();
       (signupData ?? []).forEach((s: any) => signupMap.set(s.player_id, (signupMap.get(s.player_id) ?? 0) + 1));
 
+      // "Played" uses the shared definition (lib/participation.ts): explicit
+      // attendance from the recorded result wins, selection is the fallback.
+      // Union selections and attended performances per (match, player) so a
+      // walk-on with a perf row still counts once.
+      const attendedByKey = new Map<string, boolean>();
+      (perfData ?? []).forEach((p: any) => attendedByKey.set(`${p.match_id}|${p.player_id}`, !!p.attended));
+
       const selectedMap = new Map<string, number>();
-      const playedMap = new Map<string, number>();
+      const playedKeys = new Set<string>();
       (selectionData ?? []).forEach((s: any) => {
         selectedMap.set(s.player_id, (selectedMap.get(s.player_id) ?? 0) + 1);
-        if (completedIds.has(s.match_id)) {
-          playedMap.set(s.player_id, (playedMap.get(s.player_id) ?? 0) + 1);
+        if (completedIds.has(s.match_id) && playedMatch(true, attendedByKey.get(`${s.match_id}|${s.player_id}`))) {
+          playedKeys.add(`${s.match_id}|${s.player_id}`);
         }
       });
+      (perfData ?? []).forEach((p: any) => {
+        if (completedIds.has(p.match_id) && p.attended) playedKeys.add(`${p.match_id}|${p.player_id}`);
+      });
+      const playedMap = new Map<string, number>();
+      for (const key of playedKeys) {
+        const playerId = key.slice(key.indexOf('|') + 1);
+        playedMap.set(playerId, (playedMap.get(playerId) ?? 0) + 1);
+      }
 
       const perfMap = new Map<string, { goals: number; assists: number; cleanSheets: number; yellowCards: number; redCards: number; motmCount: number; ratings: number[] }>();
       (perfData ?? []).forEach((p: any) => {
@@ -388,14 +404,15 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
     }
 
     const yearParam = req.query.year ? parseInt(req.query.year as string) : undefined;
+    const matchTypeFilter = (req.query.matchType as string | undefined) ?? 'all';
 
     const [{ data: profile }, { data: recent }, { data: perfRows }, { data: signupRows }, { data: selectionMatchRows }, { data: completedMatches }, { data: resultRows }] = await Promise.all([
       supabaseAdmin.from('users').select('user_id, name, preferred_positions').eq('user_id', playerId).single(),
-      supabaseAdmin.from('match_performance').select('*, matches(match_date)').eq('player_id', playerId).order('submitted_at', { ascending: false }).limit(10),
-      supabaseAdmin.from('match_performance').select('match_id, goals, assists, saves, clean_sheet, yellow_cards, red_cards, man_of_match').eq('player_id', playerId),
+      supabaseAdmin.from('match_performance').select('*, matches(match_date)').eq('player_id', playerId),
+      supabaseAdmin.from('match_performance').select('match_id, attended, goals, assists, saves, clean_sheet, yellow_cards, red_cards, man_of_match').eq('player_id', playerId),
       supabaseAdmin.from('signups').select('match_id').eq('player_id', playerId).eq('is_active', true),
       supabaseAdmin.from('selections').select('match_id').eq('player_id', playerId),
-      supabaseAdmin.from('matches').select('match_id, match_date').eq('status', 'completed'),
+      supabaseAdmin.from('matches').select('match_id, match_date, match_type').eq('status', 'completed'),
       supabaseAdmin.from('match_results').select('match_id, goals_for, goals_against, gk_first_half, gk_second_half'),
     ]);
 
@@ -404,18 +421,30 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
       return;
     }
 
-    // Scope every figure to ONE season (calendar year). Default to the most recent
-    // season that has completed matches so a player's home shows their current run,
-    // not a lifetime total. Attendance & "games" use the team's games that season.
-    const seasonYears = [...new Set((completedMatches ?? []).map((m: any) => new Date(m.match_date).getFullYear()))].sort((a, b) => b - a);
+    // Scope every figure to ONE season, using the same season calendar as the
+    // team stats route (lib/season.ts: futsal = Jul→Jun, otherwise calendar
+    // year). Default to the most recent season that has completed matches so a
+    // player's home shows their current run, not a lifetime total. Attendance &
+    // "games" use the team's games that season.
+    const scopedMatches = (completedMatches ?? []).filter(
+      (m: any) => matchTypeFilter === 'all' || m.match_type === matchTypeFilter,
+    );
+    const seasonYears = [...new Set(scopedMatches.map((m: any) => seasonStartYear(m.match_date, matchTypeFilter)))].sort((a, b) => b - a);
     const season = yearParam ?? seasonYears[0] ?? new Date().getFullYear();
     const seasonMatchIds = new Set(
-      (completedMatches ?? []).filter((m: any) => new Date(m.match_date).getFullYear() === season).map((m: any) => m.match_id),
+      scopedMatches.filter((m: any) => seasonStartYear(m.match_date, matchTypeFilter) === season).map((m: any) => m.match_id),
     );
     const teamGames = seasonMatchIds.size;
 
-    // Played = completed matches this season the player was selected for.
-    const playedCount = (selectionMatchRows ?? []).filter((s: any) => seasonMatchIds.has(s.match_id)).length;
+    // Played uses the shared definition (lib/participation.ts): explicit
+    // attendance from the recorded result wins, selection is the fallback.
+    const selectedIds = new Set((selectionMatchRows ?? []).map((s: any) => s.match_id));
+    const attendedById = new Map<string, boolean>();
+    (perfRows ?? []).forEach((r: any) => attendedById.set(r.match_id, !!r.attended));
+    let playedCount = 0;
+    for (const id of seasonMatchIds) {
+      if (playedMatch(selectedIds.has(id), attendedById.get(id))) playedCount++;
+    }
 
     const rows = (perfRows ?? []).filter((r: any) => seasonMatchIds.has(r.match_id));
     const goals       = rows.reduce((s: number, r: any) => s + (r.goals ?? 0), 0);
@@ -461,7 +490,12 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
       data: {
         player: { userId: profile.user_id, name: profile.name, preferredPositions: profile.preferred_positions },
         seasonStats: stats ?? {},
-        recentMatches: (recent ?? []).map((mp: any) => ({
+        // Latest matches of the SAME season/competition the figures above cover.
+        recentMatches: (recent ?? [])
+          .filter((mp: any) => seasonMatchIds.has(mp.match_id))
+          .sort((a: any, b: any) => (b.matches?.match_date ?? '').localeCompare(a.matches?.match_date ?? ''))
+          .slice(0, 10)
+          .map((mp: any) => ({
           matchId: mp.match_id,
           matchDate: mp.matches?.match_date,
           attended: mp.attended,

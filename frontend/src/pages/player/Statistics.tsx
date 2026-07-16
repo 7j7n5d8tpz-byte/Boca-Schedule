@@ -1131,7 +1131,7 @@ export default function Statistics() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <Avatar src={p.avatarUrl} name={p.name} size={28} />
                               <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
-                                {p.name}
+                                {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
                               </span>
                             </div>
                           </td>

@@ -3,14 +3,19 @@
 // Assembles a PlayerSeasonInput from the database, runs computeForPlayer, and
 // persists earned crests + streak caches idempotently. Used by the result-
 // recording route (recompute on the fly), the backfill script, and the read
-// routes. Seasons are grouped by CALENDAR YEAR to match the per-player stats
-// route in players.ts.
+// routes.
 
 import { supabaseAdmin } from './supabase.js';
+import { seasonStartYear } from './season.js';
+import { playedMatch } from './participation.js';
 import { computeForPlayer, computeTeam, type PlayerMatch, type PlayerSeasonInput, type PlayerAchievementResult, type TeamMatch } from './achievements.js';
 
+// Achievements span ALL competitions — there is one crest ladder, not one per
+// match type — so seasons use the shared helper's mixed-competition scope,
+// which groups by calendar year (see season.ts). The Achievements UI labels
+// the season accordingly.
 export function seasonYearOf(dateStr: string): number {
-  return new Date(dateStr).getFullYear();
+  return seasonStartYear(dateStr, 'all');
 }
 
 interface CompletedMatch { match_id: string; match_date: string }
@@ -60,7 +65,7 @@ async function buildInput(
         matchId: m.match_id,
         date: m.match_date,
         selected: selected.has(m.match_id),
-        played: !!p?.attended,
+        played: playedMatch(selected.has(m.match_id), p?.attended),
         signedUp: !!su,
         withdrew: su?.withdrew ?? false,
         goals: p?.goals ?? 0,

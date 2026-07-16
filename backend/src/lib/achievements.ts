@@ -72,7 +72,7 @@ export interface PlayerMatch {
   matchId: string;
   date: string;          // YYYY-MM-DD; matches must be passed ordered ascending
   selected: boolean;     // named to the squad
-  played: boolean;       // selected AND attended
+  played: boolean;       // featured in the match — see lib/participation.ts for the shared definition
   signedUp: boolean;     // had an active sign-up
   withdrew: boolean;     // signed up then withdrew
   goals: number;

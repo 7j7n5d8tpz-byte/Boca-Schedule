@@ -18,10 +18,8 @@
     "html-to-image": "^1.11.13",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-hook-form": "^7.55.0",
     "react-router-dom": "^7.5.3",
-    "recharts": "^3.8.1",
-    "zod": "^3.24.2"
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",

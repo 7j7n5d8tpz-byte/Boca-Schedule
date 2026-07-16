@@ -15,7 +15,7 @@ summary table in the last section.
 Gates 3 and 4 need local Supabase + backend + frontend up. Check first:
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule"
+cd "$(git rev-parse --show-toplevel)"
 echo "Supabase:" && (curl -sf -o /dev/null http://127.0.0.1:54321/rest/v1/ -H "apikey: x" -w "%{http_code}\n" 2>/dev/null || echo DOWN)
 echo "Backend: " && (curl -sf -o /dev/null http://localhost:3001/health -w "%{http_code}\n" 2>/dev/null || echo DOWN)
 echo "Frontend:" && (curl -sf -o /dev/null http://localhost:5173 -w "%{http_code}\n" 2>/dev/null || echo DOWN)
@@ -34,8 +34,8 @@ Catches type errors, bad imports, and the camelCase ↔ snake_case mismatches th
 most common mistakes when adding a field across the stack.
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule/frontend" && npx tsc -b
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule/backend"  && npx tsc --noEmit
+cd "$(git rev-parse --show-toplevel)/frontend" && npx tsc -b
+cd "$(git rev-parse --show-toplevel)/backend"  && npx tsc --noEmit
 ```
 
 If either prints errors, report the file:line and **stop** — fix types before running tests.
@@ -43,7 +43,7 @@ If either prints errors, report the file:line and **stop** — fix types before 
 ## Gate 2 — Frontend unit tests (vitest)
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule/frontend" && npm test
+cd "$(git rev-parse --show-toplevel)/frontend" && npm test
 ```
 
 ## Gate 3 — Backend integration tests (vitest, needs local Supabase)
@@ -52,7 +52,7 @@ These run against the local Supabase from `/start`, using the existing `backend/
 They may create and clean up their own rows in the local dev DB — expected, not a problem.
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule/backend" && npm test
+cd "$(git rev-parse --show-toplevel)/backend" && npm test
 ```
 
 ## Gate 4 — E2E (Playwright, needs the full stack)
@@ -63,7 +63,7 @@ existing `backend/.env` so the key is guaranteed to match the running local stac
 nothing is hardcoded or CLI-version-dependent):
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule"
+cd "$(git rev-parse --show-toplevel)"
 set -a; . backend/.env; set +a
 node scripts/seed-e2e-users.mjs
 ```
@@ -74,14 +74,14 @@ Then run the browser tests (the E2E auth helper defaults to these seeded users, 
 env is needed):
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule/frontend" && npm run test:e2e
+cd "$(git rev-parse --show-toplevel)/frontend" && npm run test:e2e
 ```
 
 On failure: Playwright captured a screenshot and video (`screenshot: only-on-failure`,
 `video: retain-on-failure`) and wrote an HTML report. Point the user to:
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule/frontend" && npx playwright show-report
+cd "$(git rev-parse --show-toplevel)/frontend" && npx playwright show-report
 ```
 
 (`playwright-report/` and `test-results/` are gitignored — never commit them.)

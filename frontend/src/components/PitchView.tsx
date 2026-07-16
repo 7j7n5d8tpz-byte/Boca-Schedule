@@ -47,7 +47,7 @@ const TOKEN_STYLES: Record<string, string> = {
   GUEST: 'bg-gray-400   ring-gray-200',
 };
 
-export const TOKEN_BG: Record<string, string> = {
+const TOKEN_BG: Record<string, string> = {
   GK: 'bg-yellow-400', DEF: 'bg-blue-500', WIN: 'bg-green-600',
   MID: 'bg-purple-500', STR: 'bg-red-500',
 };
@@ -70,14 +70,14 @@ function yPositions(count: number, pos: string): number[] {
   return Array.from({ length: count }, (_, i) => 10 + (i * 80 / (count - 1)));
 }
 
-export function shortName(full: string): string {
+function shortName(full: string): string {
   const parts = full.trim().split(' ');
   const last = parts[parts.length - 1];
   return last.length > 8 ? last.slice(0, 7) + '…' : last;
 }
 
 // For futsal display, remap DEF → MID (no DEF position in futsal)
-export function futsalPositions(prefs: string[]): string[] {
+function futsalPositions(prefs: string[]): string[] {
   return prefs.map(p => p === 'DEF' ? 'MID' : p).filter(p => p !== 'DEF');
 }
 

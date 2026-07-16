@@ -15,7 +15,7 @@
 // never split.
 const FUTSAL_START_MONTH = 7;
 
-export function isFutsalScope(matchType: string | undefined): boolean {
+function isFutsalScope(matchType: string | undefined): boolean {
   return matchType === 'futsal';
 }
 

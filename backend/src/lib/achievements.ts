@@ -15,10 +15,10 @@ export type Tier = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | 'cham
 /** Low → high. Index doubles as the ordinal rank used by the frontend Crest. */
 export const TIERS: Tier[] = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'champion', 'legend'];
 
-export type Category = 'performance' | 'reliability' | 'team';
+type Category = 'performance' | 'reliability' | 'team';
 
 /** A unique emblem per achievement, drawn by the frontend Crest component. */
-export type Glyph =
+type Glyph =
   | 'football' | 'boot' | 'glove' | 'medal' | 'calendar' | 'clipboard'
   | 'flame' | 'chain' | 'bolt' | 'trophy' | 'fortress' | 'swords';
 
@@ -35,7 +35,7 @@ export interface TierGroupDef {
   streakType?: StreakType;
 }
 
-export type StreakType = 'attendance' | 'scoring' | 'clean_sheet' | 'win' | 'no_withdrawal';
+type StreakType = 'attendance' | 'scoring' | 'clean_sheet' | 'win' | 'no_withdrawal';
 
 // Reaching a reliability tier is shareable ("Ever Present – Gold"), but the EXACT
 // signup/selection count behind it is private (existing stats-privacy rule). The
@@ -64,7 +64,6 @@ export const ACHIEVEMENT_DEFS: TierGroupDef[] = [
   { code: 'win_streak',        name: 'Unstoppable', description: 'Consecutive wins played in',           category: 'performance', glyph: 'bolt',  unit: 'in a row', thresholds: [2, 3, 5, 7, 9, 12, 15], streakType: 'win' },
 ];
 
-export const STREAK_TYPES: StreakType[] = ['attendance', 'scoring', 'clean_sheet', 'win', 'no_withdrawal'];
 
 // ─── Inputs / outputs ─────────────────────────────────────────────────────────
 
@@ -212,15 +211,11 @@ export function catalog() {
   }));
 }
 
-export function defByCode(code: string): TierGroupDef | undefined {
-  return ACHIEVEMENT_DEFS.find(d => d.code === code) ?? TEAM_DEFS.find(d => d.code === code);
-}
-
 // ─── Team / collective crests ─────────────────────────────────────────────────
 // Computed live (not persisted) from the team's season results. Shared on the
 // team wall; celebrate the whole squad rather than an individual.
 
-export const TEAM_DEFS: TierGroupDef[] = [
+const TEAM_DEFS: TierGroupDef[] = [
   { code: 'team_wins',         name: 'Winning Season', description: 'Wins this season',              category: 'team', glyph: 'trophy',   unit: 'wins',         thresholds: [1, 3, 5, 8, 11, 15, 20] },
   { code: 'team_clean_sheets', name: 'Fortress',       description: 'Matches without conceding',     category: 'team', glyph: 'fortress', unit: 'clean sheets', thresholds: [1, 2, 4, 6, 9, 12, 16] },
   { code: 'team_win_streak',   name: 'Juggernaut',     description: 'Longest winning run',           category: 'team', glyph: 'swords',   unit: 'in a row',     thresholds: [2, 3, 4, 6, 8, 10, 12] },

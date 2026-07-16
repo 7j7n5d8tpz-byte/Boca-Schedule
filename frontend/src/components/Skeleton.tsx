@@ -6,7 +6,7 @@ export function Skeleton({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse bg-gray-200 rounded ${className}`} />;
 }
 
-export function MatchCardSkeleton() {
+function MatchCardSkeleton() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
       <div className="flex items-start justify-between gap-4">

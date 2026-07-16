@@ -1,6 +1,6 @@
 import { supabaseAdmin } from './supabase.js';
 
-export type NotificationType =
+type NotificationType =
   | 'selected'
   | 'deselected'
   | 'match_cancelled'

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from './supabase.js';
 
-export const MAX_AVATAR_BYTES = 2_097_152; // 2 MB
+const MAX_AVATAR_BYTES = 2_097_152; // 2 MB
 
 /** Zod-friendly regex for an accepted avatar data URL (base64 webp/jpeg/png). */
 export const AVATAR_DATA_URL_RE = /^data:image\/(webp|jpeg|png);base64,/;

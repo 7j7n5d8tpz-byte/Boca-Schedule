@@ -16,11 +16,3 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, STATE
 
 // Anon client — respects RLS; hosts password-grant / refresh auth calls
 export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, STATELESS);
-
-// Create a client authenticated as the requesting user
-export function supabaseForUser(accessToken: string) {
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    ...STATELESS,
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
-  });
-}

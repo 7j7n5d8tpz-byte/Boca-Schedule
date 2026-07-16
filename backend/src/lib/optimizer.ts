@@ -1,4 +1,5 @@
-// In-process squad optimizer — a faithful port of optimization-service/server.jl.
+// In-process squad optimizer — a faithful port of the retired standalone Julia
+// optimizer service (server.jl, removed from the repo).
 //
 // The Julia service was a separate Fly machine purely because the model was
 // written in JuMP; the actual problem is a tiny mixed-integer linear program.
@@ -6,11 +7,11 @@
 // JuMP used) compiled to WebAssembly, in-process in the always-on backend —
 // so there is no extra service, no cold start, and no network hop.
 //
-// server.jl is kept in the repo for reference; this module is the runtime path.
+// This module is the only runtime path; the Julia service no longer exists.
 
 import highsLoader from 'highs';
 
-// ─── Constants (mirrors server.jl) ────────────────────────────────────────────
+// ─── Constants (mirrors the original Julia model) ─────────────────────────────
 
 const POSITIONS_7 = ['GK', 'DEF', 'WIN', 'MID', 'STR'] as const;
 const FORMATION_7: Record<string, number> = { GK: 1, DEF: 2, WIN: 2, MID: 1, STR: 1 };
@@ -180,7 +181,7 @@ function renderExpr(terms: Term[]): string {
 
 function positionsFor(matchType: string): { positions: readonly string[]; formation: Record<string, number> } {
   // Note: only "futsal" gets the 4-slot formation; everything else (incl.
-  // "11-player") uses the 7-player formation — identical to server.jl.
+  // "11-player") uses the 7-player formation — identical to the Julia model.
   return matchType === 'futsal'
     ? { positions: POSITIONS_FUTSAL, formation: FORMATION_FUTSAL }
     : { positions: POSITIONS_7, formation: FORMATION_7 };

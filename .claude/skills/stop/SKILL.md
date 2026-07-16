@@ -22,7 +22,7 @@ lsof -ti:5173 | xargs kill -9 2>/dev/null; true
 Run from the project root:
 
 ```bash
-cd "/Users/asb/Desktop/Desktop-ASBMacBookPro/Projects/Boca Schedule"
+cd "$(git rev-parse --show-toplevel)"
 npx supabase stop
 ```
 

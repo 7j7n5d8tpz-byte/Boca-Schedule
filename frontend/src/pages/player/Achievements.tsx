@@ -6,6 +6,8 @@ import Crest, { TIERS, TIER_META, tierRank, type Tier } from '../../components/C
 import CrestUnlock from '../../components/CrestUnlock';
 import BadgeDetailModal from '../../components/BadgeDetailModal';
 import PlayerCrestsModal from '../../components/PlayerCrestsModal';
+import CrestButton from '../../components/CrestButton';
+import StreakCard from '../../components/achievements/StreakCard';
 import RankBar from '../../components/RankBar';
 import { CardListSkeleton } from '../../components/Skeleton';
 import { api } from '../../api/client';
@@ -16,20 +18,6 @@ import {
 } from '../../api/achievements';
 
 type RankedPlayer = TeamWall['players'][number] & { points: number; tier: Tier | null };
-
-// A clickable crest with a hover tooltip — used across the wall + leaderboard.
-function CrestButton({ glyph, tier, size, label, onClick, locked }: {
-  glyph: CatalogEntry['glyph']; tier: Tier; size: number; label: string; onClick?: () => void; locked?: boolean;
-}) {
-  return (
-    <button type="button" onClick={onClick} className="relative group shrink-0" aria-label={label}>
-      <Crest glyph={glyph} tier={tier} size={size} showRibbon={false} locked={locked} />
-      <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1 z-10 hidden group-hover:block whitespace-nowrap rounded bg-gray-900 text-white text-[11px] px-2 py-1 shadow-lg">
-        {label}
-      </span>
-    </button>
-  );
-}
 
 // ─── Overall rank hero ──────────────────────────────────────────────────────
 
@@ -77,55 +65,6 @@ function CrestCard({ entry, group, onOpen }: {
             : `${value} / ${next} ${entry.unit}`}
         </p>
       </div>
-    </button>
-  );
-}
-
-// ─── Streaks ────────────────────────────────────────────────────────────────
-
-// Each streak card IS its crest — same name on the card and in the modal it opens.
-function StreakCard({ entry, streak, group, onOpen }: {
-  entry: CatalogEntry; streak: StreakResult; group?: GroupProgress; onOpen: (code: string) => void;
-}) {
-  const active = streak.current > 0;
-  const hot = streak.current >= 4;
-  const record = group?.value ?? streak.record;
-  const next = group?.nextThreshold ?? null;
-  const pct = next ? Math.min(100, Math.round((record / next) * 100)) : 100;
-  const tier = group?.highestTier ?? null;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(entry.code)}
-      className={`text-left bg-white rounded-xl border p-4 lift cursor-pointer ${
-        hot ? 'border-brand-red/50 ring-1 ring-brand-red/20' : active ? 'border-brand-green/40' : 'border-gray-200'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <Crest glyph={entry.glyph} tier={tier ?? 'bronze'} locked={!tier} size={52} showRibbon={false} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-900 truncate">{entry.name}</span>
-            {hot
-              ? <span className="ml-auto text-[10px] font-bold text-brand-red uppercase tracking-wide shrink-0">On fire</span>
-              : active ? <span className="ml-auto text-[10px] font-semibold text-brand-green uppercase tracking-wide shrink-0">Active</span> : null}
-          </div>
-          <p className="text-[11px] text-gray-400 truncate">{entry.description}</p>
-          <p className="text-3xl font-bold font-numeric text-gray-900 mt-1 leading-none">
-            {streak.current}<span className="text-sm font-medium text-gray-400"> now</span>
-          </p>
-          <p className="text-[11px] text-gray-400 mt-1">Best this season: {record}{tier ? ` · ${TIER_META[tier].label}` : ''}</p>
-        </div>
-      </div>
-      {next !== null && (
-        <div className="mt-3">
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-brand-green rounded-full" style={{ width: `${pct}%` }} />
-          </div>
-          <p className="text-[10px] text-gray-400 mt-1">{record} / {next} to next crest tier</p>
-        </div>
-      )}
     </button>
   );
 }
@@ -302,7 +241,7 @@ function TeamWallView({ onOpen }: { onOpen: (code: string) => void }) {
         </section>
       )}
 
-      {drillPlayer && <PlayerCrestsModal player={drillPlayer} onClose={() => setDrillPlayer(null)} />}
+      {drillPlayer && <PlayerCrestsModal player={drillPlayer} onClose={() => setDrillPlayer(null)} onOpenCrest={onOpen} />}
     </>
   );
 }

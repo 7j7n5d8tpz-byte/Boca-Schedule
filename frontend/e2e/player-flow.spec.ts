@@ -18,6 +18,34 @@ test.describe('Player flow', () => {
     await expect(page.getByRole('heading', { name: /team|statistics|season/i }).first()).toBeVisible();
   });
 
+  test('players tab opens a player profile hub', async ({ page }) => {
+    await loginAs(page, 'player');
+    await page.goto('/statistics');
+    // Open the Players roster tab, then tap the first player row.
+    await page.getByRole('button', { name: 'Players' }).click();
+    await expect(page.getByText(/All players/i).first()).toBeVisible();
+    // Rows are clickable divs/rows (mobile cards or desktop table rows).
+    await page.locator('tbody tr, .sm\\:hidden .cursor-pointer').first().click();
+    await expect(page).toHaveURL(/\/players\//);
+    // The hub renders the player header and their radar section (or the
+    // no-data fallback when no performances are recorded yet).
+    await expect(page.getByRole('heading').first()).toBeVisible();
+    await expect(
+      page.getByText('Player profile').or(page.getByText(/No per-match performance data/)).first(),
+    ).toBeVisible({ timeout: 8_000 });
+  });
+
+  test('own profile hub links to profile settings', async ({ page }) => {
+    await loginAs(page, 'player');
+    // Find your own row via the "you" chip on the Players tab.
+    await page.goto('/statistics');
+    await page.getByRole('button', { name: 'Players' }).click();
+    await page.getByText('you', { exact: true }).first().click();
+    await expect(page).toHaveURL(/\/players\//);
+    await page.getByRole('link', { name: 'Edit profile' }).click();
+    await expect(page).toHaveURL(/\/profile/);
+  });
+
   test('sign-up button is visible on an open match', async ({ page }) => {
     await loginAs(page, 'player');
     await page.goto('/dashboard');

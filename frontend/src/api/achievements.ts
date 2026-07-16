@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './client';
-import { TIERS, tierRank, type Tier, type GlyphName } from '../components/Crest';
+import { tierRank, type Tier, type GlyphName } from '../components/Crest';
 
 // Shared types + helpers for the gamification UI. The catalog is served by the
 // backend (single source of truth in backend/src/lib/achievements.ts).
@@ -36,7 +36,7 @@ export interface GroupProgress {
   nextThreshold: number | null;
 }
 
-export type StreakType = 'attendance' | 'scoring' | 'clean_sheet' | 'win' | 'no_withdrawal';
+type StreakType = 'attendance' | 'scoring' | 'clean_sheet' | 'win' | 'no_withdrawal';
 
 export interface StreakResult {
   type: StreakType;
@@ -98,8 +98,6 @@ export function overallRank(points: number): { tier: Tier | null; floor: number;
   }
   return { tier, floor, next };
 }
-
-export { TIERS };
 
 /** Shared catalog query — cached so the page and the unlock modal reuse it. */
 export function useCatalog() {

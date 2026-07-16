@@ -1,7 +1,8 @@
 # Fines history import
 
 Backfills each player's current fines position from `Fines_history.xlsx`
-(columns: name, total fines, balance) into the app's fines ledger.
+(columns: name, total fines, balance; source spreadsheet no longer kept in the
+repo) into the app's fines ledger.
 
 ## Data model
 

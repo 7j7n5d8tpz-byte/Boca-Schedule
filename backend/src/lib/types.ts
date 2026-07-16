@@ -1,9 +1,6 @@
 export type Role = 'player' | 'coach' | 'admin';
-export type Position = 'GK' | 'DEF' | 'WIN' | 'MID' | 'STR';
-export type MatchType = 'futsal' | '7-player' | '11-player';
-export type MatchStatus = 'draft' | 'signup_open' | 'signup_closed' | 'optimized' | 'published' | 'completed';
 
-export interface AuthUser {
+interface AuthUser {
   userId: string;
   email: string;
   role: Role;

@@ -602,34 +602,4 @@ router.delete('/:playerId/avatar', authenticate, async (req, res, next) => {
   }
 });
 
-// POST /api/matches/:matchId/performance
-router.post('/:matchId/performance', authenticate, async (req, res, next) => {
-  try {
-    const { matchId } = req.params;
-    const { attended, goals, assists, saves, cleanSheet, yellowCards, redCards, minutesPlayed, positionPlayed, selfRating } = req.body;
-
-    const { data, error } = await supabaseAdmin.from('match_performance').insert({
-      match_id: matchId,
-      player_id: req.user!.userId,
-      attended: attended ?? false,
-      goals: goals ?? 0,
-      assists: assists ?? 0,
-      saves: saves ?? 0,
-      clean_sheet: cleanSheet ?? false,
-      yellow_cards: yellowCards ?? 0,
-      red_cards: redCards ?? 0,
-      minutes_played: minutesPlayed,
-      position_played: positionPlayed,
-      self_rating: selfRating,
-      submitted_by: req.user!.userId,
-    }).select().single();
-
-    if (error) throw error;
-
-    res.status(201).json({ success: true, data: { performanceId: data.performance_id, matchId, playerId: req.user!.userId, submittedAt: data.submitted_at } });
-  } catch (err) {
-    next(err);
-  }
-});
-
 export default router;

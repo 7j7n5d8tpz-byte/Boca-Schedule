@@ -14,7 +14,7 @@ import { computeForPlayer, computeTeam, type PlayerMatch, type PlayerSeasonInput
 // match type — so seasons use the shared helper's mixed-competition scope,
 // which groups by calendar year (see season.ts). The Achievements UI labels
 // the season accordingly.
-export function seasonYearOf(dateStr: string): number {
+function seasonYearOf(dateStr: string): number {
   return seasonStartYear(dateStr, 'all');
 }
 
@@ -155,7 +155,7 @@ export async function seasonsWithMatches(): Promise<number[]> {
 }
 
 /** Every non-placeholder, non-merged player id (for backfill). */
-export async function allRealPlayerIds(): Promise<string[]> {
+async function allRealPlayerIds(): Promise<string[]> {
   const { data } = await supabaseAdmin
     .from('users')
     .select('user_id')

@@ -1,41 +1,21 @@
 import AppNav from '../../components/AppNav';
-import { Link } from 'react-router-dom';
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, LineChart, Line, RadarChart, Radar,
-  PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  ResponsiveContainer, LineChart, Line,
 } from 'recharts';
-
-// Mirror of the backend season helper: futsal seasons run Jul→Jun (so Nov–Feb
-// fall in one season, keyed by the start year); outdoor = calendar year.
-function seasonStartYearClient(dateStr: string, matchType: string): number {
-  const d = new Date(dateStr);
-  const y = d.getFullYear();
-  if (matchType === 'futsal') return d.getMonth() + 1 >= 7 ? y : y - 1;
-  return y;
-}
-
-function RadarTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow text-xs">
-      <p className="font-semibold text-gray-700">{d.metric}</p>
-      <p className="text-gray-900">{d.display}</p>
-    </div>
-  );
-}
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { useCatalog, type PlayerAchievements } from '../../api/achievements';
-import Crest, { tierRank } from '../../components/Crest';
 import { Skeleton } from '../../components/Skeleton';
 import StatIcon, { CardChip } from '../../components/StatIcon';
 import Icon, { Star } from '../../components/Icon';
-import CountUp from '../../components/CountUp';
 import Avatar from '../../components/Avatar';
+import LeaderBar from '../../components/stats/LeaderBar';
+import {
+  StatCard, ResultTooltip, fmtDate, CHART_COLORS, seasonStartYearClient,
+} from '../../components/stats/statShared';
 
 interface PlayerStat {
   userId: string;
@@ -74,13 +54,13 @@ interface MatchHighlight {
   goalsFor: number;
   goalsAgainst: number;
   gameAssessment: string | null;
-  goals: { scorerName: string | null; assisterName: string | null }[];
-  cleanSheets: string[];
-  yellowCards: string[];
-  redCards: string[];
-  manOfMatch: string | null;
+  goals: { scorerId: string | null; scorerName: string | null; assisterId: string | null; assisterName: string | null }[];
+  cleanSheets: { playerId: string; name: string }[];
+  yellowCards: { playerId: string; name: string }[];
+  redCards: { playerId: string; name: string }[];
+  manOfMatch: { playerId: string; name: string } | null;
   longRead: string | null;
-  players: { name: string; isScorer: boolean; isAssister: boolean; isGoalkeeper: boolean }[];
+  players: { playerId: string; name: string; isScorer: boolean; isAssister: boolean; isGoalkeeper: boolean }[];
 }
 
 interface Overview {
@@ -97,10 +77,10 @@ interface Overview {
   losses: number;
   avgGoalsFor: number;
   avgGoalsAgainst: number;
-  topScorer: { name: string; value: number } | null;
-  topAssister: { name: string; value: number } | null;
-  topGk: { name: string; halves: number; cleanSheets: number } | null;
-  topMotm: { name: string; value: number } | null;
+  topScorer: { userId: string; name: string; value: number } | null;
+  topAssister: { userId: string; name: string; value: number } | null;
+  topGk: { userId: string; name: string; halves: number; cleanSheets: number } | null;
+  topMotm: { userId: string; name: string; value: number } | null;
 }
 
 interface OpponentSummary {
@@ -157,22 +137,6 @@ interface TeamStats {
   matchHistory: MatchHistory[];
 }
 
-const POS_COLOR: Record<string, string> = {
-  GK: 'bg-yellow-100 text-yellow-700',
-  DEF: 'bg-blue-100 text-blue-700',
-  WIN: 'bg-green-100 text-green-700',
-  MID: 'bg-purple-100 text-purple-700',
-  STR: 'bg-red-100 text-red-700',
-};
-
-const CHART_COLORS = {
-  goals: '#205B3B',      // brand green (kit)
-  against: '#c41230',    // brand crimson (kit)
-  assists: '#8b5cf6',
-  cleanSheets: '#3da06a',
-  attendance: '#f59e0b',
-};
-
 const ASSESSMENT_LABEL: Record<string, { label: string; color: string }> = {
   dominated:          { label: 'We dominated',      color: 'text-green-700' },
   strong_performance: { label: 'Strong performance', color: 'text-green-600' },
@@ -182,104 +146,18 @@ const ASSESSMENT_LABEL: Record<string, { label: string; color: string }> = {
   off_day:            { label: 'Off day',            color: 'text-red-600'   },
 };
 
-// ─── Small stat card ──────────────────────────────────────────────────────────
+// ─── Player-name link → profile hub ───────────────────────────────────────────
 
-function StatCard({ label, value, sub, color = 'text-gray-900' }: {
-  label: string; value: string | number; sub?: string; color?: string;
-}) {
+function PlayerLink({ to, name, className = '' }: { to: string | null; name: string; className?: string }) {
+  if (!to) return <span className={className}>{name}</span>;
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <p className={`text-2xl font-bold font-numeric ${color}`}>{typeof value === 'number' ? <CountUp value={value} /> : value}</p>
-      <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-    </div>
-  );
-}
-
-// ─── Match label formatter ────────────────────────────────────────────────────
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-}
-
-// ─── Custom tooltip ───────────────────────────────────────────────────────────
-
-function ResultTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload;
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 shadow text-xs">
-      <p className="font-medium text-gray-700">{label}</p>
-      {d?.opponent && <p className="text-gray-400 mb-1">{d.date}</p>}
-      {!d?.opponent && <div className="mb-1" />}
-      {payload.map((entry: any) => (
-        <p key={entry.name} style={{ color: entry.color }}>
-          {entry.name}: <span className="font-semibold">{entry.value}</span>
-        </p>
-      ))}
-    </div>
-  );
-}
-
-// ─── Horizontal leaderboard bar ───────────────────────────────────────────────
-
-function LeaderBar({ name, value, max, color, isMe }: {
-  name: string; value: number; max: number; color: string; isMe: boolean;
-}) {
-  const pct = max > 0 ? (value / max) * 100 : 0;
-  return (
-    <div className={`flex items-center gap-3 py-1.5 ${isMe ? 'font-semibold' : ''}`}>
-      <span className="text-xs text-gray-700 w-28 truncate shrink-0">
-        {name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
-      </span>
-      <div className="flex-1 bg-gray-100 rounded-full h-2">
-        <div
-          className="h-2 rounded-full transition-all"
-          style={{ width: `${pct}%`, backgroundColor: color }}
-        />
-      </div>
-      <span className="text-xs font-medium text-gray-600 w-4 text-right">{value}</span>
-    </div>
-  );
-}
-
-// ─── Player crest strip ───────────────────────────────────────────────────────
-// The player's earned crests (highest tier per group) on their stats view,
-// linking to the Achievements page — stitches the two pages together without
-// merging them. Note the achievement season is club-wide (all competitions,
-// calendar year), so it may span more matches than the filters above.
-
-function PlayerCrestStrip({ playerId }: { playerId: string }) {
-  const { data: catalog } = useCatalog();
-  const { data } = useQuery<PlayerAchievements>({
-    queryKey: ['achievements', playerId],
-    queryFn: () => api.get(`/players/${playerId}/achievements`).then(r => r.data.data),
-  });
-  if (!catalog?.individual || !data?.groups) return null;
-
-  const lookup = (code: string) => [...catalog.individual, ...catalog.team].find(c => c.code === code);
-  const earned = data.groups
-    .filter(g => g.highestTier)
-    .sort((a, b) => tierRank(b.highestTier!) - tierRank(a.highestTier!));
-  if (earned.length === 0) return null;
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <h2 className="text-sm font-semibold text-gray-700">Crests · {data.seasonYear} (all competitions)</h2>
-        <Link to="/achievements" className="text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors shrink-0">
-          All achievements →
-        </Link>
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-3">
-        {earned.map(g => (
-          <div key={g.code} className="flex flex-col items-center text-center w-16">
-            <Crest glyph={lookup(g.code)?.glyph ?? 'medal'} tier={g.highestTier!} size={48} showRibbon={false} />
-            <p className="mt-1 text-[10px] font-medium text-gray-700 leading-tight">{lookup(g.code)?.name ?? g.code}</p>
-          </div>
-        ))}
-      </div>
-    </div>
+    <Link
+      to={to}
+      state={{ from: '/statistics', fromLabel: 'Team stats' }}
+      className={`${className} hover:text-brand-green hover:underline`}
+    >
+      {name}
+    </Link>
   );
 }
 
@@ -287,10 +165,10 @@ function PlayerCrestStrip({ playerId }: { playerId: string }) {
 
 export default function Statistics() {
   const { user } = useAuth();
-  const [selectedPlayer, setSelectedPlayer] = useState<string>('');
+  const navigate = useNavigate();
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all' | '7-player' | 'futsal'>('all');
-  const [view, setView] = useState<'team' | 'highlights' | 'opponents'>('team');
+  const [view, setView] = useState<'team' | 'players' | 'highlights' | 'opponents'>('team');
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [selectedOpponent, setSelectedOpponent] = useState<string>('');
   const highlightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -316,21 +194,6 @@ export default function Statistics() {
       return api.get(`/players/statistics/team${qs ? `?${qs}` : ''}`).then(r => r.data.data);
     },
     staleTime: 60_000,
-  });
-
-  // Player detail follows the page's season + match-type filters, so the
-  // per-match chart shows the same season as the totals around it.
-  const detailYear = selectedYear ?? data?.year ?? null;
-  const { data: playerDetail } = useQuery({
-    queryKey: ['player-stats', selectedPlayer, detailYear, matchTypeFilter],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      if (detailYear) params.set('year', String(detailYear));
-      if (matchTypeFilter !== 'all') params.set('matchType', matchTypeFilter);
-      const qs = params.toString();
-      return api.get(`/players/${selectedPlayer}/statistics${qs ? `?${qs}` : ''}`).then(r => r.data.data);
-    },
-    enabled: !!selectedPlayer,
   });
 
   const { data: highlightsData, isLoading: highlightsLoading } = useQuery<{ highlights: MatchHighlight[] }>({
@@ -369,10 +232,16 @@ export default function Statistics() {
   const players = data?.players ?? [];
   const matchHistory = data?.matchHistory ?? [];
 
-  const focusPlayer = useMemo(
-    () => players.find(p => p.userId === selectedPlayer) ?? null,
-    [players, selectedPlayer]
-  );
+  // Link target for a player's profile hub, forwarding the active filters so
+  // the hub opens on the same season/competition the user was looking at.
+  const hubUrl = (id: string) => {
+    const params = new URLSearchParams();
+    if (selectedYear) params.set('year', String(selectedYear));
+    if (matchTypeFilter !== 'all') params.set('matchType', matchTypeFilter);
+    const qs = params.toString();
+    return `/players/${id}${qs ? `?${qs}` : ''}`;
+  };
+  const hubState = { from: '/statistics', fromLabel: 'Team stats' };
 
   // Build data for goals/against chart
   const goalsChartData = matchHistory.map(m => ({
@@ -420,54 +289,9 @@ export default function Statistics() {
   const maxCleanSheets = topCleanSheets[0]?.totalCleanSheets ?? 1;
   const maxAttend      = 100;
 
-  // Radar data for selected player — all axes normalized to 0-100
-  const played = focusPlayer?.totalPlayed ?? 0;
-  const radarData = focusPlayer ? [
-    {
-      metric: 'Attendance',
-      value: Math.round(focusPlayer.attendanceRate),
-      display: `${Math.round(focusPlayer.attendanceRate)}%`,
-    },
-    {
-      metric: 'Goals/game',
-      value: played > 0 ? Math.min(100, Math.round(focusPlayer.totalGoals / played * 50)) : 0,
-      display: played > 0 ? `${(focusPlayer.totalGoals / played).toFixed(2)} per game` : '0 per game',
-    },
-    {
-      metric: 'Assists/game',
-      value: played > 0 ? Math.min(100, Math.round(focusPlayer.totalAssists / played * 50)) : 0,
-      display: played > 0 ? `${(focusPlayer.totalAssists / played).toFixed(2)} per game` : '0 per game',
-    },
-    {
-      // Share of the player's on-pitch half-slots spent in goal (2 halves per game).
-      // Replaces the old clean-sheets axis, which sat at ~0 for every outfield player.
-      metric: 'Time in goal',
-      value: played > 0 ? Math.min(100, Math.round(focusPlayer.gkAppearances / (played * 2) * 100)) : 0,
-      display: played > 0 ? `${Math.min(100, Math.round(focusPlayer.gkAppearances / (played * 2) * 100))}% (${focusPlayer.gkAppearances} halves)` : '0%',
-    },
-  ] : [];
-
-  // Per-match history for selected player
-  const playerMatchData = (playerDetail?.recentMatches ?? [])
-    .filter((m: any) => m.attended)
-    .reverse()
-    .map((m: any) => ({
-      name: fmtDate(m.matchDate),
-      Goals: m.goals ?? 0,
-      Assists: m.assists ?? 0,
-      'Clean sheets': m.cleanSheet ? 1 : 0,
-    }));
-
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [view]);
-
-  // Selecting a player swaps in a new view in place (no route change), so the
-  // page would otherwise keep the list's scroll position. Jump to the top so
-  // the player's profile starts at the top, matching a normal page navigation.
-  useEffect(() => {
-    if (selectedPlayer) window.scrollTo({ top: 0, behavior: 'instant' });
-  }, [selectedPlayer]);
 
   useEffect(() => {
     if (!selectedMatchId || view !== 'highlights' || highlightsLoading) return;
@@ -485,14 +309,14 @@ export default function Statistics() {
       <main className="max-w-5xl mx-auto px-4 py-8">
 
         {/* Header + filters */}
-        {/* Desktop (sm+): title + year + segmented match-type on the left, player select on the right. */}
+        {/* Desktop (sm+): title + year + segmented match-type. */}
         <div className="hidden sm:flex items-center justify-between gap-4 flex-wrap mb-8">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-extrabold text-gray-900">Team Statistics</h1>
             {(data?.availableSeasons ?? []).length > 0 && (
               <select
                 value={selectedYear ?? data?.year ?? ''}
-                onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedPlayer(''); }}
+                onChange={e => setSelectedYear(Number(e.target.value))}
                 className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
               >
                 {(data?.availableSeasons ?? []).map(s => (
@@ -518,25 +342,11 @@ export default function Statistics() {
               ))}
             </div>
           </div>
-          {view === 'team' && (
-            <select
-              value={selectedPlayer}
-              onChange={e => setSelectedPlayer(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white min-w-48"
-            >
-              <option value="">All players</option>
-              {players.map(p => (
-                <option key={p.userId} value={p.userId}>
-                  {p.name}{p.userId === user?.userId ? ' (you)' : ''}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
 
-        {/* Mobile (<sm): title, then all filter dropdowns grouped in a highlighted
-            box. Match type is a dropdown here (not segmented buttons) so the year
-            and player selects fit on the same row and the header stays compact. */}
+        {/* Mobile (<sm): title, then the filter dropdowns grouped in a highlighted
+            box. Match type is a dropdown here (not segmented buttons) so both
+            selects fit on the same row and the header stays compact. */}
         <div className="sm:hidden mb-8">
           <h1 className="text-2xl font-extrabold text-gray-900 mb-3">Team Statistics</h1>
           <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl p-2">
@@ -544,7 +354,7 @@ export default function Statistics() {
               <select
                 aria-label="Season"
                 value={selectedYear ?? data?.year ?? ''}
-                onChange={e => { setSelectedYear(Number(e.target.value)); setSelectedPlayer(''); }}
+                onChange={e => setSelectedYear(Number(e.target.value))}
                 className="shrink-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
               >
                 {(data?.availableSeasons ?? []).map(s => (
@@ -562,40 +372,31 @@ export default function Statistics() {
               <option value="7-player">7-player</option>
               <option value="futsal">Futsal</option>
             </select>
-            {view === 'team' && (
-              <select
-                aria-label="Player"
-                value={selectedPlayer}
-                onChange={e => setSelectedPlayer(e.target.value)}
-                className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
-              >
-                <option value="">All players</option>
-                {players.map(p => (
-                  <option key={p.userId} value={p.userId}>
-                    {p.name}{p.userId === user?.userId ? ' (you)' : ''}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
         </div>
 
         {/* Sidebar + content layout */}
         <div className="flex flex-col sm:flex-row gap-6 items-stretch sm:items-start">
 
-          {/* Sidebar — horizontal tab bar on mobile, sidebar on sm+.
-              Hidden on mobile when viewing a specific player (the highlights tab
-              just crowds the top); always shown as a sidebar on sm+. */}
-          <nav className={`w-full sm:w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-2 ${selectedPlayer && view === 'team' ? 'hidden sm:flex' : 'flex'} sm:flex-col gap-1 sm:sticky sm:top-[calc(var(--app-nav-offset)+0.5rem)] transition-[top] duration-[var(--app-nav-dur)]`}>
+          {/* Sidebar — horizontal tab bar on mobile, sidebar on sm+. */}
+          <nav className="w-full sm:w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-2 flex sm:flex-col gap-1 sm:sticky sm:top-[calc(var(--app-nav-offset)+0.5rem)] transition-[top] duration-[var(--app-nav-dur)]">
             <button
               onClick={() => setView('team')}
               className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 view === 'team' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              {/* Short label on mobile so three tabs share the row without wrapping. */}
+              {/* Short label on mobile so four tabs share the row without wrapping. */}
               <span className="sm:hidden">Team</span>
               <span className="hidden sm:inline">Team stats</span>
+            </button>
+            <button
+              onClick={() => setView('players')}
+              className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                view === 'players' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <span>Players</span>
             </button>
             <button
               onClick={() => setView('highlights')}
@@ -676,9 +477,9 @@ export default function Statistics() {
                       {h.goals.map((g, i) => (
                         <p key={i} className="text-sm text-gray-700">
                           <span className="text-gray-400 mr-1">{i + 1}.</span>
-                          <span className="font-medium">{g.scorerName ?? 'Unknown'}</span>
+                          <PlayerLink to={g.scorerId ? hubUrl(g.scorerId) : null} name={g.scorerName ?? 'Unknown'} className="font-medium" />
                           {g.assisterName && (
-                            <span className="text-gray-400"> · assist: <span className="text-gray-600">{g.assisterName}</span></span>
+                            <span className="text-gray-400"> · assist: <PlayerLink to={g.assisterId ? hubUrl(g.assisterId) : null} name={g.assisterName} className="text-gray-600" /></span>
                           )}
                         </p>
                       ))}
@@ -691,7 +492,14 @@ export default function Statistics() {
                   {h.cleanSheets.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Clean sheets</p>
-                      <p className="text-sm text-gray-700 mt-0.5">{h.cleanSheets.join(', ')}</p>
+                      <p className="text-sm text-gray-700 mt-0.5">
+                        {h.cleanSheets.map((cs, i) => (
+                          <span key={cs.playerId}>
+                            {i > 0 && ', '}
+                            <PlayerLink to={hubUrl(cs.playerId)} name={cs.name} />
+                          </span>
+                        ))}
+                      </p>
                     </div>
                   )}
 
@@ -700,13 +508,27 @@ export default function Statistics() {
                       {h.yellowCards.length > 0 && (
                         <div>
                           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><CardChip color="yellow" /> Yellow cards</p>
-                          <p className="text-sm text-gray-700 mt-0.5">{h.yellowCards.join(', ')}</p>
+                          <p className="text-sm text-gray-700 mt-0.5">
+                            {h.yellowCards.map((c, i) => (
+                              <span key={c.playerId}>
+                                {i > 0 && ', '}
+                                <PlayerLink to={hubUrl(c.playerId)} name={c.name} />
+                              </span>
+                            ))}
+                          </p>
                         </div>
                       )}
                       {h.redCards.length > 0 && (
                         <div>
                           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><CardChip color="red" /> Red cards</p>
-                          <p className="text-sm text-gray-700 mt-0.5">{h.redCards.join(', ')}</p>
+                          <p className="text-sm text-gray-700 mt-0.5">
+                            {h.redCards.map((c, i) => (
+                              <span key={c.playerId}>
+                                {i > 0 && ', '}
+                                <PlayerLink to={hubUrl(c.playerId)} name={c.name} />
+                              </span>
+                            ))}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -717,7 +539,9 @@ export default function Statistics() {
                       <Star className="w-5 h-5 text-amber-500" />
                       <div>
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Man of the match</p>
-                        <p className="text-sm font-semibold text-amber-600 mt-0.5">{h.manOfMatch}</p>
+                        <p className="text-sm font-semibold text-amber-600 mt-0.5">
+                          <PlayerLink to={hubUrl(h.manOfMatch.playerId)} name={h.manOfMatch.name} />
+                        </p>
                       </div>
                     </div>
                   )}
@@ -735,7 +559,7 @@ export default function Statistics() {
                           {h.players.map((p, i) => (
                             <div key={i} className="flex items-center gap-2 text-sm">
                               <span className={`flex-1 ${p.isGoalkeeper ? 'font-semibold text-yellow-700' : 'text-gray-700'}`}>
-                                {p.name}
+                                <PlayerLink to={hubUrl(p.playerId)} name={p.name} />
                               </span>
                               {p.isGoalkeeper && (
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-semibold">GK</span>
@@ -958,7 +782,7 @@ export default function Statistics() {
           </div>
         )}
 
-        {view === 'team' && isLoading && (
+        {(view === 'team' || view === 'players') && isLoading && (
           <div className="space-y-8">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -973,7 +797,7 @@ export default function Statistics() {
           </div>
         )}
 
-        {view === 'team' && !isLoading && !selectedPlayer && overview && (
+        {view === 'team' && !isLoading && overview && (
           <>
             {/* Overview cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -995,7 +819,7 @@ export default function Statistics() {
                 <div>
                   <p className="text-xs text-gray-500">Top scorer</p>
                   {overview.topScorer
-                    ? <><p className="font-semibold text-gray-900">{overview.topScorer.name}</p><p className="text-sm text-brand-green">{overview.topScorer.value} goals</p></>
+                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topScorer.userId ? hubUrl(overview.topScorer.userId) : null} name={overview.topScorer.name} /></p><p className="text-sm text-brand-green">{overview.topScorer.value} goals</p></>
                     : <p className="text-sm text-gray-300">No data yet</p>}
                 </div>
               </div>
@@ -1004,7 +828,7 @@ export default function Statistics() {
                 <div>
                   <p className="text-xs text-gray-500">Most assists</p>
                   {overview.topAssister
-                    ? <><p className="font-semibold text-gray-900">{overview.topAssister.name}</p><p className="text-sm text-purple-600">{overview.topAssister.value} assists</p></>
+                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topAssister.userId ? hubUrl(overview.topAssister.userId) : null} name={overview.topAssister.name} /></p><p className="text-sm text-purple-600">{overview.topAssister.value} assists</p></>
                     : <p className="text-sm text-gray-300">No data yet</p>}
                 </div>
               </div>
@@ -1013,7 +837,7 @@ export default function Statistics() {
                 <div>
                   <p className="text-xs text-gray-500">Most time in goal</p>
                   {overview.topGk
-                    ? <><p className="font-semibold text-gray-900">{overview.topGk.name}</p><p className="text-sm text-green-600">{overview.topGk.halves} halves in goal{overview.topGk.cleanSheets > 0 && ` · ${overview.topGk.cleanSheets} clean sheet${overview.topGk.cleanSheets === 1 ? '' : 's'}`}</p></>
+                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topGk.userId ? hubUrl(overview.topGk.userId) : null} name={overview.topGk.name} /></p><p className="text-sm text-green-600">{overview.topGk.halves} halves in goal{overview.topGk.cleanSheets > 0 && ` · ${overview.topGk.cleanSheets} clean sheet${overview.topGk.cleanSheets === 1 ? '' : 's'}`}</p></>
                     : <p className="text-sm text-gray-300">No data yet</p>}
                 </div>
               </div>
@@ -1022,7 +846,7 @@ export default function Statistics() {
                 <div>
                   <p className="text-xs text-gray-500">Top man of match</p>
                   {overview.topMotm
-                    ? <><p className="font-semibold text-gray-900">{overview.topMotm.name}</p><p className="text-sm text-amber-500">{overview.topMotm.value}×</p></>
+                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topMotm.userId ? hubUrl(overview.topMotm.userId) : null} name={overview.topMotm.name} /></p><p className="text-sm text-amber-500">{overview.topMotm.value}×</p></>
                     : <p className="text-sm text-gray-300">No data yet</p>}
                 </div>
               </div>
@@ -1117,7 +941,7 @@ export default function Statistics() {
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
                   <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="ball" className="w-4 h-4" /> Top scorers</h2>
                   {topScorers.map(p => (
-                    <LeaderBar key={p.userId} name={p.name} value={p.totalGoals}
+                    <LeaderBar key={p.userId} name={p.name} value={p.totalGoals} hubTo={hubUrl(p.userId)}
                       max={maxGoals} color={CHART_COLORS.goals} isMe={p.userId === user?.userId} />
                   ))}
                 </div>
@@ -1126,7 +950,7 @@ export default function Statistics() {
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
                   <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="target" className="w-4 h-4" /> Top assisters</h2>
                   {topAssisters.map(p => (
-                    <LeaderBar key={p.userId} name={p.name} value={p.totalAssists}
+                    <LeaderBar key={p.userId} name={p.name} value={p.totalAssists} hubTo={hubUrl(p.userId)}
                       max={maxAssists} color={CHART_COLORS.assists} isMe={p.userId === user?.userId} />
                   ))}
                 </div>
@@ -1136,7 +960,7 @@ export default function Statistics() {
                   <div className="bg-white rounded-xl border border-gray-200 p-5">
                     <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="glove" className="w-4 h-4" /> Clean sheets</h2>
                     {topCleanSheets.map(p => (
-                      <LeaderBar key={p.userId} name={p.name} value={p.totalCleanSheets}
+                      <LeaderBar key={p.userId} name={p.name} value={p.totalCleanSheets} hubTo={hubUrl(p.userId)}
                         max={maxCleanSheets} color={CHART_COLORS.cleanSheets} isMe={p.userId === user?.userId} />
                     ))}
                   </div>
@@ -1159,7 +983,7 @@ export default function Statistics() {
                         return (
                           <div key={p.userId} className={`flex items-center gap-2 py-0.5 ${isMe ? 'font-semibold' : ''}`}>
                             <span className="text-xs text-gray-700 w-28 truncate shrink-0">
-                              {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
+                              <PlayerLink to={hubUrl(p.userId)} name={p.name} />{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
                             </span>
                             <span className="text-xs text-gray-600 w-16 text-center">{p.gkAppearances}</span>
                             <span className="text-xs text-gray-600 w-16 text-center">{p.totalCleanSheets}</span>
@@ -1177,7 +1001,7 @@ export default function Statistics() {
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
                   <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><Icon name="calendar" className="w-4 h-4 text-gray-400" /> Attendance rate</h2>
                   {topAttenders.filter(p => p.totalSignups > 0).map(p => (
-                    <LeaderBar key={p.userId} name={p.name} value={Math.round(p.attendanceRate)}
+                    <LeaderBar key={p.userId} name={p.name} value={Math.round(p.attendanceRate)} hubTo={hubUrl(p.userId)}
                       max={maxAttend} color={CHART_COLORS.attendance} isMe={p.userId === user?.userId} />
                   ))}
                 </div>
@@ -1192,7 +1016,7 @@ export default function Statistics() {
                         return (
                           <div key={p.userId} className={`flex items-center gap-3 py-1 ${isMe ? 'font-semibold' : ''}`}>
                             <span className="text-xs text-gray-700 w-28 truncate shrink-0">
-                              {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
+                              <PlayerLink to={hubUrl(p.userId)} name={p.name} />{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
                             </span>
                             <div className="flex gap-2">
                               {p.totalYellowCards > 0 && (
@@ -1215,8 +1039,13 @@ export default function Statistics() {
               </div>
             )}
 
-            {/* Player list — cards on mobile, table on sm+ (never overflow-hidden:
-                it clips columns on phones with no way to scroll). */}
+          </>
+        )}
+
+        {/* ── Players roster view — every player links to their profile hub.
+            Cards on mobile, table on sm+ (never overflow-hidden: it clips
+            columns on phones with no way to scroll). ── */}
+        {view === 'players' && !isLoading && (
             <div>
               {/* Mobile cards */}
               <div className="sm:hidden space-y-3">
@@ -1225,9 +1054,10 @@ export default function Statistics() {
                   const isMe = p.userId === user?.userId;
                   const rate = p.totalSignups > 0 ? p.attendanceRate : null;
                   return (
-                    <div key={p.userId} onClick={() => setSelectedPlayer(p.userId)}
+                    <div key={p.userId} onClick={() => navigate(hubUrl(p.userId), { state: hubState })}
                       className={`bg-white rounded-xl border p-4 space-y-3 cursor-pointer ${isMe ? 'border-brand-green ring-1 ring-brand-green/30 bg-brand-green-50' : 'border-gray-200'}`}>
                       <div className="flex items-center gap-2 flex-wrap">
+                        <Avatar src={p.avatarUrl} name={p.name} size={32} />
                         <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
                           {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
                         </span>
@@ -1263,7 +1093,7 @@ export default function Statistics() {
                     </div>
                   );
                 })}
-                <p className="text-xs text-gray-400">Tap a player to view details</p>
+                <p className="text-xs text-gray-400">Tap a player to view their profile</p>
               </div>
 
               {/* Desktop table */}
@@ -1295,10 +1125,11 @@ export default function Statistics() {
                       return (
                         <tr key={p.userId}
                           className={`cursor-pointer transition-colors ${isMe ? 'bg-brand-green-50' : 'hover:bg-gray-50'}`}
-                          onClick={() => setSelectedPlayer(p.userId)}
+                          onClick={() => navigate(hubUrl(p.userId), { state: hubState })}
                         >
                           <td className="px-3 py-2.5">
                             <div className="flex items-center gap-2 flex-wrap">
+                              <Avatar src={p.avatarUrl} name={p.name} size={28} />
                               <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
                                 {p.name}
                               </span>
@@ -1330,95 +1161,9 @@ export default function Statistics() {
                     })}
                   </tbody>
                 </table>
-                <p className="text-xs text-gray-400 px-5 py-3">Click a row to view player details</p>
+                <p className="text-xs text-gray-400 px-5 py-3">Click a row to view the player's profile</p>
               </div>
             </div>
-          </>
-        )}
-
-        {/* ── Selected player view ── */}
-        {view === 'team' && !isLoading && selectedPlayer && focusPlayer && (
-          <>
-            <div className="space-y-3">
-              <button onClick={() => setSelectedPlayer('')} className="inline-flex items-center gap-1 rounded-lg bg-brand-green/10 hover:bg-brand-green/20 text-brand-green text-sm font-medium pl-2 pr-3 py-1.5 transition-colors">
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 shrink-0" aria-hidden>
-                  <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                All players
-              </button>
-              {/* Profile header — who it is, their positions, and their photo. */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
-                <Avatar src={focusPlayer.avatarUrl} name={focusPlayer.name} size={64} className="ring-1 ring-gray-200" />
-                <div className="min-w-0">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {focusPlayer.name}
-                    {focusPlayer.userId === user?.userId && <span className="text-brand-green ml-2 text-sm font-medium">you</span>}
-                  </h2>
-                  <div className="flex gap-1.5 flex-wrap mt-2">
-                    {focusPlayer.preferredPositions.length > 0
-                      ? focusPlayer.preferredPositions.map(pos => (
-                          <span key={pos} className={`text-xs font-medium px-2 py-0.5 rounded-full ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
-                        ))
-                      : <span className="text-sm text-gray-400">No positions set</span>}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Player stat cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {(isCoach || focusPlayer.userId === user?.userId) && <StatCard label="Signed up" value={focusPlayer.totalSignups} />}
-              <StatCard label="Games"      value={focusPlayer.totalPlayed} sub={overview && overview.teamGames > 0 ? `of ${overview.teamGames} · ${Math.round(focusPlayer.attendanceRate)}%` : undefined} />
-              <StatCard label="Goals"      value={focusPlayer.totalGoals}        sub={focusPlayer.totalPlayed > 0 ? `${(focusPlayer.totalGoals        / focusPlayer.totalPlayed).toFixed(2)}/game` : undefined} />
-              <StatCard label="Assists"    value={focusPlayer.totalAssists}      sub={focusPlayer.totalPlayed > 0 ? `${(focusPlayer.totalAssists      / focusPlayer.totalPlayed).toFixed(2)}/game` : undefined} />
-              <StatCard label="Clean sheets" value={focusPlayer.totalCleanSheets} sub={focusPlayer.totalPlayed > 0 ? `${(focusPlayer.totalCleanSheets / focusPlayer.totalPlayed).toFixed(2)}/game` : undefined} />
-              <StatCard label="Avg rating" value={focusPlayer.avgRating > 0 ? focusPlayer.avgRating.toFixed(1) : '—'} />
-              {focusPlayer.totalManOfMatch > 0 && <StatCard label="Man of match" value={focusPlayer.totalManOfMatch} color="text-amber-500" />}
-              {focusPlayer.totalYellowCards > 0 && <StatCard label="Yellow cards" value={focusPlayer.totalYellowCards} color="text-amber-500" />}
-              {focusPlayer.totalRedCards > 0 && <StatCard label="Red cards" value={focusPlayer.totalRedCards} color="text-red-600" />}
-            </div>
-
-            <PlayerCrestStrip playerId={focusPlayer.userId} />
-
-            {/* Radar chart */}
-            {radarData.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h2 className="text-sm font-semibold text-gray-700 mb-2">Player profile</h2>
-                <ResponsiveContainer width="100%" height={260}>
-                  <RadarChart data={radarData}>
-                    <PolarGrid stroke="#e5e7eb" />
-                    <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11 }} />
-                    <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
-                    <Tooltip content={<RadarTooltip />} />
-                    <Radar name={focusPlayer.name} dataKey="value" stroke={CHART_COLORS.goals} fill={CHART_COLORS.goals} fillOpacity={0.25} />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {/* Per-match performance */}
-            {playerMatchData.length > 0 ? (
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h2 className="text-sm font-semibold text-gray-700 mb-4">Goals · Assists · Clean sheets per match</h2>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={playerMatchData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                    <Tooltip content={<ResultTooltip />} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="Goals"   stroke={CHART_COLORS.goals}   strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="Assists" stroke={CHART_COLORS.assists} strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="Clean sheets" stroke={CHART_COLORS.cleanSheets} strokeWidth={2} dot={{ r: 3 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                No per-match performance data recorded yet.
-              </div>
-            )}
-          </>
         )}
 
           </div> {/* end flex-1 content */}

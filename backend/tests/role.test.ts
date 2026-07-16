@@ -112,18 +112,40 @@ describe('Role enforcement', () => {
 
   // ── Player stats privacy ────────────────────────────────────────────────────
 
-  it('player cannot view another player\'s statistics', async () => {
+  it('player can view a teammate\'s statistics, with signups redacted', async () => {
     const res = await request(app)
       .get(`/api/players/${coach.userId}/statistics`)
       .set('Authorization', `Bearer ${player.token}`);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
+    expect(res.body.data.seasonStats.total_signups).toBeNull();
   });
 
-  it('player can view their own statistics', async () => {
+  it('player can view their own statistics, including signups', async () => {
     const res = await request(app)
       .get(`/api/players/${player.userId}/statistics`)
       .set('Authorization', `Bearer ${player.token}`);
     expect(res.status).toBe(200);
+    expect(res.body.data.seasonStats.total_signups).toBeTypeOf('number');
+    expect(res.body.data.player).toHaveProperty('avatarUrl');
+    expect(Array.isArray(res.body.data.availableSeasons)).toBe(true);
+    expect(res.body.data.seasonStats).toHaveProperty('gk_appearances');
+    expect(res.body.data.seasonStats).toHaveProperty('total_yellow_cards');
+    expect(res.body.data.seasonStats).toHaveProperty('total_red_cards');
+  });
+
+  it('coach sees a player\'s real signup count', async () => {
+    const res = await request(app)
+      .get(`/api/players/${player.userId}/statistics`)
+      .set('Authorization', `Bearer ${coach.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.seasonStats.total_signups).toBeTypeOf('number');
+  });
+
+  it('returns 404 for an unknown player id', async () => {
+    const res = await request(app)
+      .get('/api/players/00000000-0000-0000-0000-000000000000/statistics')
+      .set('Authorization', `Bearer ${player.token}`);
+    expect(res.status).toBe(404);
   });
 
   it('coach can view any player\'s statistics', async () => {

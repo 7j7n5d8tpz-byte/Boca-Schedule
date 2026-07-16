@@ -11,6 +11,7 @@ import MatchDetail from './pages/coach/MatchDetail';
 import Selections from './pages/coach/Selections';
 import NewMatch from './pages/coach/NewMatch';
 import PlayerProfile from './pages/player/Profile';
+import PlayerHub from './pages/player/PlayerHub';
 import Statistics from './pages/player/Statistics';
 import Achievements from './pages/player/Achievements';
 import CrestSprite from './components/CrestSprite';
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/dashboard" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerDashboard /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerProfile /></ProtectedRoute>} />
             <Route path="/statistics" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><Statistics /></ProtectedRoute>} />
+            <Route path="/players/:playerId" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerHub /></ProtectedRoute>} />
             <Route path="/achievements" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><Achievements /></ProtectedRoute>} />
             <Route path="/fines" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><FinesPage /></ProtectedRoute>} />
             <Route path="/fines/manage" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><ManageFinesPage /></ProtectedRoute>} />

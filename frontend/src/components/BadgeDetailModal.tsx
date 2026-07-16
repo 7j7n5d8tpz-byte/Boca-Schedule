@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import Crest, { TIER_META, TIERS, tierRank, type Tier } from './Crest';
 import Avatar from './Avatar';
 import { useCatalog, useTeamWall } from '../api/achievements';
@@ -61,14 +62,20 @@ export default function BadgeDetailModal({ code, onClose }: { code: string; onCl
           </p>
           <div className="space-y-1.5">
             {holders.map(h => (
-              <div key={h.playerId} className="flex items-center gap-2.5">
+              <Link
+                key={h.playerId}
+                to={`/players/${h.playerId}`}
+                state={{ from: '/achievements', fromLabel: 'Achievements' }}
+                onClick={onClose}
+                className="flex items-center gap-2.5 rounded-lg -mx-1 px-1 py-0.5 hover:bg-gray-50 transition-colors"
+              >
                 <Avatar src={h.avatarUrl} name={h.name} size={28} />
                 <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">{h.name}</span>
                 <Crest glyph={entry.glyph} tier={h.tier} size={24} showRibbon={false} />
                 <span className="text-xs font-medium w-16 text-right" style={{ color: TIER_META[h.tier].ribbon }}>
                   {TIER_META[h.tier].label}
                 </span>
-              </div>
+              </Link>
             ))}
             {!isTeam && holders.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-3">Be the first to earn this one.</p>

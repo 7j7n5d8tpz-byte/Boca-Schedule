@@ -229,10 +229,10 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
         avgAttendanceRate: avgAttendance, gamesWithResults, teamGames, wins, draws, losses,
         avgGoalsFor:     gamesWithResults ? +(totalGoals / gamesWithResults).toFixed(2) : 0,
         avgGoalsAgainst: gamesWithResults ? +(totalGoalsAgainst / gamesWithResults).toFixed(2) : 0,
-        topScorer:   topScorer?.totalGoals        ? { name: topScorer.name,   value: topScorer.totalGoals }         : null,
-        topAssister: topAssister?.totalAssists    ? { name: topAssister.name, value: topAssister.totalAssists }     : null,
-        topGk:       topGk?.gkAppearances         ? { name: topGk.name, halves: topGk.gkAppearances, cleanSheets: topGk.totalCleanSheets } : null,
-        topMotm:     topMotm?.totalManOfMatch     ? { name: topMotm.name,     value: topMotm.totalManOfMatch }      : null,
+        topScorer:   topScorer?.totalGoals        ? { userId: topScorer.userId,   name: topScorer.name,   value: topScorer.totalGoals }     : null,
+        topAssister: topAssister?.totalAssists    ? { userId: topAssister.userId, name: topAssister.name, value: topAssister.totalAssists } : null,
+        topGk:       topGk?.gkAppearances         ? { userId: topGk.userId, name: topGk.name, halves: topGk.gkAppearances, cleanSheets: topGk.totalCleanSheets } : null,
+        topMotm:     topMotm?.totalManOfMatch     ? { userId: topMotm.userId,     name: topMotm.name,     value: topMotm.totalManOfMatch }  : null,
       };
     }
 
@@ -318,35 +318,36 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
       gkByMatch.set(r.match_id, gks);
     }
 
-    const cleanSheetMap = new Map<string, string[]>();
-    const yellowCardMap = new Map<string, string[]>();
-    const redCardMap    = new Map<string, string[]>();
-    const motmMap       = new Map<string, string>();
-    const playersMap    = new Map<string, { name: string; isScorer: boolean; isAssister: boolean; isGoalkeeper: boolean }[]>();
+    type NamedPlayer = { playerId: string; name: string };
+    const cleanSheetMap = new Map<string, NamedPlayer[]>();
+    const yellowCardMap = new Map<string, NamedPlayer[]>();
+    const redCardMap    = new Map<string, NamedPlayer[]>();
+    const motmMap       = new Map<string, NamedPlayer>();
+    const playersMap    = new Map<string, { playerId: string; name: string; isScorer: boolean; isAssister: boolean; isGoalkeeper: boolean }[]>();
     for (const p of (cardPerfs ?? [])) {
-      const pname = p.users?.name ?? 'Unknown';
+      const entry: NamedPlayer = { playerId: p.player_id, name: p.users?.name ?? 'Unknown' };
       if (p.clean_sheet) {
         const arr = cleanSheetMap.get(p.match_id) ?? [];
-        arr.push(pname);
+        arr.push(entry);
         cleanSheetMap.set(p.match_id, arr);
       }
       if ((p.yellow_cards ?? 0) > 0) {
         const arr = yellowCardMap.get(p.match_id) ?? [];
-        arr.push(pname);
+        arr.push(entry);
         yellowCardMap.set(p.match_id, arr);
       }
       if ((p.red_cards ?? 0) > 0) {
         const arr = redCardMap.get(p.match_id) ?? [];
-        arr.push(pname);
+        arr.push(entry);
         redCardMap.set(p.match_id, arr);
       }
       if (p.man_of_match) {
-        motmMap.set(p.match_id, pname);
+        motmMap.set(p.match_id, entry);
       }
       if (p.attended) {
         const arr = playersMap.get(p.match_id) ?? [];
         arr.push({
-          name:         pname,
+          ...entry,
           isScorer:     (scorersByMatch.get(p.match_id)   ?? new Set()).has(p.player_id),
           isAssister:   (assistersByMatch.get(p.match_id) ?? new Set()).has(p.player_id),
           isGoalkeeper: (gkByMatch.get(p.match_id)        ?? new Set()).has(p.player_id),
@@ -375,7 +376,9 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
       goalsAgainst:   Number(r.goals_against),
       gameAssessment: r.game_assessment ?? null,
       goals: (r.goal_events ?? []).map((g: any) => ({
+        scorerId:     g.scorerId ?? null,
         scorerName:   g.scorerId   ? (nameMap.get(g.scorerId)   ?? 'Unknown') : null,
+        assisterId:   g.assisterId ?? null,
         assisterName: g.assisterId ? (nameMap.get(g.assisterId) ?? null)      : null,
       })),
       cleanSheets:  cleanSheetMap.get(r.match_id) ?? [],
@@ -397,17 +400,16 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
   try {
     const { playerId } = req.params;
 
-    // Only allow viewing own stats unless coach/admin
-    if (playerId !== req.user!.userId && req.user!.role === 'player') {
-      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } });
-      return;
-    }
+    // Any teammate may view a player's stats (the profile hub links here from
+    // all over the app). Signup counts are the one private figure — redacted
+    // for non-owners, mirroring the achievements route's PRIVATE_COUNT_CODES.
+    const canSeePrivate = playerId === req.user!.userId || req.user!.role !== 'player';
 
     const yearParam = req.query.year ? parseInt(req.query.year as string) : undefined;
     const matchTypeFilter = (req.query.matchType as string | undefined) ?? 'all';
 
     const [{ data: profile }, { data: recent }, { data: perfRows }, { data: signupRows }, { data: selectionMatchRows }, { data: completedMatches }, { data: resultRows }] = await Promise.all([
-      supabaseAdmin.from('users').select('user_id, name, preferred_positions').eq('user_id', playerId).single(),
+      supabaseAdmin.from('users').select('user_id, name, preferred_positions, avatar_url').eq('user_id', playerId).single(),
       supabaseAdmin.from('match_performance').select('*, matches(match_date)').eq('player_id', playerId),
       supabaseAdmin.from('match_performance').select('match_id, attended, goals, assists, saves, clean_sheet, yellow_cards, red_cards, man_of_match').eq('player_id', playerId),
       supabaseAdmin.from('signups').select('match_id').eq('player_id', playerId).eq('is_active', true),
@@ -452,6 +454,8 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
     const saves       = rows.reduce((s: number, r: any) => s + (r.saves ?? 0), 0);
     const cleanSheets = rows.filter((r: any) => r.clean_sheet).length;
     const manOfMatch  = rows.filter((r: any) => r.man_of_match).length;
+    const yellowCards = rows.reduce((s: number, r: any) => s + (r.yellow_cards ?? 0), 0);
+    const redCards    = rows.reduce((s: number, r: any) => s + (r.red_cards ?? 0), 0);
     const totalSignups = (signupRows ?? []).filter((s: any) => seasonMatchIds.has(s.match_id)).length;
 
     // Computed performance rating: score each match the player featured in from the
@@ -465,6 +469,10 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
         if (id === playerId) gkHalvesMap.set(r.match_id, (gkHalvesMap.get(r.match_id) ?? 0) + 1);
       }
     });
+    // Halves in goal this season (same "time in goal" unit as the team route).
+    let gkAppearances = 0;
+    for (const id of seasonMatchIds) gkAppearances += gkHalvesMap.get(id) ?? 0;
+
     const avgRating = averageRating(rows.map((r: any) => computeMatchRating({
       goals: r.goals, assists: r.assists, cleanSheet: r.clean_sheet,
       gkHalves: gkHalvesMap.get(r.match_id) ?? 0,
@@ -479,7 +487,9 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
       total_goals: goals, total_assists: assists,
       total_saves: saves, total_clean_sheets: cleanSheets,
       total_man_of_match: manOfMatch,
-      total_signups: totalSignups,
+      total_yellow_cards: yellowCards, total_red_cards: redCards,
+      gk_appearances: gkAppearances,
+      total_signups: canSeePrivate ? totalSignups : null,
       avg_rating: avgRating,
       // Attendance = share of the team's games this season the player featured in.
       attendance_rate: teamGames > 0 ? +((playedCount / teamGames) * 100).toFixed(2) : 0,
@@ -488,8 +498,9 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        player: { userId: profile.user_id, name: profile.name, preferredPositions: profile.preferred_positions },
+        player: { userId: profile.user_id, name: profile.name, preferredPositions: profile.preferred_positions, avatarUrl: profile.avatar_url ?? null },
         seasonStats: stats ?? {},
+        availableSeasons: (seasonYears.length > 0 ? seasonYears : [season]).map((y: number) => ({ year: y, label: seasonLabel(y, matchTypeFilter) })),
         // Latest matches of the SAME season/competition the figures above cover.
         recentMatches: (recent ?? [])
           .filter((mp: any) => seasonMatchIds.has(mp.match_id))

@@ -31,11 +31,11 @@ test.describe('Player flow', () => {
     // no-data fallback when no performances are recorded yet).
     await expect(page.getByRole('heading').first()).toBeVisible();
     await expect(
-      page.getByText('Player profile').or(page.getByText(/No per-match performance data/)).first(),
+      page.getByText('Play style').or(page.getByText(/No per-match performance data/)).first(),
     ).toBeVisible({ timeout: 8_000 });
   });
 
-  test('own profile hub links to profile settings', async ({ page }) => {
+  test('own profile hub links to settings', async ({ page }) => {
     await loginAs(page, 'player');
     // Find your own (visible, desktop) row via the "you" chip on the Players tab.
     await page.goto('/statistics');
@@ -47,7 +47,7 @@ test.describe('Player flow', () => {
       .click();
     await expect(page).toHaveURL(/\/players\//);
     await page.getByRole('link', { name: 'Edit profile' }).click();
-    await expect(page).toHaveURL(/\/profile/);
+    await expect(page).toHaveURL(/\/settings/);
   });
 
   test('sign-up button is visible on an open match', async ({ page }) => {
@@ -66,11 +66,15 @@ test.describe('Player flow', () => {
     await expect(matchState).toBeVisible({ timeout: 8_000 });
   });
 
-  test('profile page loads', async ({ page }) => {
+  test('nav avatar opens your hub; settings load from the menu', async ({ page }) => {
     await loginAs(page, 'player');
-    // Profile is reached via the avatar button on the right of the nav.
+    // The avatar button on the right of the nav opens your own player hub.
     await page.getByRole('link', { name: /your profile/i }).click();
-    await expect(page).toHaveURL(/profile/);
-    await expect(page.getByRole('heading', { name: /profile/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/players\//);
+    // Account settings live in the drawer menu footer.
+    await page.getByRole('button', { name: /open menu/i }).click();
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await expect(page).toHaveURL(/\/settings/);
+    await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible();
   });
 });

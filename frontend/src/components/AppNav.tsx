@@ -213,14 +213,15 @@ export default function AppNav({ backHref, backLabel = 'Back', onBack }: AppNavP
         }}
       />
 
-      {/* ── Profile avatar (far right) → profile page. Placeholder initial
-             circle for now; swap in an uploaded photo later. ── */}
+      {/* ── Profile avatar (far right) → your own player hub (photo, stats,
+             crests). Account settings are reached from there or the drawer. ── */}
       <Link
-        to="/profile"
+        to={`/players/${user?.userId}`}
+        state={{ from: '/dashboard', fromLabel: 'Dashboard' }}
         aria-label="Your profile"
         className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden text-sm font-bold transition-all ${
-          pathname === '/profile' ? 'ring-2 ring-white/40' : 'hover:opacity-90'
-        } ${avatarUrl ? 'bg-white/10' : pathname === '/profile' ? 'bg-brand-green text-white' : 'bg-brand-green/30 text-brand-green'}`}
+          pathname === `/players/${user?.userId}` ? 'ring-2 ring-white/40' : 'hover:opacity-90'
+        } ${avatarUrl ? 'bg-white/10' : pathname === `/players/${user?.userId}` ? 'bg-brand-green text-white' : 'bg-brand-green/30 text-brand-green'}`}
       >
         {avatarUrl
           ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -287,13 +288,14 @@ export default function AppNav({ backHref, backLabel = 'Back', onBack }: AppNavP
               {isAdmin && navLink('/admin', 'Admin panel', 'text-purple-300')}
             </div>
 
-            {/* Footer: log out. Pad the bottom by the safe-area inset so Log out
-                clears the home indicator in the installed full-screen app
-                (env() is 0 in a normal Safari tab, leaving py-2). */}
+            {/* Footer: settings + log out. Pad the bottom by the safe-area inset
+                so Log out clears the home indicator in the installed full-screen
+                app (env() is 0 in a normal Safari tab, leaving py-2). */}
             <div
               style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
               className="border-t border-white/10 py-2"
             >
+              {navLink('/settings', 'Settings')}
               <button
                 onClick={() => { logout(); setOpen(false); }}
                 className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-white/10 transition-colors"

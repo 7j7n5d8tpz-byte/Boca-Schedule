@@ -45,7 +45,7 @@ const POS_COLOR: Record<string, string> = {
   STR: 'bg-red-100 text-red-700 border-red-300',
 };
 
-export default function PlayerProfile() {
+export default function Settings() {
   const { user, updateUser } = useAuth();
   const qc = useQueryClient();
 
@@ -165,7 +165,7 @@ export default function PlayerProfile() {
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-extrabold text-gray-900">My Profile</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900">Settings</h1>
           {!editing && (
             <button
               onClick={() => setEditing(true)}

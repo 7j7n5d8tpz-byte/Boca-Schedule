@@ -501,13 +501,25 @@ export default function PlayerDashboard() {
 
           return (
             <div className="space-y-4">
-              {season && (
-                <div className="flex items-baseline justify-between">
-                  <h2 className="text-sm font-semibold text-gray-700">Your season</h2>
-                  <span className="text-xs text-gray-400">{season}</span>
-                </div>
-              )}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-sm font-semibold text-gray-700">
+                  Your season{season ? <span className="font-normal text-gray-400"> · {season}</span> : null}
+                </h2>
+                <Link
+                  to={`/players/${user?.userId}`}
+                  state={{ from: '/dashboard', fromLabel: 'Dashboard' }}
+                  className="text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
+                >
+                  Full profile →
+                </Link>
+              </div>
+              {/* The whole stat block opens your player hub — the one place with
+                  the full picture (stats, crests, streaks, match history). */}
+              <Link
+                to={`/players/${user?.userId}`}
+                state={{ from: '/dashboard', fromLabel: 'Dashboard' }}
+                className="grid grid-cols-3 gap-3 group"
+              >
                 {[
                   { label: 'Played',        value: played, suffix: ` / ${teamGames}` },
                   { label: 'Goals',         value: goals },
@@ -516,15 +528,15 @@ export default function PlayerDashboard() {
                   { label: 'Clean sheets',  value: sheets },
                   { label: 'Attendance',    value: Math.round(attend), suffix: '%' },
                 ].map(s => (
-                  <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
+                  <div key={s.label} className="bg-white rounded-xl border border-gray-200 group-hover:border-brand-green p-4 text-center transition-colors">
                     <p className="text-2xl font-bold font-numeric text-gray-900"><CountUp value={s.value} />{s.suffix ?? ''}</p>
                     <p className="text-xs text-gray-500 mt-1">{s.label}</p>
                   </div>
                 ))}
-              </div>
+              </Link>
 
               {/* Quick links */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <Link to="/statistics" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
                   <div>
                     <p className="text-sm font-semibold text-gray-900">Team Stats</p>
@@ -532,14 +544,7 @@ export default function PlayerDashboard() {
                   </div>
                   <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
                 </Link>
-                <Link to="/profile" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">My Profile</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Positions &amp; account info</p>
-                  </div>
-                  <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
-                </Link>
-                <Link to="/achievements" className="col-span-2 bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
+                <Link to="/achievements" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900">Achievements</p>
                     <p className="text-xs text-gray-400 mt-0.5">

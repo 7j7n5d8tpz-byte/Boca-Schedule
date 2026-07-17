@@ -226,7 +226,7 @@ export default function PlayerHub() {
                 </div>
                 {isOwn && (
                   <Link
-                    to="/profile"
+                    to="/settings"
                     className="shrink-0 text-xs font-semibold text-brand-green border border-brand-green/40 hover:bg-brand-green/10 rounded-lg px-3 py-1.5 transition-colors"
                   >
                     Edit profile
@@ -314,7 +314,7 @@ export default function PlayerHub() {
             {/* Radar chart */}
             {radarData.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h2 className="text-sm font-semibold text-gray-700 mb-2">Player profile</h2>
+                <h2 className="text-sm font-semibold text-gray-700 mb-2">Play style</h2>
                 <ResponsiveContainer width="100%" height={260}>
                   <RadarChart data={radarData}>
                     <PolarGrid stroke="#e5e7eb" />

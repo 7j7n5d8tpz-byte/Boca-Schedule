@@ -100,7 +100,7 @@ describe('PlayerHub', () => {
     expect(await screen.findByRole('heading', { name: /Ana Own/ })).toBeInTheDocument();
     expect(await screen.findByText('Signed up')).toBeInTheDocument();
     const edit = screen.getByRole('link', { name: 'Edit profile' });
-    expect(edit).toHaveAttribute('href', '/profile');
+    expect(edit).toHaveAttribute('href', '/settings');
   });
 
   it('renders a not-found state when the player does not exist', async () => {

@@ -10,7 +10,7 @@ import CoachDashboard from './pages/coach/Dashboard';
 import MatchDetail from './pages/coach/MatchDetail';
 import Selections from './pages/coach/Selections';
 import NewMatch from './pages/coach/NewMatch';
-import PlayerProfile from './pages/player/Profile';
+import Settings from './pages/player/Settings';
 import PlayerHub from './pages/player/PlayerHub';
 import Statistics from './pages/player/Statistics';
 import Achievements from './pages/player/Achievements';
@@ -46,7 +46,9 @@ export default function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/dashboard" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerDashboard /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerProfile /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><Settings /></ProtectedRoute>} />
+            {/* Old bookmark: /profile used to be the settings page. */}
+            <Route path="/profile" element={<Navigate to="/settings" replace />} />
             <Route path="/statistics" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><Statistics /></ProtectedRoute>} />
             <Route path="/players/:playerId" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><PlayerHub /></ProtectedRoute>} />
             <Route path="/achievements" element={<ProtectedRoute roles={['player', 'coach', 'admin']}><Achievements /></ProtectedRoute>} />

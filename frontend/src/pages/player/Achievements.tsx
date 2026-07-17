@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import AppNav from '../../components/AppNav';
 import Avatar from '../../components/Avatar';
@@ -7,36 +8,16 @@ import CrestUnlock from '../../components/CrestUnlock';
 import BadgeDetailModal from '../../components/BadgeDetailModal';
 import PlayerCrestsModal from '../../components/PlayerCrestsModal';
 import CrestButton from '../../components/CrestButton';
-import StreakCard from '../../components/achievements/StreakCard';
 import RankBar from '../../components/RankBar';
 import { CardListSkeleton } from '../../components/Skeleton';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import {
   useCatalog, useTeamWall, overallPoints, overallRank,
-  type CatalogEntry, type PlayerAchievements, type EarnedCrest, type GroupProgress, type StreakResult, type TeamWall,
+  type CatalogEntry, type PlayerAchievements, type EarnedCrest, type GroupProgress, type TeamWall,
 } from '../../api/achievements';
 
 type RankedPlayer = TeamWall['players'][number] & { points: number; tier: Tier | null };
-
-// ─── Overall rank hero ──────────────────────────────────────────────────────
-
-function OverallHero({ earned }: { earned: EarnedCrest[] }) {
-  const points = overallPoints(earned);
-  const { tier } = overallRank(points);
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
-      <Crest glyph="medal" tier={tier ?? 'bronze'} locked={!tier} size={84} />
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-gray-500">Overall rank</p>
-        <p className="text-xl font-bold text-gray-900 mb-2">{tier ? TIER_META[tier].label : 'Unranked'}</p>
-        <RankBar points={points} />
-        <p className="text-[11px] text-gray-400 mt-1.5">{earned.length} crest tiers earned</p>
-      </div>
-    </div>
-  );
-}
 
 // ─── Crest card (own page) ──────────────────────────────────────────────────
 
@@ -82,12 +63,7 @@ function MyCrests({ userId, onOpen }: { userId: string; onOpen: (code: string) =
   if (isLoading || !catalog || !data) return <CardListSkeleton />;
 
   const groupByCode = new Map(data.groups.map(g => [g.code, g]));
-  const streakByType = new Map(data.streaks.map(s => [s.type, s]));
   const earnedCode = (code: string) => !!groupByCode.get(code)?.highestTier;
-  // Catalog code → live streak type. The streak crest and its live run are one thing.
-  const typeForCode: Record<string, StreakResult['type']> = {
-    attendance_streak: 'attendance', scoring_streak: 'scoring', win_streak: 'win',
-  };
   const categories: { key: CatalogEntry['category']; label: string }[] = [
     { key: 'performance', label: 'On the pitch' },
     { key: 'reliability', label: 'Reliability' },
@@ -100,7 +76,19 @@ function MyCrests({ userId, onOpen }: { userId: string; onOpen: (code: string) =
   return (
     <>
       <CrestUnlock userId={userId} earned={data.earned} />
-      <OverallHero earned={data.earned} />
+      {/* Overall rank, streaks and season stats live on the player hub — this
+          tab is the full catalog: progress per crest and locked ones to chase. */}
+      <Link
+        to={`/players/${userId}`}
+        state={{ from: '/achievements', fromLabel: 'Achievements' }}
+        className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift"
+      >
+        <div>
+          <p className="text-sm font-semibold text-gray-900">Your profile</p>
+          <p className="text-xs text-gray-400 mt-0.5">Overall rank, streaks &amp; season stats</p>
+        </div>
+        <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
+      </Link>
       <p className="text-xs text-gray-400">
         Season {data.seasonYear} — every competition counts (calendar year).
       </p>
@@ -129,26 +117,6 @@ function MyCrests({ userId, onOpen }: { userId: string; onOpen: (code: string) =
           {showLocked ? 'Hide locked crests' : `Show ${lockedCount} locked crest${lockedCount > 1 ? 's' : ''} to chase`}
         </button>
       )}
-
-      <section>
-        <h2 className="text-sm font-semibold text-gray-700 mb-1 mt-5">Streaks</h2>
-        <p className="text-xs text-gray-400 mb-2">Live runs — keep them going. Your best run banks a permanent crest.</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {catalog.individual.filter(c => c.isStreak).map(entry => {
-            const streak = streakByType.get(typeForCode[entry.code]);
-            if (!streak) return null;
-            return (
-              <StreakCard
-                key={entry.code}
-                entry={entry}
-                streak={streak}
-                group={groupByCode.get(entry.code)}
-                onOpen={onOpen}
-              />
-            );
-          })}
-        </div>
-      </section>
     </>
   );
 }

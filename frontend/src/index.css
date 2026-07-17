@@ -70,6 +70,17 @@
   .lift:hover { transform: none; box-shadow: none; }
 }
 
+/* iOS Safari auto-zooms the page when a focused form control's font-size is
+   under 16px — and it stays zoomed after navigating away (login → dashboard
+   lands zoomed in). Floor every control at 16px on touch devices so the zoom
+   never triggers; pinch-zoom stays available, unlike the `maximum-scale=1`
+   viewport workaround. `!important` because Tailwind utility classes on the
+   elements (`text-sm`) otherwise win the cascade. No control in the app styles
+   its font larger than `text-sm`, so this only ever scales up. */
+@media (hover: none) and (pointer: coarse) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
 /* iOS Safari renders native date/time controls as gray, centre-aligned pills
    that ignore our field styling and size to their own intrinsic width (looks
    broken next to the white text inputs/selects). Normalise them to match the

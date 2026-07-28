@@ -84,12 +84,12 @@ describe('PlayerHub', () => {
     expect(screen.getByText('Assists')).toBeInTheDocument();
     // Overall tier from the earned crest (gold = 3+1 = 4 points → bronze rank).
     expect(await screen.findByText(/rank/)).toBeInTheDocument();
-    // Rating sits with the rank, not among the counting stats: career leads, the
-    // filtered season figure rides underneath labelled with the season it covers.
+    // Rating sits with the rank, not among the counting stats — and it is the
+    // career figure alone, so nothing in the block reacts to the season filters.
     expect(screen.getByText('7.6')).toBeInTheDocument();
     expect(screen.getByText('career rating')).toBeInTheDocument();
-    expect(screen.getByText('7.4 · 2026')).toBeInTheDocument();
     expect(screen.queryByText('Avg rating')).not.toBeInTheDocument();
+    expect(screen.queryByText(/7\.4/)).not.toBeInTheDocument();
     // Signups are redacted for teammates → no card; not their own page → no edit link.
     expect(screen.queryByText('Signed up')).not.toBeInTheDocument();
     expect(screen.queryByText('Edit profile')).not.toBeInTheDocument();

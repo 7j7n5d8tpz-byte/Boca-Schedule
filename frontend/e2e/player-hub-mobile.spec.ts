@@ -11,7 +11,12 @@ import { loginAs } from './helpers/auth';
 // re-runs every spec at this width, and the roster specs deliberately target
 // `tbody tr`, which is `hidden sm:block` and therefore invisible below Tailwind's
 // sm breakpoint (640px). See commit 3175563 for that trap in the other direction.
-test.use({ viewport: { width: 390, height: 844 } });
+//
+// 360px (common Android) rather than 390px (modern iPhone) because that is where
+// the tier caption actually needs truncating: at 390 it fits exactly — scrollWidth
+// 183 vs clientWidth 183 — so `truncate` does no work and the guard below would
+// pass whether or not the class were still there. At 360 it is 182 vs 153.
+test.use({ viewport: { width: 360, height: 800 } });
 
 test.describe('Player hub on a phone', () => {
   test('own hub does not scroll sideways', async ({ page }) => {
@@ -79,8 +84,6 @@ test.describe('Player hub on a phone', () => {
             gk_appearances: 4, total_signups: 19,
             avg_rating: 7.4, career_rating: 7.6, attendance_rate: 90,
           },
-          // Futsal seasons render as "2025/26" — the longest label seasonLabel
-          // produces — and the spec appends the competition on top of that.
           availableSeasons: [{ year: 2025, label: '2025/26' }],
           recentMatches: [],
         },
@@ -90,24 +93,27 @@ test.describe('Player hub on a phone', () => {
     await loginAs(page, 'player');
     await page.getByRole('link', { name: /your profile/i }).click();
     await expect(page).toHaveURL(/\/players\//);
-    // ?matchType=futsal makes the sub-line read "7.4 · 2025/26 futsal".
-    await page.goto(page.url() + '?matchType=futsal');
 
-    // Both figures render, and the tier caption is the long one we asked for.
+    // The career rating renders, and the tier caption is the long one we asked for.
     await expect(page.getByText('7.6')).toBeVisible({ timeout: 8_000 });
     await expect(page.getByText('career rating')).toBeVisible();
-    await expect(page.getByText('7.4 · 2025/26 futsal')).toBeVisible();
     await expect(page.getByText(/Champion rank/)).toBeVisible();
 
     // The tier caption must stay on ONE line. This is the assertion that actually
     // guards the layout: `truncate` (PlayerHub.tsx) is what keeps the caption from
     // wrapping and shoving the row taller. Dropping it does NOT trigger a page
     // overflow — the text simply wraps — so a scrollWidth check alone would never
-    // go red here. Measured: 16px truncated, 32px wrapped.
+    // go red here. Measured at this viewport: 16px truncated, 32px wrapped.
     const caption = page.getByText(/rank ·/).first();
     const captionBox = await caption.boundingBox();
     expect(captionBox).not.toBeNull();
     expect(captionBox!.height).toBeLessThan(24);
+
+    // And the caption is genuinely being clipped here, so the check above is
+    // testing something. If this ever stops holding, the fixture has grown roomy
+    // enough that the truncate assertion has gone vacuous — widen the text or
+    // narrow the viewport rather than deleting this line.
+    expect(await caption.evaluate(el => el.scrollWidth > el.clientWidth)).toBe(true);
 
     // And the rating column must sit inside the viewport, not be pushed past its
     // edge by the caption beside it.

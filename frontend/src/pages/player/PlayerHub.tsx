@@ -131,14 +131,10 @@ export default function PlayerHub() {
   const overallTier = earned ? overallRank(points).tier : null;
 
   // Rating lives with the rank rather than among the counting stats — it measures how
-  // a player performs, not how much they accumulate. The career figure leads because it
-  // survives the seasonal crest reset; the filtered season figure rides underneath,
-  // labelled with the season it actually covers (the picker sits below this block).
+  // a player performs, not how much they accumulate. Career only: one number that
+  // survives the seasonal crest reset and, like the tier beside it, never moves when
+  // the season/match-type filters below change.
   const careerRating = stats?.career_rating ?? 0;
-  const seasonRating = stats?.avg_rating ?? 0;
-  const seasonLabel = data?.availableSeasons?.find(s => s.year === (year ?? stats?.season_year))?.label
-    ?? String(stats?.season_year ?? '');
-  const seasonRatingLabel = matchType === 'all' ? seasonLabel : `${seasonLabel} ${matchType}`;
 
   // Radar profile — all axes normalized to 0-100.
   const radarData = stats ? [
@@ -262,9 +258,6 @@ export default function PlayerHub() {
                     <div className={`shrink-0 ${earned ? 'text-right' : 'flex-1 text-left'}`}>
                       <p className="text-2xl font-bold font-numeric text-gray-900 leading-none">{careerRating.toFixed(1)}</p>
                       <p className="text-[10px] text-gray-500 mt-1">career rating</p>
-                      {seasonRating > 0 && (
-                        <p className="text-[10px] text-gray-400">{seasonRating.toFixed(1)} · {seasonRatingLabel}</p>
-                      )}
                     </div>
                   )}
                 </div>

@@ -129,6 +129,9 @@ describe('Role enforcement', () => {
     expect(res.body.data.player).toHaveProperty('avatarUrl');
     expect(Array.isArray(res.body.data.availableSeasons)).toBe(true);
     expect(res.body.data.seasonStats).toHaveProperty('gk_appearances');
+    // Career rating spans every season/competition, so it is present (though null
+    // until the player has featured in a completed match) regardless of filters.
+    expect(res.body.data.seasonStats).toHaveProperty('career_rating');
     expect(res.body.data.seasonStats).toHaveProperty('total_yellow_cards');
     expect(res.body.data.seasonStats).toHaveProperty('total_red_cards');
   });

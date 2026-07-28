@@ -136,7 +136,7 @@ export default function PlayerHub() {
   // labelled with the season it actually covers (the picker sits below this block).
   const careerRating = stats?.career_rating ?? 0;
   const seasonRating = stats?.avg_rating ?? 0;
-  const seasonLabel = data?.availableSeasons.find(s => s.year === (year ?? stats?.season_year))?.label
+  const seasonLabel = data?.availableSeasons?.find(s => s.year === (year ?? stats?.season_year))?.label
     ?? String(stats?.season_year ?? '');
   const seasonRatingLabel = matchType === 'all' ? seasonLabel : `${seasonLabel} ${matchType}`;
 

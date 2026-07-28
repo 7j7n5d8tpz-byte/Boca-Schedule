@@ -36,7 +36,8 @@ function statsFor(userId: string, name: string, signups: number | null) {
       season_year: 2026, total_team_games: 10, total_played: 8,
       total_goals: 5, total_assists: 3, total_saves: 0, total_clean_sheets: 2,
       total_man_of_match: 1, total_yellow_cards: 0, total_red_cards: 0,
-      gk_appearances: 4, total_signups: signups, avg_rating: 7.4, attendance_rate: 80,
+      gk_appearances: 4, total_signups: signups, avg_rating: 7.4, career_rating: 7.6,
+      attendance_rate: 80,
     },
     availableSeasons: [{ year: 2026, label: '2026' }],
     recentMatches: [
@@ -83,6 +84,12 @@ describe('PlayerHub', () => {
     expect(screen.getByText('Assists')).toBeInTheDocument();
     // Overall tier from the earned crest (gold = 3+1 = 4 points → bronze rank).
     expect(await screen.findByText(/rank/)).toBeInTheDocument();
+    // Rating sits with the rank, not among the counting stats: career leads, the
+    // filtered season figure rides underneath labelled with the season it covers.
+    expect(screen.getByText('7.6')).toBeInTheDocument();
+    expect(screen.getByText('career rating')).toBeInTheDocument();
+    expect(screen.getByText('7.4 · 2026')).toBeInTheDocument();
+    expect(screen.queryByText('Avg rating')).not.toBeInTheDocument();
     // Signups are redacted for teammates → no card; not their own page → no edit link.
     expect(screen.queryByText('Signed up')).not.toBeInTheDocument();
     expect(screen.queryByText('Edit profile')).not.toBeInTheDocument();

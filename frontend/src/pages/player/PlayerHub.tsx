@@ -36,7 +36,9 @@ interface SeasonStats {
   total_red_cards: number;
   gk_appearances: number;
   total_signups: number | null;
-  avg_rating: number;
+  avg_rating: number | null;
+  // All seasons, all competitions — ignores the season/match-type filters.
+  career_rating: number | null;
   attendance_rate: number;
 }
 
@@ -127,6 +129,16 @@ export default function PlayerHub() {
   const earned = achievements?.earned ?? null;
   const points = earned ? overallPoints(earned) : 0;
   const overallTier = earned ? overallRank(points).tier : null;
+
+  // Rating lives with the rank rather than among the counting stats — it measures how
+  // a player performs, not how much they accumulate. The career figure leads because it
+  // survives the seasonal crest reset; the filtered season figure rides underneath,
+  // labelled with the season it actually covers (the picker sits below this block).
+  const careerRating = stats?.career_rating ?? 0;
+  const seasonRating = stats?.avg_rating ?? 0;
+  const seasonLabel = data?.availableSeasons.find(s => s.year === (year ?? stats?.season_year))?.label
+    ?? String(stats?.season_year ?? '');
+  const seasonRatingLabel = matchType === 'all' ? seasonLabel : `${seasonLabel} ${matchType}`;
 
   // Radar profile — all axes normalized to 0-100.
   const radarData = stats ? [
@@ -233,15 +245,28 @@ export default function PlayerHub() {
                   </Link>
                 )}
               </div>
-              {earned && (
+              {(earned || careerRating > 0) && (
                 <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-3">
-                  <Crest glyph="medal" tier={overallTier ?? 'bronze'} locked={!overallTier} size={44} showRibbon={false} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs" style={{ color: overallTier ? TIER_META[overallTier].ribbon : '#9ca3af' }}>
-                      {overallTier ? `${TIER_META[overallTier].label} rank` : 'Unranked'} · {earned.length} crest tiers
-                    </p>
-                    <div className="mt-1.5"><RankBar points={points} /></div>
-                  </div>
+                  {earned && (
+                    <>
+                      <Crest glyph="medal" tier={overallTier ?? 'bronze'} locked={!overallTier} size={44} showRibbon={false} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs truncate" style={{ color: overallTier ? TIER_META[overallTier].ribbon : '#9ca3af' }}>
+                          {overallTier ? `${TIER_META[overallTier].label} rank` : 'Unranked'} · {earned.length} crest tiers
+                        </p>
+                        <div className="mt-1.5"><RankBar points={points} /></div>
+                      </div>
+                    </>
+                  )}
+                  {careerRating > 0 && (
+                    <div className={`shrink-0 ${earned ? 'text-right' : 'flex-1 text-left'}`}>
+                      <p className="text-2xl font-bold font-numeric text-gray-900 leading-none">{careerRating.toFixed(1)}</p>
+                      <p className="text-[10px] text-gray-500 mt-1">career rating</p>
+                      {seasonRating > 0 && (
+                        <p className="text-[10px] text-gray-400">{seasonRating.toFixed(1)} · {seasonRatingLabel}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -284,7 +309,6 @@ export default function PlayerHub() {
               <StatCard label="Goals"        value={stats.total_goals}        sub={played > 0 ? `${(stats.total_goals        / played).toFixed(2)}/game` : undefined} />
               <StatCard label="Assists"      value={stats.total_assists}      sub={played > 0 ? `${(stats.total_assists      / played).toFixed(2)}/game` : undefined} />
               <StatCard label="Clean sheets" value={stats.total_clean_sheets} sub={played > 0 ? `${(stats.total_clean_sheets / played).toFixed(2)}/game` : undefined} />
-              <StatCard label="Avg rating"   value={stats.avg_rating > 0 ? stats.avg_rating.toFixed(1) : '—'} />
               {stats.total_man_of_match > 0 && <StatCard label="Man of match" value={stats.total_man_of_match} color="text-amber-500" />}
               {stats.total_yellow_cards > 0 && <StatCard label="Yellow cards" value={stats.total_yellow_cards} color="text-amber-500" />}
               {stats.total_red_cards > 0 && <StatCard label="Red cards" value={stats.total_red_cards} color="text-red-600" />}

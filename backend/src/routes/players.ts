@@ -473,12 +473,24 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
     let gkAppearances = 0;
     for (const id of seasonMatchIds) gkAppearances += gkHalvesMap.get(id) ?? 0;
 
-    const avgRating = averageRating(rows.map((r: any) => computeMatchRating({
+    const rate = (r: any) => computeMatchRating({
       goals: r.goals, assists: r.assists, cleanSheet: r.clean_sheet,
       gkHalves: gkHalvesMap.get(r.match_id) ?? 0,
       manOfMatch: r.man_of_match, yellowCards: r.yellow_cards, redCards: r.red_cards,
       result: resultMap.get(r.match_id) ?? null,
-    }, positions)));
+    }, positions);
+
+    const avgRating = averageRating(rows.map(rate));
+
+    // Career rating: every completed match ever, across ALL competitions — unlike
+    // every other figure here it ignores both filters. The crest rank it sits beside
+    // on the hub resets each season, so this is the one number a player carries
+    // across seasons; it also stays fair to irregular players, being a per-match
+    // average rather than a volume total.
+    const completedIds = new Set((completedMatches ?? []).map((m: any) => m.match_id));
+    const careerRating = averageRating(
+      (perfRows ?? []).filter((r: any) => completedIds.has(r.match_id)).map(rate),
+    );
 
     const stats = {
       season_year: season,
@@ -491,6 +503,7 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
       gk_appearances: gkAppearances,
       total_signups: canSeePrivate ? totalSignups : null,
       avg_rating: avgRating,
+      career_rating: careerRating,
       // Attendance = share of the team's games this season the player featured in.
       attendance_rate: teamGames > 0 ? +((playedCount / teamGames) * 100).toFixed(2) : 0,
     };

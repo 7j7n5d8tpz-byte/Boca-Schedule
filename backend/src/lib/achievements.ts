@@ -59,7 +59,13 @@ export const ACHIEVEMENT_DEFS: TierGroupDef[] = [
   { code: 'signups_made',   name: 'Always In',    description: 'Matches signed up for this season', category: 'reliability', glyph: 'clipboard', unit: 'sign-ups', thresholds: [1, 5, 10, 16, 22, 30, 40] },
 
   // Streaks — consecutive runs (measured by the season's best run).
-  { code: 'attendance_streak', name: 'Iron Run',    description: 'Matches played without missing one',   category: 'reliability', glyph: 'chain', unit: 'in a row', thresholds: [2, 4, 6, 9, 12, 16, 20], streakType: 'attendance' },
+  // Retuned for the strict rule (any missed match breaks the run). The old
+  // ladder topped out at 20 in a row, which was only survivable back when the
+  // streak could not break; measured against the 2026 season the best run in
+  // the squad was 6 over 9 matches and nobody played more than 78% of them, so
+  // legend now sits at 12 — a genuine feat over a full season, not an
+  // impossibility. See docs/achievement-tuning.md for the distribution.
+  { code: 'attendance_streak', name: 'Iron Run',    description: 'Matches played without missing one',   category: 'reliability', glyph: 'chain', unit: 'in a row', thresholds: [2, 3, 4, 5, 7, 9, 12], streakType: 'attendance' },
   { code: 'scoring_streak',    name: 'On Fire',     description: 'Consecutive matches with a goal',      category: 'performance', glyph: 'flame', unit: 'in a row', thresholds: [2, 3, 4, 6, 8, 10, 13], streakType: 'scoring' },
   { code: 'win_streak',        name: 'Unstoppable', description: 'Consecutive wins played in',           category: 'performance', glyph: 'bolt',  unit: 'in a row', thresholds: [2, 3, 5, 7, 9, 12, 15], streakType: 'win' },
 ];

@@ -141,6 +141,26 @@ describe('computeForPlayer', () => {
     expect(res.groups.find(g => g.code === 'signups_made')!.value).toBe(1);
   });
 
+  it('sizes the Iron Run ladder to a real season', () => {
+    // Tuned against the 2026 season: 9 completed matches, best run in the squad
+    // 6, nobody playing more than 78% of them (docs/achievement-tuning.md). The
+    // club's best attendee should land on platinum with room left to climb, and
+    // legend must stay inside a season's match count — the old ladder wanted 20
+    // in a row, which is more matches than the season has.
+    const run = (n: number): PlayerMatch[] =>
+      Array.from({ length: n }, (_, i) => match({ date: `2026-01-${String(i + 1).padStart(2, '0')}` }));
+    const tierOf = (n: number) =>
+      computeForPlayer({ seasonYear: 2026, matches: run(n) }).groups
+        .find(g => g.code === 'attendance_streak')!.highestTier;
+
+    expect(tierOf(1)).toBeNull();
+    expect(tierOf(2)).toBe('bronze');
+    expect(tierOf(6)).toBe('platinum');
+
+    const iron = ACHIEVEMENT_DEFS.find(d => d.code === 'attendance_streak')!;
+    expect(iron.thresholds.at(-1)).toBeLessThanOrEqual(20);
+  });
+
   it('catalog and engine codes stay in sync', () => {
     const codes = new Set(ACHIEVEMENT_DEFS.map(d => d.code));
     for (const def of ACHIEVEMENT_DEFS) expect(def.thresholds).toHaveLength(TIERS.length);

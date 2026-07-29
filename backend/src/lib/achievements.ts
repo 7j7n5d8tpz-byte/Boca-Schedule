@@ -43,31 +43,62 @@ type StreakType = 'attendance' | 'scoring' | 'clean_sheet' | 'win' | 'no_withdra
 // leaving only the earned tier badges.
 export const PRIVATE_COUNT_CODES = ['matches_played', 'signups_made'];
 
+// ─── Season volume ──────────────────────────────────────────────────────────
+// Every ladder is calibrated against this. A season (calendar year, all
+// competitions — see achievementsStore.ts) is:
+//
+//   20  seven-a-side serie
+//   10  futsal serie
+//    3  seven-a-side pokal   ⎫ win-or-out, so the real number depends on how far
+//    3  futsal pokal         ⎭ the team goes; 3 apiece is the working estimate
+//   ──
+//   36  matches
+//
+// No count achievement may exceed this — a legend nobody can reach is a dead
+// tier, and `signups_made` previously topped out at 40, which is more matches
+// than exist. Keep it in sync if the fixture list changes; the engine test
+// asserts every threshold fits inside a season.
+export const SEASON_MATCHES = 36;
+
 // ─── Catalog ────────────────────────────────────────────────────────────────
 // Thresholds are tuned for an amateur club's season volume: bronze is reachable
-// almost immediately, legend is a genuine season-long feat.
+// almost immediately, legend is a genuine season-long feat that is nonetheless
+// achievable. Sized against the 2026 season's measured per-player rates scaled
+// to SEASON_MATCHES — the working assumption is that the club's best performer
+// in a category lands around diamond/champion, leaving legend as a stretch.
+// docs/achievement-tuning.md records the distribution and the arithmetic.
 
 export const ACHIEVEMENT_DEFS: TierGroupDef[] = [
   // Performance — on-pitch output (per season).
-  { code: 'goals_scored',  name: 'Goalscorer',   description: 'Goals scored this season',        category: 'performance', glyph: 'football', unit: 'goals',        thresholds: [1, 3, 6, 10, 15, 22, 30] },
-  { code: 'assists_made',  name: 'Playmaker',    description: 'Assists made this season',         category: 'performance', glyph: 'boot',     unit: 'assists',      thresholds: [1, 3, 6, 10, 14, 18, 25] },
-  { code: 'clean_sheets',  name: 'Wall',         description: 'Clean sheets kept this season',    category: 'performance', glyph: 'glove',    unit: 'clean sheets', thresholds: [1, 2, 4, 6, 9, 12, 16] },
-  { code: 'motm_awards',   name: 'Match Winner', description: 'Man of the Match awards',          category: 'performance', glyph: 'medal',    unit: 'awards',       thresholds: [1, 2, 3, 5, 7, 10, 14] },
+  { code: 'goals_scored',  name: 'Goalscorer',   description: 'Goals scored this season',        category: 'performance', glyph: 'football', unit: 'goals',        thresholds: [1, 3, 6, 9, 13, 18, 24] },
+  { code: 'assists_made',  name: 'Playmaker',    description: 'Assists made this season',         category: 'performance', glyph: 'boot',     unit: 'assists',      thresholds: [1, 3, 5, 8, 11, 15, 20] },
+  // Wall/Fortress are the least data-backed ladders: the reference season kept
+  // zero clean sheets in 9 matches, so these are scaled to season length and a
+  // recovered defence rather than measured. Revisit after a season with some.
+  { code: 'clean_sheets',  name: 'Wall',         description: 'Clean sheets kept this season',    category: 'performance', glyph: 'glove',    unit: 'clean sheets', thresholds: [1, 2, 3, 4, 6, 8, 10] },
+  // One award per match, so a whole season only mints SEASON_MATCHES of them
+  // across the entire squad; legend at 10 is ~28% of every award going one way.
+  { code: 'motm_awards',   name: 'Match Winner', description: 'Man of the Match awards',          category: 'performance', glyph: 'medal',    unit: 'awards',       thresholds: [1, 2, 3, 4, 6, 8, 10] },
 
   // Reliability — showing up, which is what keeps squads filled (per season).
-  { code: 'matches_played', name: 'Ever Present', description: 'Matches played this season',      category: 'reliability', glyph: 'calendar',  unit: 'matches', thresholds: [1, 5, 10, 15, 20, 28, 36] },
-  { code: 'signups_made',   name: 'Always In',    description: 'Matches signed up for this season', category: 'reliability', glyph: 'clipboard', unit: 'sign-ups', thresholds: [1, 5, 10, 16, 22, 30, 40] },
+  // Legend for Ever Present is 28 (78% of the season), the best attendance rate
+  // the club has actually managed — 36 would have demanded a perfect record.
+  // Always In sits higher because signing up costs nothing but intent; you can
+  // put your name down for a match you are not picked for.
+  { code: 'matches_played', name: 'Ever Present', description: 'Matches played this season',      category: 'reliability', glyph: 'calendar',  unit: 'matches', thresholds: [1, 4, 8, 12, 17, 22, 28] },
+  { code: 'signups_made',   name: 'Always In',    description: 'Matches signed up for this season', category: 'reliability', glyph: 'clipboard', unit: 'sign-ups', thresholds: [1, 5, 10, 15, 21, 27, 33] },
 
   // Streaks — consecutive runs (measured by the season's best run).
-  // Retuned for the strict rule (any missed match breaks the run). The old
-  // ladder topped out at 20 in a row, which was only survivable back when the
-  // streak could not break; measured against the 2026 season the best run in
-  // the squad was 6 over 9 matches and nobody played more than 78% of them, so
-  // legend now sits at 12 — a genuine feat over a full season, not an
-  // impossibility. See docs/achievement-tuning.md for the distribution.
-  { code: 'attendance_streak', name: 'Iron Run',    description: 'Matches played without missing one',   category: 'reliability', glyph: 'chain', unit: 'in a row', thresholds: [2, 3, 4, 5, 7, 9, 12], streakType: 'attendance' },
-  { code: 'scoring_streak',    name: 'On Fire',     description: 'Consecutive matches with a goal',      category: 'performance', glyph: 'flame', unit: 'in a row', thresholds: [2, 3, 4, 6, 8, 10, 13], streakType: 'scoring' },
-  { code: 'win_streak',        name: 'Unstoppable', description: 'Consecutive wins played in',           category: 'performance', glyph: 'bolt',  unit: 'in a row', thresholds: [2, 3, 5, 7, 9, 12, 15], streakType: 'win' },
+  // Iron Run breaks on any missed match, so it is bounded by attendance rate
+  // rather than season length: at the observed 78%, the longest run a dedicated
+  // player can expect across 36 matches is low-to-mid teens, hence legend at 14.
+  // The old ladder wanted 20 in a row and was only survivable back when the
+  // streak could not break at all.
+  { code: 'attendance_streak', name: 'Iron Run',    description: 'Matches played without missing one',   category: 'reliability', glyph: 'chain', unit: 'in a row', thresholds: [2, 3, 4, 6, 8, 11, 14], streakType: 'attendance' },
+  // Scoring and winning runs only count matches the player featured in, so they
+  // are bounded by appearances (~28 at best), not by the 36-match season.
+  { code: 'scoring_streak',    name: 'On Fire',     description: 'Consecutive matches with a goal',      category: 'performance', glyph: 'flame', unit: 'in a row', thresholds: [2, 3, 4, 5, 6, 8, 10], streakType: 'scoring' },
+  { code: 'win_streak',        name: 'Unstoppable', description: 'Consecutive wins played in',           category: 'performance', glyph: 'bolt',  unit: 'in a row', thresholds: [2, 3, 4, 5, 6, 8, 10], streakType: 'win' },
 ];
 
 
@@ -227,10 +258,15 @@ export function catalog() {
 // Computed live (not persisted) from the team's season results. Shared on the
 // team wall; celebrate the whole squad rather than an individual.
 
+// Calibrated against SEASON_MATCHES like the individual ladders. These are
+// deliberately not tuned to the reference season's record (1W-1D-7L, zero clean
+// sheets): pinning legend to a bad run would make the whole ladder trivial the
+// moment the team improves. Legend is a strong season — 20 wins is 56% of the
+// fixture list — not the club's current form.
 const TEAM_DEFS: TierGroupDef[] = [
-  { code: 'team_wins',         name: 'Winning Season', description: 'Wins this season',              category: 'team', glyph: 'trophy',   unit: 'wins',         thresholds: [1, 3, 5, 8, 11, 15, 20] },
-  { code: 'team_clean_sheets', name: 'Fortress',       description: 'Matches without conceding',     category: 'team', glyph: 'fortress', unit: 'clean sheets', thresholds: [1, 2, 4, 6, 9, 12, 16] },
-  { code: 'team_win_streak',   name: 'Juggernaut',     description: 'Longest winning run',           category: 'team', glyph: 'swords',   unit: 'in a row',     thresholds: [2, 3, 4, 6, 8, 10, 12] },
+  { code: 'team_wins',         name: 'Winning Season', description: 'Wins this season',              category: 'team', glyph: 'trophy',   unit: 'wins',         thresholds: [1, 3, 6, 9, 12, 16, 20] },
+  { code: 'team_clean_sheets', name: 'Fortress',       description: 'Matches without conceding',     category: 'team', glyph: 'fortress', unit: 'clean sheets', thresholds: [1, 2, 4, 6, 8, 11, 14] },
+  { code: 'team_win_streak',   name: 'Juggernaut',     description: 'Longest winning run',           category: 'team', glyph: 'swords',   unit: 'in a row',     thresholds: [2, 3, 4, 5, 7, 9, 12] },
 ];
 
 export interface TeamMatch {

@@ -4,7 +4,9 @@ import {
   computeForPlayer,
   computeStreaks,
   computeTeam,
+  teamCatalog,
   ACHIEVEMENT_DEFS,
+  SEASON_MATCHES,
   TIERS,
   type PlayerMatch,
 } from '../src/lib/achievements.js';
@@ -141,12 +143,27 @@ describe('computeForPlayer', () => {
     expect(res.groups.find(g => g.code === 'signups_made')!.value).toBe(1);
   });
 
-  it('sizes the Iron Run ladder to a real season', () => {
-    // Tuned against the 2026 season: 9 completed matches, best run in the squad
-    // 6, nobody playing more than 78% of them (docs/achievement-tuning.md). The
-    // club's best attendee should land on platinum with room left to climb, and
-    // legend must stay inside a season's match count — the old ladder wanted 20
-    // in a row, which is more matches than the season has.
+  it('keeps every ladder reachable within one season', () => {
+    // A season is SEASON_MATCHES fixtures across all competitions, so no count
+    // or streak can exceed it — signups_made used to want 40, which is more
+    // matches than the club plays. Guards the whole catalog, not just the ladder
+    // that happened to be wrong. See docs/achievement-tuning.md.
+    for (const def of [...ACHIEVEMENT_DEFS, ...teamCatalog().map(d => ({
+      code: d.code, thresholds: d.tiers.map(t => t.threshold),
+    }))]) {
+      const top = def.thresholds[def.thresholds.length - 1];
+      expect(top, `${def.code} legend exceeds a season`).toBeLessThanOrEqual(SEASON_MATCHES);
+      // Strictly increasing, so no tier is unreachable or awarded twice over.
+      for (let i = 1; i < def.thresholds.length; i++) {
+        expect(def.thresholds[i], `${def.code} tier ${i}`).toBeGreaterThan(def.thresholds[i - 1]);
+      }
+    }
+  });
+
+  it('sizes the Iron Run ladder to the club it is for', () => {
+    // 2026 reference season: best run in the squad 6 over 9 matches, nobody
+    // playing more than 78% of them. Bronze should be near-universal and the
+    // club's best attendee should sit mid-ladder with room left to climb.
     const run = (n: number): PlayerMatch[] =>
       Array.from({ length: n }, (_, i) => match({ date: `2026-01-${String(i + 1).padStart(2, '0')}` }));
     const tierOf = (n: number) =>
@@ -155,10 +172,7 @@ describe('computeForPlayer', () => {
 
     expect(tierOf(1)).toBeNull();
     expect(tierOf(2)).toBe('bronze');
-    expect(tierOf(6)).toBe('platinum');
-
-    const iron = ACHIEVEMENT_DEFS.find(d => d.code === 'attendance_streak')!;
-    expect(iron.thresholds.at(-1)).toBeLessThanOrEqual(20);
+    expect(tierOf(6)).toBe('platinum'); // club's best run, 3 tiers still to chase
   });
 
   it('catalog and engine codes stay in sync', () => {

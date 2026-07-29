@@ -2,76 +2,119 @@
 
 How the crest ladders in [`backend/src/lib/achievements.ts`](../backend/src/lib/achievements.ts)
 are sized, and the data behind the current numbers. Re-run the measurement below
-before changing a ladder — the original thresholds were guesses, and one of them
+before changing a ladder — the original thresholds were guesses, and several
 turned out to be unreachable.
 
-## Reference season
+## Season volume
 
-2026, measured from `templates/historical-import/`:
+A season is a calendar year across **all** competitions (achievements span every
+match type — there is one crest ladder, not one per competition), so:
 
-- **9 completed matches**, 2026-04-12 → 2026-06-21 (season ongoing; next fixture 2026-08-15)
-- **23 real players** (guests excluded, placeholder duplicates merged)
-- **Most appearances by one player: 7 of 9 (78%)** — nobody plays every match
-- A full season looks like ~18–20 matches at this rate
-
-## Iron Run (`attendance_streak`)
-
-Longest run of consecutive matches played, where *any* missed match breaks the
-run — including one the player wasn't selected for.
-
-Measured distribution over the 9 completed matches:
-
-| Longest run | Players reaching it |
+| Competition | Matches |
 |---|---|
-| ≥ 2 | 16 (70%) |
-| ≥ 3 | 7 (30%) |
-| ≥ 4 | 4 (17%) |
-| ≥ 5 | 1 (4%) |
-| ≥ 6 | 1 (4%) |
-| ≥ 7 | 0 |
+| Seven-a-side serie | 20 |
+| Futsal serie | 10 |
+| Seven-a-side pokal | 3 (estimate) |
+| Futsal pokal | 3 (estimate) |
+| **Total** | **36** |
 
-Best run in the club: **6** (Ajay Kumar). The most-selected player, Mads Emil
-Oxholm Iversen, has 7 appearances but a best run of only 4.
+Both pokals are win-or-out, so their real length depends on how far the team
+goes; 3 apiece is the working estimate. This is `SEASON_MATCHES` in
+`achievements.ts` — **no threshold may exceed it**, and an engine test asserts
+that for the whole catalog.
 
-**Thresholds: `[2, 3, 4, 5, 7, 9, 12]`** (bronze → legend)
+## Reference data
 
-Against half a season this puts 70% of the squad on bronze, the club's best
-attendee on platinum, and leaves diamond/champion/legend as things to chase over
-a full season. Gaps widen as they climb (1, 1, 1, 2, 2, 3) so the top of the
-ladder stays meaningful.
+2026 season to date, from `templates/historical-import/` (9 completed matches,
+2026-04-12 → 2026-06-21, 23 real players after merging placeholder duplicates via
+`4_Players.csv`). Extrapolation to a full season is ×4.
 
-The previous ladder was `[2, 4, 6, 9, 12, 16, 20]`. Those numbers were only
-survivable while the streak could never break (see below); under the strict rule
-legend at 20 would have exceeded the entire season's match count.
+**Team:** 1W 1D 7L, goals 18:31, **zero clean sheets**, best win run 1.
 
-### Why the ladder had to be retuned
+**Per player, scaled to 36 matches:**
 
-The streak originally counted only matches the player was selected for, skipping
-the rest rather than treating them as a break. Since results are always recorded
-with `attended: true` for the whole squad, a selected match always counted as
-played — so nothing in a season could break the run. Iron Run silently
-re-measured total appearances on an easier ladder than Ever Present, and players
-earned gold without ever playing six matches in a row.
+| Metric | Club best (observed → projected) |
+|---|---|
+| Appearances | 7 of 9 (78%) → **28** |
+| Goals | 4 → **16** |
+| Assists | 4 → **16** |
+| MOTM | 1 → **4** |
+| Longest attendance run | **6** |
 
-## Known issue: Ever Present (`matches_played`) is over-tuned
+Two facts drive most of the calibration: **nobody plays every match** (78% is the
+ceiling), and **one MOTM is minted per match**, so the whole squad shares 36 a
+season.
 
-Not yet changed, flagged here so it isn't forgotten. Thresholds are
-`[1, 5, 10, 15, 20, 28, 36]`, but the reference season has ~18–20 matches total
-and the best attendee played 78% of them. Diamond (20), champion (28) and legend
-(36) are unreachable in a season of this size — the ladder effectively caps at
-platinum. Something like `[1, 3, 6, 9, 12, 15, 18]` would restore a full range;
-worth confirming against a completed season first.
+## Current ladders
+
+Sized so the club's best performer in a category lands around diamond/champion,
+leaving legend as a genuine stretch that is still inside the season.
+
+| Achievement | Bronze → Legend | Legend means |
+|---|---|---|
+| Goalscorer | 1, 3, 6, 9, 13, 18, 24 | 24 goals (projected best: 16) |
+| Playmaker | 1, 3, 5, 8, 11, 15, 20 | 20 assists (projected best: 16) |
+| Wall | 1, 2, 3, 4, 6, 8, 10 | 10 clean sheets |
+| Match Winner | 1, 2, 3, 4, 6, 8, 10 | 10 MOTM — 28% of the season's awards |
+| Ever Present | 1, 4, 8, 12, 17, 22, 28 | 28 of 36 — the observed 78% ceiling |
+| Always In | 1, 5, 10, 15, 21, 27, 33 | 33 of 36 sign-ups |
+| Iron Run | 2, 3, 4, 6, 8, 11, 14 | 14 consecutive matches |
+| On Fire | 2, 3, 4, 5, 6, 8, 10 | scored in 10 straight |
+| Unstoppable | 2, 3, 4, 5, 6, 8, 10 | 10 straight wins played in |
+| Winning Season (team) | 1, 3, 6, 9, 12, 16, 20 | 20 wins — 56% of fixtures |
+| Fortress (team) | 1, 2, 4, 6, 8, 11, 14 | 14 clean sheets |
+| Juggernaut (team) | 2, 3, 4, 5, 7, 9, 12 | 12 straight wins |
+
+### Notes per ladder
+
+**Ever Present** — legend was 36, i.e. a perfect record. Nobody has exceeded 78%
+attendance, so the top tier was decorative. Now 28.
+
+**Always In** — legend was 40, *more matches than the season contains*: strictly
+impossible. Now 33. It sits above Ever Present deliberately, since signing up
+costs only intent — you can put your name down for a match you aren't picked for.
+
+**Iron Run** — bounded by attendance rate, not season length. At 78% attendance
+the longest run a dedicated player can expect across 36 matches is low-to-mid
+teens, so legend is 14. The club's current best (6) lands on platinum.
+
+**Match Winner** — bounded by supply: 36 awards exist per season across ~23
+players. Legend at 10 means more than a quarter of them going one way. Was 14.
+
+**On Fire / Unstoppable** — count only matches the player featured in, so they're
+capped by appearances (~28 at best), not by 36. Both were unreachable before (13
+and 15 in a row).
+
+**Wall and Fortress are the least data-backed.** The reference season kept zero
+clean sheets in 9 matches, so there is nothing to extrapolate from — these are
+scaled to season length assuming a recovered defence. Revisit after a season with
+some clean sheets in it.
+
+**Team ladders are deliberately not tuned to the reference season's record.** The
+team is on 1W-1D-7L; pinning legend to that would make the ladder trivial as soon
+as form improves. Legend describes a strong season, not the current one.
+
+## Known limitation: streaks mix competitions
+
+Iron Run breaks on any missed match, and a season interleaves four competitions.
+A player who only plays futsal has their run broken by every seven-a-side fixture
+and can never build a long one, however reliable they are. The same applies to
+On Fire and Unstoppable.
+
+If that turns out to matter, the fix is to compute streaks per competition and
+take the player's best, rather than over the whole mixed fixture list. Left as-is
+for now — it is a design change, not a calibration one.
 
 ## Re-measuring
 
-The distribution above came from a throwaway script over the historical-import
-CSVs. To redo it after a season completes, read match dates + participation
-straight from the DB instead:
+The numbers above came from a throwaway script over the historical-import CSVs.
+Once a full season is in the database, redo it from there instead:
 
 - completed matches for the season, ordered by `match_date`
 - per player, the set of matches where `playedMatch(selected, attended)` is true
-- longest consecutive run over the ordered match list
+- totals for goals/assists/MOTM/clean sheets, and longest consecutive run over the
+  ordered match list
 
-Then pick thresholds so bronze is near-universal, the current season's best
-performer lands around platinum, and legend sits above anything yet achieved but
-inside the season's match count.
+Then pick thresholds so bronze is near-universal, the season's best performer
+lands around diamond/champion, and legend sits above anything yet achieved but
+inside `SEASON_MATCHES`.

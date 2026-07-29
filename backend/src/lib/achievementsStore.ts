@@ -94,6 +94,35 @@ async function persist(playerId: string, seasonYear: number, result: PlayerAchie
       .upsert(earnedRows, { onConflict: 'player_id,achievement_code,tier,season_year', ignoreDuplicates: true });
   }
 
+  // Reconcile: drop persisted crests the player no longer qualifies for. Upsert
+  // alone makes this table append-only, so a corrected result — or a tightened
+  // award rule — would leave revoked crests on the team wall forever (the wall
+  // reads these rows; a player's own page recomputes live and would disagree).
+  // Rows that survive keep their original earned_at.
+  const keep = new Set(result.earned.map(e => `${e.code}:${e.tier}`));
+  const { data: persisted } = await supabaseAdmin
+    .from('player_achievements')
+    .select('achievement_code, tier')
+    .eq('player_id', playerId)
+    .eq('season_year', seasonYear);
+
+  const staleByCode = new Map<string, string[]>();
+  for (const r of (persisted ?? []) as any[]) {
+    if (keep.has(`${r.achievement_code}:${r.tier}`)) continue;
+    const tiers = staleByCode.get(r.achievement_code) ?? [];
+    tiers.push(r.tier);
+    staleByCode.set(r.achievement_code, tiers);
+  }
+  for (const [code, tiers] of staleByCode) {
+    await supabaseAdmin
+      .from('player_achievements')
+      .delete()
+      .eq('player_id', playerId)
+      .eq('season_year', seasonYear)
+      .eq('achievement_code', code)
+      .in('tier', tiers);
+  }
+
   const streakRows = result.streaks.map(s => ({
     player_id: playerId,
     streak_type: s.type,

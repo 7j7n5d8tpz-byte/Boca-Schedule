@@ -1,6 +1,9 @@
-// One-off backfill of gamification crests + streaks from existing match history.
-// Idempotent — safe to run repeatedly. Run after deploying the gamification
-// migration:  tsx src/scripts/backfillAchievements.ts
+// Backfill of gamification crests + streaks from existing match history.
+// Idempotent — safe to run repeatedly:  tsx src/scripts/backfillAchievements.ts
+//
+// Reconciling, not just additive: it also revokes persisted crests a player no
+// longer qualifies for. Re-run it after any change to the award rules so the
+// team wall (which reads persisted rows) matches what the engine now computes.
 import 'dotenv/config';
 import { backfillAll } from '../lib/achievementsStore.js';
 

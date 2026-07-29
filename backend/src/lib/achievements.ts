@@ -59,7 +59,7 @@ export const ACHIEVEMENT_DEFS: TierGroupDef[] = [
   { code: 'signups_made',   name: 'Always In',    description: 'Matches signed up for this season', category: 'reliability', glyph: 'clipboard', unit: 'sign-ups', thresholds: [1, 5, 10, 16, 22, 30, 40] },
 
   // Streaks — consecutive runs (measured by the season's best run).
-  { code: 'attendance_streak', name: 'Iron Run',    description: 'Consecutive matches played',          category: 'reliability', glyph: 'chain', unit: 'in a row', thresholds: [2, 4, 6, 9, 12, 16, 20], streakType: 'attendance' },
+  { code: 'attendance_streak', name: 'Iron Run',    description: 'Matches played without missing one',   category: 'reliability', glyph: 'chain', unit: 'in a row', thresholds: [2, 4, 6, 9, 12, 16, 20], streakType: 'attendance' },
   { code: 'scoring_streak',    name: 'On Fire',     description: 'Consecutive matches with a goal',      category: 'performance', glyph: 'flame', unit: 'in a row', thresholds: [2, 3, 4, 6, 8, 10, 13], streakType: 'scoring' },
   { code: 'win_streak',        name: 'Unstoppable', description: 'Consecutive wins played in',           category: 'performance', glyph: 'bolt',  unit: 'in a row', thresholds: [2, 3, 5, 7, 9, 12, 15], streakType: 'win' },
 ];
@@ -129,8 +129,8 @@ export function tiersForValue(thresholds: number[], value: number): { tiers: Tie
 
 /**
  * Longest and trailing run of a boolean signal over an ordered sequence.
- * `counts(m)` decides whether a match participates at all (non-participating
- * matches are skipped, not treated as a break); `hit(m)` is the success test.
+ * `counts(m)` decides whether a match participates at all (matches that don't
+ * count are skipped, not treated as a break); `hit(m)` is the success test.
  */
 function runStreak(matches: PlayerMatch[], counts: (m: PlayerMatch) => boolean, hit: (m: PlayerMatch) => boolean): StreakResult & { type: StreakType } {
   let record = 0;
@@ -155,7 +155,13 @@ function runStreak(matches: PlayerMatch[], counts: (m: PlayerMatch) => boolean, 
 export function computeStreaks(input: PlayerSeasonInput): StreakResult[] {
   const m = input.matches;
   const defs: Array<{ type: StreakType; counts: (x: PlayerMatch) => boolean; hit: (x: PlayerMatch) => boolean }> = [
-    { type: 'attendance',    counts: x => x.selected,          hit: x => x.played },
+    // Every completed match counts, so missing one breaks the run — including a
+    // match the player wasn't picked for. Anything narrower makes Iron Run
+    // unbreakable in practice: results are recorded with attended=true for the
+    // whole squad, so a selected match always hits, and skipping the rest would
+    // leave nothing that can ever break the streak (it would just re-measure
+    // total appearances, which is what Ever Present already does).
+    { type: 'attendance',    counts: () => true,               hit: x => x.played },
     { type: 'scoring',       counts: x => x.played,            hit: x => x.goals > 0 },
     { type: 'clean_sheet',   counts: x => x.played,            hit: x => x.cleanSheet },
     { type: 'win',           counts: x => x.played && x.win !== null, hit: x => x.win === true },

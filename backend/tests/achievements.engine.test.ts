@@ -51,18 +51,38 @@ describe('tiersForValue', () => {
 });
 
 describe('computeStreaks', () => {
-  it('counts the longest and trailing attendance run, skipping non-selected games', () => {
+  it('counts the longest and trailing attendance run, breaking on any missed match', () => {
     const matches: PlayerMatch[] = [
       match({ date: '2026-01-01', selected: true, played: true }),
       match({ date: '2026-01-08', selected: true, played: true }),
-      match({ date: '2026-01-15', selected: false, played: false }), // not selected → skipped, not a break
+      match({ date: '2026-01-15', selected: false, played: false }), // not selected → break
       match({ date: '2026-01-22', selected: true, played: true }),
       match({ date: '2026-01-29', selected: true, played: false }), // selected but absent → break
       match({ date: '2026-02-05', selected: true, played: true }),
     ];
     const att = computeStreaks({ seasonYear: 2026, matches }).find(s => s.type === 'attendance')!;
-    expect(att.record).toBe(3); // 1,8,(skip),22
+    expect(att.record).toBe(2); // 1,8
     expect(att.current).toBe(1); // trailing run after the absence
+  });
+
+  it('does not award Iron Run for appearances spread across missed matches', () => {
+    // Regression: results are recorded with attended=true for the whole squad, so
+    // a selected match always counts as played. Before the fix, unselected
+    // matches were skipped rather than breaking the run, which made the streak
+    // unbreakable — six scattered appearances silently earned Iron Run gold.
+    const matches: PlayerMatch[] = Array.from({ length: 12 }, (_, i) =>
+      match({
+        date: `2026-01-${String(i + 1).padStart(2, '0')}`,
+        selected: i % 2 === 0,
+        played: i % 2 === 0,
+      }),
+    );
+    const att = computeStreaks({ seasonYear: 2026, matches }).find(s => s.type === 'attendance')!;
+    expect(att.record).toBe(1); // six appearances, never two in a row
+
+    const groups = computeForPlayer({ seasonYear: 2026, matches }).groups;
+    expect(groups.find(g => g.code === 'attendance_streak')!.highestTier).toBeNull();
+    expect(groups.find(g => g.code === 'matches_played')!.value).toBe(6);
   });
 
   it('breaks a scoring streak on a played match without a goal', () => {

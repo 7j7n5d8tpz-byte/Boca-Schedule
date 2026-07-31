@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { PLAYERS_HUB_ORIGIN } from '../../hubOrigin';
 
 // Horizontal leaderboard bar. When hubTo is set the name links to the
 // player's profile hub.
@@ -16,7 +17,7 @@ export default function LeaderBar({ name, value, max, color, isMe, hubTo }: {
       {hubTo ? (
         <Link
           to={hubTo}
-          state={{ from: '/statistics', fromLabel: 'Team stats' }}
+          state={PLAYERS_HUB_ORIGIN}
           className="text-xs text-gray-700 w-28 truncate shrink-0 hover:text-brand-green hover:underline"
         >
           {nameEl}

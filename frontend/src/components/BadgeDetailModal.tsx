@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Crest, { TIER_META, TIERS, tierRank, type Tier } from './Crest';
 import Avatar from './Avatar';
 import { useCatalog, useTeamWall } from '../api/achievements';
+import { useHubOrigin } from '../hubOrigin';
 
 // "Who else has this?" — opened by clicking any crest. Explains the badge (glyph,
 // description, tier ladder) and lists every player who has earned it, by tier.
@@ -10,6 +11,9 @@ import { useCatalog, useTeamWall } from '../api/achievements';
 export default function BadgeDetailModal({ code, onClose }: { code: string; onClose: () => void }) {
   const { data: catalog } = useCatalog();
   const { data: wall } = useTeamWall();
+  // This modal opens from several pages, so hand on wherever the page it sits
+  // on would go back to — not a hard-coded "Achievements".
+  const origin = useHubOrigin();
 
   const entry = catalog && [...catalog.individual, ...catalog.team].find(c => c.code === code);
   if (!entry) return null;
@@ -65,7 +69,7 @@ export default function BadgeDetailModal({ code, onClose }: { code: string; onCl
               <Link
                 key={h.playerId}
                 to={`/players/${h.playerId}`}
-                state={{ from: '/achievements', fromLabel: 'Achievements' }}
+                state={origin}
                 onClick={onClose}
                 className="flex items-center gap-2.5 rounded-lg -mx-1 px-1 py-0.5 hover:bg-gray-50 transition-colors"
               >

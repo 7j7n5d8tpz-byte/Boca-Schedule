@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { loginAs, TEST_USERS } from './helpers/auth';
+import { clearVenue } from './helpers/cleanup';
+
+const VENUE = 'Test Pitch E2E';
+const PUBLISH_VENUE = 'E2E Publish Pitch';
 
 test.describe('Coach flow', () => {
   test('logs in to the shared dashboard and reaches the coach view from the menu', async ({ page }) => {
@@ -23,6 +27,11 @@ test.describe('Coach flow', () => {
 
   test('creates a match and it appears in the list', async ({ page }) => {
     await loginAs(page, 'coach');
+    const coachToken = await page.evaluate(() => localStorage.getItem('accessToken'));
+    // Start clean: an earlier run that failed after creating the match would
+    // otherwise leave a second fixture behind for this one to trip over.
+    await clearVenue(page.request, coachToken, VENUE);
+
     await page.goto('/coach/matches/new');
 
     // Fill the form
@@ -32,16 +41,19 @@ test.describe('Coach flow', () => {
 
     // Location picker is a dropdown — add a new venue via the "+ Add location…" flow
     await page.getByLabel(/venue/i).selectOption('__add_new__');
-    await page.getByPlaceholder(/new venue name/i).fill('Test Pitch E2E');
+    await page.getByPlaceholder(/new venue name/i).fill(VENUE);
     await page.getByRole('button', { name: /^add$/i }).click();
     // Adding a venue POSTs to the backend; wait until it's selected before submitting
-    await expect(page.getByLabel(/venue/i)).toHaveValue('Test Pitch E2E');
+    await expect(page.getByLabel(/venue/i)).toHaveValue(VENUE);
 
     await page.getByRole('button', { name: /create|save|submit/i }).click();
 
     // Should redirect back to coach dashboard
     await expect(page).toHaveURL(/\/coach$/);
-    await expect(page.getByText(/Test Pitch E2E/i)).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText(new RegExp(VENUE, 'i'))).toBeVisible({ timeout: 8_000 });
+
+    // Leave the DB as we found it.
+    await clearVenue(page.request, coachToken, VENUE);
   });
 
   test('can view team statistics', async ({ page }) => {
@@ -56,6 +68,7 @@ test.describe('Coach flow', () => {
     const coachToken = await page.evaluate(() => localStorage.getItem('accessToken'));
 
     const base = process.env.VITE_API_URL || 'http://127.0.0.1:3001';
+    await clearVenue(page.request, coachToken, PUBLISH_VENUE);
 
     // Create a match with minPlayers=1 so we can publish after selecting one player
     const matchRes = await page.request.post(`${base}/api/matches`, {
@@ -63,7 +76,7 @@ test.describe('Coach flow', () => {
       data: JSON.stringify({
         matchDate:       '2030-09-01',
         matchTime:       '18:00',
-        location:        'E2E Publish Pitch',
+        location:        PUBLISH_VENUE,
         matchType:       '7-player',
         minPlayers:      1,
         maxPlayers:      7,
@@ -102,5 +115,8 @@ test.describe('Coach flow', () => {
     // On success the coach is returned to the dashboard, where the match now
     // shows a "Published" status badge.
     await expect(page.getByText(/published/i).first()).toBeVisible({ timeout: 10_000 });
+
+    // A published fixture shows on every player's home, so don't leave it behind.
+    await clearVenue(page.request, coachToken, PUBLISH_VENUE);
   });
 });

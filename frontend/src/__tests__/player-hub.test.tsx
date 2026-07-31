@@ -118,6 +118,6 @@ describe('PlayerHub', () => {
     renderHub('/players/nope');
 
     expect(await screen.findByText('Player not found.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Back to team stats/ })).toHaveAttribute('href', '/statistics');
+    expect(screen.getByRole('link', { name: /All players/ })).toHaveAttribute('href', '/statistics?view=players');
   });
 });

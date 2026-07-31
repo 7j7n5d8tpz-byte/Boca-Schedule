@@ -1,5 +1,5 @@
 import AppNav from '../../components/AppNav';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -16,6 +16,7 @@ import LeaderBar from '../../components/stats/LeaderBar';
 import {
   StatCard, ResultTooltip, fmtDate, CHART_COLORS, seasonStartYearClient,
 } from '../../components/stats/statShared';
+import { PLAYERS_HUB_ORIGIN } from '../../hubOrigin';
 
 interface PlayerStat {
   userId: string;
@@ -153,7 +154,7 @@ function PlayerLink({ to, name, className = '' }: { to: string | null; name: str
   return (
     <Link
       to={to}
-      state={{ from: '/statistics', fromLabel: 'Team stats' }}
+      state={PLAYERS_HUB_ORIGIN}
       className={`${className} hover:text-brand-green hover:underline`}
     >
       {name}
@@ -163,12 +164,25 @@ function PlayerLink({ to, name, className = '' }: { to: string | null; name: str
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+type View = 'team' | 'players' | 'highlights' | 'opponents';
+
 export default function Statistics() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all' | '7-player' | 'futsal'>('all');
-  const [view, setView] = useState<'team' | 'players' | 'highlights' | 'opponents'>('team');
+  // The active tab lives in the URL so links back here (e.g. the player hub's
+  // back button) can reopen the tab the user came from.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawView = searchParams.get('view');
+  const view: View = rawView === 'players' || rawView === 'highlights' || rawView === 'opponents' ? rawView : 'team';
+  const setView = (next: View) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'team') params.delete('view');
+    else params.set('view', next);
+    setSearchParams(params, { replace: true });
+  };
+  const [playerSearch, setPlayerSearch] = useState('');
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [selectedOpponent, setSelectedOpponent] = useState<string>('');
   const highlightRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -241,7 +255,15 @@ export default function Statistics() {
     const qs = params.toString();
     return `/players/${id}${qs ? `?${qs}` : ''}`;
   };
-  const hubState = { from: '/statistics', fromLabel: 'Team stats' };
+  const hubState = PLAYERS_HUB_ORIGIN;
+
+  // Roster search — name or preferred position, case-insensitive.
+  const playerQuery = playerSearch.trim().toLowerCase();
+  const visiblePlayers = playerQuery
+    ? players.filter(p =>
+        p.name.toLowerCase().includes(playerQuery) ||
+        (p.preferredPositions ?? []).some(pos => pos.toLowerCase().includes(playerQuery)))
+    : players;
 
   // Build data for goals/against chart
   const goalsChartData = matchHistory.map(m => ({
@@ -1047,10 +1069,29 @@ export default function Statistics() {
             columns on phones with no way to scroll). ── */}
         {view === 'players' && !isLoading && (
             <div>
+              {/* Search — filters both the cards and the table below. */}
+              <div className="relative mb-4">
+                <Icon name="search" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="search"
+                  value={playerSearch}
+                  onChange={e => setPlayerSearch(e.target.value)}
+                  placeholder="Search players by name or position"
+                  aria-label="Search players"
+                  className="w-full border border-gray-300 rounded-lg bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+                />
+              </div>
+
+              {visiblePlayers.length === 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                  No players match “{playerSearch.trim()}”.
+                </div>
+              )}
+
               {/* Mobile cards */}
               <div className="sm:hidden space-y-3">
-                <h2 className="text-sm font-semibold text-gray-700">All players</h2>
-                {players.map(p => {
+                {visiblePlayers.length > 0 && <h2 className="text-sm font-semibold text-gray-700">All players</h2>}
+                {visiblePlayers.map(p => {
                   const isMe = p.userId === user?.userId;
                   const rate = p.totalSignups > 0 ? p.attendanceRate : null;
                   return (
@@ -1093,11 +1134,11 @@ export default function Statistics() {
                     </div>
                   );
                 })}
-                <p className="text-xs text-gray-400">Tap a player to view their profile</p>
+                {visiblePlayers.length > 0 && <p className="text-xs text-gray-400">Tap a player to view their profile</p>}
               </div>
 
               {/* Desktop table */}
-              <div className="hidden sm:block bg-white rounded-xl border border-gray-200 overflow-x-auto">
+              <div className={`${visiblePlayers.length === 0 ? 'hidden' : 'hidden sm:block'} bg-white rounded-xl border border-gray-200 overflow-x-auto`}>
                 <div className="px-5 py-4 border-b border-gray-100">
                   <h2 className="text-sm font-semibold text-gray-700">All players</h2>
                 </div>
@@ -1120,7 +1161,7 @@ export default function Statistics() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {players.map(p => {
+                    {visiblePlayers.map(p => {
                       const isMe = p.userId === user?.userId;
                       return (
                         <tr key={p.userId}

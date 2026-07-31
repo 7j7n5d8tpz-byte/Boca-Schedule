@@ -5,6 +5,7 @@ import Avatar from './Avatar';
 import RankBar from './RankBar';
 import CrestButton from './CrestButton';
 import { useCatalog, overallPoints, overallRank, type EarnedCrest } from '../api/achievements';
+import { useHubOrigin } from '../hubOrigin';
 
 interface WallPlayer {
   playerId: string;
@@ -22,6 +23,7 @@ export default function PlayerCrestsModal({ player, onClose, onOpenCrest }: {
   onOpenCrest?: (code: string) => void;
 }) {
   const { data: catalog } = useCatalog();
+  const origin = useHubOrigin();
   const lookup = (code: string) => catalog && [...catalog.individual, ...catalog.team].find(c => c.code === code);
 
   const points = overallPoints(player.crests);
@@ -73,7 +75,7 @@ export default function PlayerCrestsModal({ player, onClose, onOpenCrest }: {
         <div className="p-4 pt-0 space-y-2">
           <Link
             to={`/players/${player.playerId}`}
-            state={{ from: '/achievements', fromLabel: 'Achievements' }}
+            state={origin}
             onClick={onClose}
             className="block w-full text-center bg-brand-green text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-brand-green-700 transition-colors"
           >

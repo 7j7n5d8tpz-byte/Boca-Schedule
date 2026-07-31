@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { loginAs, TEST_USERS } from './helpers/auth';
+import { clearVenue } from './helpers/cleanup';
 
 const base = process.env.VITE_API_URL || 'http://127.0.0.1:3001';
+const VENUE = 'E2E Claim Pitch';
 
 // End-to-end of the open-spot claim flow: a published match has a free spot, an
 // unselected player claims it from their dashboard, and the coach confirms the
@@ -15,13 +17,14 @@ test.describe('Open-spot claim flow', () => {
     //    leaving the e2e player unselected and a spot open. ──────────────────────
     await loginAs(page, 'coach');
     const coachToken = await page.evaluate(() => localStorage.getItem('accessToken'));
+    await clearVenue(page.request, coachToken, VENUE);
 
     const matchRes = await page.request.post(`${base}/api/matches`, {
       headers: { Authorization: `Bearer ${coachToken}`, 'Content-Type': 'application/json' },
       data: JSON.stringify({
         matchDate:       '2030-10-01',
         matchTime:       '18:00',
-        location:        'E2E Claim Pitch',
+        location:        VENUE,
         opponent,
         matchType:       '7-player',
         minPlayers:      1,
@@ -72,5 +75,8 @@ test.describe('Open-spot claim flow', () => {
 
     // Only claimant resolved → the claimants panel disappears.
     await expect(page.getByRole('heading', { name: /spot claimants/i })).toBeHidden({ timeout: 8_000 });
+
+    // A published fixture shows on every player's home, so don't leave it behind.
+    await clearVenue(page.request, coachToken, VENUE);
   });
 });

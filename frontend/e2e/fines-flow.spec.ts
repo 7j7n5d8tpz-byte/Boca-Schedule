@@ -1,14 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { loginAs, TEST_USERS } from './helpers/auth';
+import { clearFines } from './helpers/cleanup';
 
 const base = process.env.VITE_API_URL || 'http://127.0.0.1:3001';
+const MARKER_PREFIX = 'E2EFine';
 
 // End-to-end of the fines flow: a fine admin issues a fine, the fined player
 // pays it from the Fines page, and the admin confirms the payment on the
 // Manage-fines page.
 test.describe('Fines flow', () => {
   test('admin issues a fine, player pays, admin confirms', async ({ page }) => {
-    const marker = `E2EFine${Date.now()}`; // unique reason so we can find this exact fine
+    const marker = `${MARKER_PREFIX}${Date.now()}`; // unique reason so we can find this exact fine
     const amount = 42;
 
     // ── Setup via API: log in player (for id) + admin (for token), issue an
@@ -24,6 +26,10 @@ test.describe('Fines flow', () => {
       data: JSON.stringify({ email: TEST_USERS.admin.email, password: TEST_USERS.admin.password }),
     })).json();
     const adminToken = adminLogin.data.tokens.accessToken;
+
+    // Start clean: "I've paid" settles *all* outstanding fines at once, so a
+    // fine left by an earlier run would be swept into this run's payment.
+    await clearFines(page.request, adminToken, MARKER_PREFIX);
 
     const issue = await page.request.post(`${base}/api/fines`, {
       headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
@@ -57,5 +63,8 @@ test.describe('Fines flow', () => {
 
     // Confirmed → the fine leaves the "payments to confirm" queue.
     await expect(page.getByText(marker)).toHaveCount(0, { timeout: 8_000 });
+
+    // A paid fine stays in every player's transparency table, so void it.
+    await clearFines(page.request, adminToken, MARKER_PREFIX);
   });
 });

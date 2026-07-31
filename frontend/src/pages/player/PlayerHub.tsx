@@ -16,6 +16,7 @@ import { Skeleton } from '../../components/Skeleton';
 import {
   StatCard, ResultTooltip, RadarTooltip, fmtDate, CHART_COLORS, POS_COLOR,
 } from '../../components/stats/statShared';
+import { useHubOrigin } from '../../hubOrigin';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -75,9 +76,9 @@ export default function PlayerHub() {
   const rawType = searchParams.get('matchType');
   const matchType: MatchTypeFilter = rawType === '7-player' || rawType === 'futsal' ? rawType : 'all';
 
-  const from = (location.state as { from?: string; fromLabel?: string } | null) ?? {};
-  const backHref = from.from ?? '/statistics';
-  const backLabel = from.fromLabel ?? 'Team stats';
+  // Back target — whoever linked here says where "back" goes; without that we
+  // return to the roster, the list this profile belongs to.
+  const { from: backHref, fromLabel: backLabel } = useHubOrigin();
 
   // Switching competitions changes the season calendar, so clear the picked
   // season and fall back to the latest — same rule as the statistics page.
@@ -185,16 +186,19 @@ export default function PlayerHub() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref={backHref} backLabel={backLabel} />
+      <AppNav />
 
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
 
+        {/* Back to the list this profile was opened from — same plain green
+            control as "All opponents" on the statistics page. */}
+        <Link to={backHref} className="inline-block text-sm font-medium text-brand-green hover:text-brand-green-700 transition-colors">
+          ← {backLabel}
+        </Link>
+
         {notFound && (
-          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center space-y-3">
+          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
             <p className="text-gray-500 text-sm">Player not found.</p>
-            <Link to="/statistics" className="inline-block text-sm font-medium text-brand-green hover:text-brand-green-700 transition-colors">
-              ← Back to team stats
-            </Link>
           </div>
         )}
 

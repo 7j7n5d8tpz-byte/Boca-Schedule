@@ -35,6 +35,38 @@ test.describe('Player flow', () => {
     ).toBeVisible({ timeout: 8_000 });
   });
 
+  test('profile hub returns to the players roster', async ({ page }) => {
+    await loginAs(page, 'player');
+    await page.goto('/statistics');
+    await page.getByRole('button', { name: 'Players' }).click();
+    await page.locator('tbody tr').first().click();
+    await expect(page).toHaveURL(/\/players\//);
+    // The back link goes to the roster tab, not the team-stats tab.
+    await page.getByRole('link', { name: /All players/ }).click();
+    await expect(page).toHaveURL(/\/statistics\?view=players/);
+    await expect(page.getByRole('table')).toBeVisible();
+  });
+
+  test('players roster can be searched by name', async ({ page }) => {
+    await loginAs(page, 'player');
+    await page.goto('/statistics?view=players');
+    const rows = page.locator('tbody tr');
+    await expect(rows.first()).toBeVisible();
+    const total = await rows.count();
+    // The name cell is [avatar span][name span]; take the second so the
+    // avatar's initial letter doesn't end up in the query.
+    const firstName = ((await rows.first().locator('td').first().locator('span').nth(1).innerText()) || '')
+      .replace(/\s*you\s*$/i, '').trim();
+
+    await page.getByRole('searchbox', { name: 'Search players' }).fill(firstName);
+    await expect(rows.first()).toContainText(firstName);
+    expect(await rows.count()).toBeLessThanOrEqual(total);
+
+    // A query nobody matches → empty state, no rows.
+    await page.getByRole('searchbox', { name: 'Search players' }).fill('zzzzzzzz');
+    await expect(page.getByText(/No players match/)).toBeVisible();
+  });
+
   test('own profile hub links to settings', async ({ page }) => {
     await loginAs(page, 'player');
     // Find your own (visible, desktop) row via the "you" chip on the Players tab.

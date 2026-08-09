@@ -23,6 +23,7 @@ describe('Squad visibility', () => {
     publishedMatchId = published.match_id;
     await signupPlayer(publishedMatchId, selected.userId);
     await selectPlayer(publishedMatchId, selected.userId);
+    await signupPlayer(openMatchId, selected.userId);
   });
 
   afterAll(async () => {
@@ -56,6 +57,49 @@ describe('Squad visibility', () => {
   it('404s for an unknown match', async () => {
     const res = await request(app)
       .get('/api/matches/00000000-0000-0000-0000-000000000000/squad')
+      .set('Authorization', `Bearer ${player.token}`);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('Sign-up list visibility', () => {
+  let player: TestUser;
+  let signedUp: TestUser;
+  let matchId: string;
+
+  beforeAll(async () => {
+    [player, signedUp] = await Promise.all([
+      createTestUser('player', '-sl1'),
+      createTestUser('player', '-sl2'),
+    ]);
+    const match = await createTestMatch({ status: 'signup_open' });
+    matchId = match.match_id;
+    await signupPlayer(matchId, signedUp.userId);
+  });
+
+  afterAll(async () => {
+    await deleteTestMatch(matchId);
+    await Promise.all([deleteTestUser(player.userId), deleteTestUser(signedUp.userId)]);
+  });
+
+  it('any authenticated player can see who signed up before the squad is published', async () => {
+    const res = await request(app)
+      .get(`/api/matches/${matchId}/signup-list`)
+      .set('Authorization', `Bearer ${player.token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.data.count).toBe(1);
+    expect(res.body.data.players[0].userId).toBe(signedUp.userId);
+    expect(res.body.data.players[0].name).toBeTruthy();
+  });
+
+  it('requires authentication', async () => {
+    const res = await request(app).get(`/api/matches/${matchId}/signup-list`);
+    expect(res.status).toBe(401);
+  });
+
+  it('404s for an unknown match', async () => {
+    const res = await request(app)
+      .get('/api/matches/00000000-0000-0000-0000-000000000000/signup-list')
       .set('Authorization', `Bearer ${player.token}`);
     expect(res.status).toBe(404);
   });

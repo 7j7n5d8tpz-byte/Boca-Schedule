@@ -110,6 +110,7 @@ function MatchCard({ match }: { match: Match }) {
   const qc = useQueryClient();
   const [showCantAttend, setShowCantAttend] = useState(false);
   const [showSquad, setShowSquad] = useState(false);
+  const [showSignups, setShowSignups] = useState(false);
   const [claimError, setClaimError] = useState('');
 
   const { data: squad } = useQuery<{ selected: Player[]; guests: { name: string; position: string | null }[]; count: number }>({
@@ -118,14 +119,26 @@ function MatchCard({ match }: { match: Match }) {
     enabled: showSquad && match.status === 'published',
   });
 
+  const { data: signupList } = useQuery<{ players: Player[]; count: number }>({
+    queryKey: ['signup-list', match.matchId],
+    queryFn: () => api.get(`/matches/${match.matchId}/signup-list`).then(r => r.data.data),
+    enabled: showSignups,
+  });
+
   const signupMutation = useMutation({
     mutationFn: () => api.post('/signups', { matchId: match.matchId }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['matches'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['matches'] });
+      qc.invalidateQueries({ queryKey: ['signup-list', match.matchId] });
+    },
   });
 
   const withdrawMutation = useMutation({
     mutationFn: () => api.delete(`/signups/${match.signupId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['matches'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['matches'] });
+      qc.invalidateQueries({ queryKey: ['signup-list', match.matchId] });
+    },
   });
 
   const claimMutation = useMutation({
@@ -202,17 +215,37 @@ function MatchCard({ match }: { match: Match }) {
           </div>
         </div>
 
+        {/* No sign-up cap — show the count only, never a "x of max" ratio, so
+            nobody reads sign-up as first-come, first-served. */}
         <div className="flex gap-4 text-sm text-gray-600">
-          <span>Players: {match.currentSignups}/{match.maxPlayers}</span>
+          {match.currentSignups > 0 ? (
+            <button
+              onClick={() => setShowSignups(v => !v)}
+              className="hover:text-brand-green transition-colors inline-flex items-center gap-1"
+            >
+              {match.currentSignups} signed up
+              <Icon name="chevronDown" className={`w-3.5 h-3.5 transition-transform ${showSignups ? 'rotate-180' : ''}`} />
+            </button>
+          ) : (
+            <span>No one signed up yet</span>
+          )}
           <span>Deadline: {deadline.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
         </div>
 
-        <div className="w-full bg-gray-100 rounded-full h-1.5">
-          <div
-            className="bg-brand-green h-1.5 rounded-full transition-all"
-            style={{ width: `${Math.min(100, (match.currentSignups / match.maxPlayers) * 100)}%` }}
-          />
-        </div>
+        {showSignups && signupList && (
+          <div className="space-y-1.5">
+            {signupList.players.map(p => (
+              <div key={p.userId} className="flex items-center gap-2 text-sm">
+                <span className="text-gray-700 flex-1 truncate">{p.name}</span>
+                <span className="flex gap-1 shrink-0">
+                  {p.preferredPositions.map(pos => (
+                    <span key={pos} className={`text-xs font-medium px-1.5 py-0.5 rounded ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Open spot available — claimable by players not in the squad */}
         {match.status === 'published' && !match.isSelected && match.openSpot && !match.myClaim && (

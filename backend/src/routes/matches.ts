@@ -701,6 +701,45 @@ router.get('/:matchId/squad', authenticate, async (req, res, next) => {
   }
 });
 
+// GET /api/matches/:matchId/signup-list — who has signed up, visible to any player.
+// Names and positions only; the coach-only /signups route keeps the stats and
+// priority flags. There is no sign-up cap, so this is deliberately not gated on
+// the squad being published.
+router.get('/:matchId/signup-list', authenticate, async (req, res, next) => {
+  try {
+    const { matchId } = req.params;
+
+    const { data: match } = await supabaseAdmin
+      .from('matches')
+      .select('match_id')
+      .eq('match_id', matchId)
+      .single();
+
+    if (!match) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
+      return;
+    }
+
+    const { data: signups } = await supabaseAdmin
+      .from('signups')
+      .select('users!signups_player_id_fkey(user_id, name, preferred_positions)')
+      .eq('match_id', matchId)
+      .eq('is_active', true);
+
+    const players = (signups ?? [])
+      .map((s: any) => ({
+        userId: s.users.user_id,
+        name: s.users.name,
+        preferredPositions: s.users.preferred_positions ?? [],
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    res.json({ success: true, data: { players, count: players.length } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/:matchId/guests', authenticate, async (req, res, next) => {
   try {
     const { data, error } = await supabaseAdmin

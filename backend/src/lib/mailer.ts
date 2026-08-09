@@ -246,6 +246,54 @@ export async function sendSignupReminder(
   )));
 }
 
+// ─── Sign-ups open ────────────────────────────────────────────────────────────
+
+// Sent to every active player when new matches open for sign-up. Batched by
+// /api/cron/match-announcements across every match that opened in the same
+// burst, so a coach entering the season's next block sends one email, not one
+// per match.
+export async function sendSignupOpenAnnouncement(
+  player: { name: string; email: string },
+  matches: { matchDate: string; matchTime: string; location: string; opponent: string | null; signupCloseDate: string }[],
+) {
+  const n = matches.length;
+  const rows = matches.map(m => {
+    const dateStr = new Date(`${m.matchDate}T${m.matchTime}`).toLocaleDateString('en-GB', {
+      weekday: 'long', day: 'numeric', month: 'long',
+    });
+    const opponent = m.opponent ? ` vs ${m.opponent}` : '';
+    const deadline = new Date(m.signupCloseDate).toLocaleString('en-GB', {
+      weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    });
+    return {
+      label: `${dateStr}${opponent}`,
+      html: `<li style="margin:10px 0;font-size:14px">
+               <strong>${dateStr}</strong>${opponent}<br>
+               <span style="color:#6b7280">${m.matchTime.slice(0, 5)} · ${m.location}</span><br>
+               <span style="color:#6b7280">Sign up by ${deadline}</span>
+             </li>`,
+      text: `- ${dateStr}${opponent}\n  ${m.matchTime.slice(0, 5)} · ${m.location}\n  Sign up by ${deadline}`,
+    };
+  });
+
+  const subject = n === 1
+    ? `Sign-ups open — ${rows[0].label}`
+    : `Sign-ups open — ${n} new matches`;
+  const intro = n === 1
+    ? 'Sign-ups are open for a new match:'
+    : `Sign-ups are open for ${n} new matches:`;
+
+  await send(
+    player.email,
+    subject,
+    `<p>Hi <strong>${player.name}</strong>,</p>
+     <p>${intro}</p>
+     <ul style="padding-left:18px;margin:12px 0">${rows.map(r => r.html).join('')}</ul>
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Sign up now →</a>`,
+    `Hi ${player.name},\n\n${intro}\n${rows.map(r => r.text).join('\n')}\n\n${FRONTEND_URL}/dashboard`,
+  );
+}
+
 // ─── New registration ─────────────────────────────────────────────────────────
 
 export async function sendAdminRegistrationNotification(playerName: string, playerEmail: string) {

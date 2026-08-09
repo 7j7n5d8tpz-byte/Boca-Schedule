@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { sendSelectionNotifications, sendCancellationNotifications, sendReleaseNotification, sendSpotOpenNotification } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
+import { notifySignupOpen } from '../lib/signupOpen.js';
 import { resolveOpponent } from '../lib/opponents.js';
 
 // Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
@@ -194,6 +195,14 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
 
     if (error) throw error;
 
+    // Sign-ups are live the moment the match is created (unless it's scheduled
+    // to open later, in which case it's a draft and the cron announces it when
+    // the time comes). The in-app notification fires now; the email is batched
+    // by /api/cron/match-announcements so a burst of matches is one email.
+    if (data.status === 'signup_open') {
+      notifySignupOpen([data.match_id]).catch(err => console.error('Failed to announce sign-ups open:', err));
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -370,6 +379,13 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
 
     const { data, error } = await supabaseAdmin.from('matches').update(updates).eq('match_id', matchId).select().single();
     if (error) throw error;
+
+    // Opening a draft by hand announces it, exactly as creating an open match
+    // does. notifySignupOpen claims the match atomically, so this can't collide
+    // with the cron doing the same flip.
+    if (data.status === 'signup_open' && existing?.status === 'draft') {
+      notifySignupOpen([String(matchId)]).catch(err => console.error('Failed to announce sign-ups open:', err));
+    }
 
     // Fire cancellation emails only when transitioning into cancelled state
     if (d.status === 'cancelled' && existing && existing.status !== 'cancelled') {

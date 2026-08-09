@@ -39,6 +39,8 @@ function iconFor(type: string): { tone: keyof typeof TONE; paths: ReactNode } {
       return { tone: 'red',    paths: <><circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6M9 9l6 6" /></> };
     case 'claim_rejected':             // "Spot went to someone else"
       return { tone: 'gray',   paths: <><circle cx="12" cy="12" r="9" /><path d="M15 9l-6 6M9 9l6 6" /></> };
+    case 'signup_open':                // "Sign-ups are open" — a sign-up sheet
+      return { tone: 'green',  paths: <><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M8.5 12h7M8.5 16h4.5" /></> };
     case 'signup_reminder':            // "Signup closing soon"
       return { tone: 'amber',  paths: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 1.5" /></> };
     case 'matchday_reminder':          // "Match tomorrow"

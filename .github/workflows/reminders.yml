@@ -23,6 +23,15 @@ jobs:
           # Fail the run on server/auth errors so problems are visible in Actions.
           if [ "$code" -ge 400 ]; then exit 1; fi
 
+      - name: Trigger match announcements (grouped "sign-ups open" email)
+        run: |
+          code=$(curl -s -o /tmp/body -w '%{http_code}' -X POST \
+            --retry 4 --retry-delay 2 --retry-connrefused --retry-all-errors \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            https://boca-backend.fly.dev/api/cron/match-announcements)
+          echo "HTTP $code"; cat /tmp/body; echo
+          if [ "$code" -ge 400 ]; then exit 1; fi
+
       - name: Trigger daily reminders (match-day / pick-squad / record-result)
         run: |
           code=$(curl -s -o /tmp/body -w '%{http_code}' -X POST \

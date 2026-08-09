@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
-import { sendSignupReminder, sendMatchdayReminder, sendSelectionReminder, sendResultReminder } from '../lib/mailer.js';
+import { sendSignupReminder, sendMatchdayReminder, sendSelectionReminder, sendResultReminder, sendSignupOpenAnnouncement } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
+import { notifySignupOpen, openDueDrafts } from '../lib/signupOpen.js';
 
 const router = Router();
 
@@ -156,6 +157,155 @@ router.post('/signup-reminders', async (req, res) => {
     // — that opacity is exactly what made this failure hard to diagnose.
     const detail = err instanceof Error ? err.message : String(err);
     console.error('signup-reminders failed:', err);
+    res.status(500).json({ success: false, error: { code: 'CRON_ERROR', message: detail } });
+  }
+});
+
+// A numeric knob from system_config, with a fallback when unset or unparseable.
+async function configNumber(key: string, fallback: number): Promise<number> {
+  const { data } = await supabaseAdmin
+    .from('system_config').select('config_value').eq('config_key', key).maybeSingle();
+  const n = Number(data?.config_value);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+// POST /api/cron/match-announcements
+//
+// Invoked hourly by the same workflow as the reminders. Announces matches whose
+// sign-up window has opened:
+//   1. drafts whose opening time has arrived become signup_open
+//   2. in-app notification for anything open but not yet announced
+//   3. ONE grouped email per player covering every match in the current burst
+//      that they haven't already signed up for
+//
+// The email is held back while matches are still arriving (a coach entering the
+// next block of fixtures adds them a minute apart), so the club gets a single
+// "sign-ups open for 6 matches" email instead of six. `signup_open_notified_at`
+// is the "opened at" instant the grouping works off; `signup_open_emailed_at`
+// marks a match as done.
+router.post('/match-announcements', async (req, res) => {
+  try {
+    if (!cronAuthorized(req, res)) return;
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    const opened = await openDueDrafts(now);
+
+    // Anything open without an in-app announcement yet: the drafts just flipped
+    // above, plus any match whose create-time notification failed.
+    const { data: unannounced, error: unErr } = await supabaseAdmin
+      .from('matches')
+      .select('match_id')
+      .eq('status', 'signup_open')
+      .is('signup_open_notified_at', null)
+      .gt('signup_close_date', nowIso);
+    if (unErr) throw unErr;
+    const notified = await notifySignupOpen((unannounced ?? []).map((m: any) => m.match_id));
+
+    // Retire matches that were announced in-app but can no longer be emailed
+    // about — the deadline passed while they waited, or they were cancelled or
+    // moved on. Without this they'd be rescanned on every run, forever. Two
+    // plain filters rather than one `.or()`, because a PostgREST or-clause has
+    // to embed the timestamp in its comma/dot-delimited grammar.
+    const retire = () => supabaseAdmin
+      .from('matches')
+      .update({ signup_open_emailed_at: nowIso })
+      .is('signup_open_emailed_at', null)
+      .not('signup_open_notified_at', 'is', null);
+    await retire().lte('signup_close_date', nowIso);
+    await retire().neq('status', 'signup_open');
+
+    const { data: pending, error: pendErr } = await supabaseAdmin
+      .from('matches')
+      .select('match_id, match_date, match_time, location, opponent, signup_close_date, signup_open_notified_at')
+      .eq('status', 'signup_open')
+      .is('signup_open_emailed_at', null)
+      .not('signup_open_notified_at', 'is', null)
+      .gt('signup_close_date', nowIso)
+      .order('match_date', { ascending: true });
+    if (pendErr) throw pendErr;
+
+    if (!pending || pending.length === 0) {
+      res.json({ success: true, data: { opened: opened.length, notified: notified.length, matches: 0, recipients: 0 } });
+      return;
+    }
+
+    // Hold the email while the burst is still growing, but never longer than the
+    // max-defer cap — otherwise a coach adding one match every quiet-window
+    // could postpone the email indefinitely.
+    const quietMinutes = await configNumber('signup_open_quiet_minutes', 20);
+    const maxDeferHours = await configNumber('signup_open_max_defer_hours', 3);
+    const openedAt = (pending as any[]).map(m => new Date(m.signup_open_notified_at).getTime());
+    const stillArriving = now.getTime() - Math.max(...openedAt) < quietMinutes * 60 * 1000;
+    const waitedLongEnough = now.getTime() - Math.min(...openedAt) >= maxDeferHours * 60 * 60 * 1000;
+    if (stillArriving && !waitedLongEnough) {
+      res.json({
+        success: true,
+        data: { opened: opened.length, notified: notified.length, deferred: pending.length, reason: 'still inside the quiet window' },
+      });
+      return;
+    }
+
+    const { data: recipients, error: recErr } = await supabaseAdmin
+      .from('users')
+      .select('user_id, name, email')
+      .eq('is_active', true)
+      .is('merged_into', null)
+      .not('email', 'is', null);
+    if (recErr) throw recErr;
+
+    // Anyone who signed up while the email was still batching has already acted
+    // on that match — leave it out of their copy, and skip them entirely if it
+    // was the only one. Withdrawn sign-ups (is_active false) don't count.
+    const matchIds = (pending as any[]).map(m => m.match_id);
+    const { data: signups, error: signupErr } = await supabaseAdmin
+      .from('signups')
+      .select('match_id, player_id')
+      .in('match_id', matchIds)
+      .eq('is_active', true);
+    if (signupErr) throw signupErr;
+
+    const signedUpByPlayer = new Map<string, Set<string>>();
+    for (const s of (signups ?? []) as any[]) {
+      const set = signedUpByPlayer.get(s.player_id) ?? new Set<string>();
+      set.add(s.match_id);
+      signedUpByPlayer.set(s.player_id, set);
+    }
+
+    const announced = (pending as any[]).map(m => ({
+      matchId: m.match_id,
+      matchDate: m.match_date,
+      matchTime: m.match_time,
+      location: m.location,
+      opponent: m.opponent ?? null,
+      signupCloseDate: m.signup_close_date,
+    }));
+
+    let emailed = 0;
+    let skipped = 0;
+    for (const r of (recipients ?? []) as any[]) {
+      const alreadyIn = signedUpByPlayer.get(r.user_id);
+      const theirs = alreadyIn ? announced.filter(m => !alreadyIn.has(m.matchId)) : announced;
+      if (theirs.length === 0) { skipped += 1; continue; }
+      await sendSignupOpenAnnouncement({ name: r.name, email: r.email }, theirs)
+        .catch(err => console.error('sign-ups open email failed:', err));
+      emailed += 1;
+    }
+
+    const { error: stampErr } = await supabaseAdmin
+      .from('matches')
+      .update({ signup_open_emailed_at: new Date().toISOString() })
+      .in('match_id', (pending as any[]).map(m => m.match_id));
+    if (stampErr) throw stampErr;
+
+    res.json({
+      success: true,
+      data: { opened: opened.length, notified: notified.length, matches: pending.length, recipients: emailed, skipped },
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('match-announcements failed:', err);
     res.status(500).json({ success: false, error: { code: 'CRON_ERROR', message: detail } });
   }
 });

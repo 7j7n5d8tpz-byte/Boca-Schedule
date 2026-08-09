@@ -52,6 +52,45 @@ describe('Matches', () => {
     createdMatchIds.push(res.body.data.matchId);
   });
 
+  it('announces sign-ups in-app when a match is created already open', async () => {
+    const res = await request(app)
+      .post('/api/matches')
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({
+        matchDate:       '2030-06-20',
+        matchTime:       '19:00',
+        location:        'Announce Pitch',
+        matchType:       '7-player',
+        minPlayers:      5,
+        maxPlayers:      7,
+        signupOpenDate:  new Date(Date.now() - 86_400_000).toISOString(),
+        signupCloseDate: new Date('2030-06-19T18:00:00.000Z').toISOString(),
+      });
+    expect(res.status).toBe(201);
+    expect(res.body.data.status).toBe('signup_open');
+    const mid = res.body.data.matchId;
+    createdMatchIds.push(mid);
+
+    // Fire-and-forget: the notification lands just after the response.
+    const notes = await eventually(
+      async () => (await supabaseAdmin
+        .from('notifications').select('user_id, title')
+        .eq('match_id', mid).eq('type', 'signup_open')).data ?? [],
+      rows => rows.length > 0,
+    );
+    expect(notes.length).toBeGreaterThan(0);
+    expect(notes[0].title).toBe('Sign-ups are open');
+    expect(notes.some(n => n.user_id === player.userId)).toBe(true);
+
+    // In-app is stamped; the email is left for the batching cron.
+    const { data: row } = await supabaseAdmin
+      .from('matches')
+      .select('signup_open_notified_at, signup_open_emailed_at')
+      .eq('match_id', mid).single();
+    expect(row!.signup_open_notified_at).toBeTruthy();
+    expect(row!.signup_open_emailed_at).toBeNull();
+  });
+
   it('rejects a match with missing required fields', async () => {
     const res = await request(app)
       .post('/api/matches')

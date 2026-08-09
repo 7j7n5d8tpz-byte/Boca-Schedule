@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
+import { formatClubDeadline } from './clubTime.js';
 
 const FROM = process.env.EMAIL_FROM || '"Boca Boldisch" <boca_admin@bocaboldisch.dk>';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -303,9 +304,7 @@ export async function sendSignupReminder(
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
-  const deadlineStr = new Date(match.signupCloseDate).toLocaleString('en-GB', {
-    weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  });
+  const deadlineStr = formatClubDeadline(match.signupCloseDate);
 
   return sendMany(players, 'signup reminders', p => ({
     subject: `Signup closing soon — ${dateStr}`,
@@ -338,9 +337,7 @@ export async function sendSignupOpenAnnouncement(
       weekday: 'long', day: 'numeric', month: 'long',
     });
     const opponent = m.opponent ? ` vs ${m.opponent}` : '';
-    const deadline = new Date(m.signupCloseDate).toLocaleString('en-GB', {
-      weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-    });
+    const deadline = formatClubDeadline(m.signupCloseDate);
     return {
       label: `${dateStr}${opponent}`,
       html: `<li style="margin:10px 0;font-size:14px">

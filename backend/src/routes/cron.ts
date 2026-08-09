@@ -3,11 +3,10 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { sendSignupReminder, sendMatchdayReminder, sendSelectionReminder, sendResultReminder, sendSignupOpenAnnouncement } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
 import { notifySignupOpen, openDueDrafts } from '../lib/signupOpen.js';
+// The daily reminders all send at 18:00 club time.
+import { CLUB_TZ } from '../lib/clubTime.js';
 
 const router = Router();
-
-// The club's wall-clock timezone — the daily reminders all send at 18:00 here.
-const CLUB_TZ = 'Europe/Copenhagen';
 
 function clubHour(d: Date): number {
   const h = new Intl.DateTimeFormat('en-GB', { timeZone: CLUB_TZ, hour: '2-digit', hour12: false })

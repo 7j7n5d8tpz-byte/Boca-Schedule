@@ -14,7 +14,7 @@ const match = {
   matchTime: '13:10:00',
   location: 'Boldbanen',
   opponent: 'Premier United',
-  signupCloseDate: '2026-08-14T19:00:00.000Z',
+  signupCloseDate: '2026-08-09T19:00:00.000Z',
 };
 
 const players = (n: number) =>
@@ -102,6 +102,22 @@ describe('mailer transport', () => {
     // A few ms of timer slack, but nowhere near the simultaneous burst that
     // would blow the limit.
     expect(Math.min(...gaps)).toBeGreaterThanOrEqual(45);
+  });
+
+  it('states the sign-up deadline in club time, not the server\'s', async () => {
+    // signup_close_date is a timestamptz: 19:00 UTC is 21:00 in Copenhagen, and
+    // 21:00 is what the app shows. Formatting it without an explicit zone gave
+    // whatever Fly was set to (UTC), so every email under-stated the deadline
+    // by an hour in winter and two in summer.
+    const { sendSignupReminder } = await loadMailer(1000);
+    sendMock.mockResolvedValue(ok);
+
+    await sendSignupReminder(players(1), match);
+
+    const { html, text } = sendMock.mock.calls[0][0];
+    expect(html).toContain('Sun 9 Aug, 21:00');
+    expect(text).toContain('Signup closes: Sun 9 Aug, 21:00');
+    expect(html).not.toContain('19:00');
   });
 
   it('does not let one failed send poison the ones queued behind it', async () => {

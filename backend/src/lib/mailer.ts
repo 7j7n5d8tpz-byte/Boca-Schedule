@@ -4,13 +4,61 @@ import nodemailer from 'nodemailer';
 const FROM = process.env.EMAIL_FROM || '"Boca Boldisch" <boca_admin@bocaboldisch.dk>';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
+// Resend rate-limits its API (2 requests/second on the default plan). Fanning a
+// club-wide email out in parallel blows straight through that and the overflow
+// comes back as 429 — on 2026-08-09 seven of the nineteen signup reminders for
+// the 15 Aug match were lost exactly that way. So every Resend call queues
+// through one process-wide chain that spaces the requests out.
+const SENDS_PER_SECOND = Number(process.env.RESEND_SENDS_PER_SECOND) || 2;
+const MIN_GAP_MS = Math.ceil(1000 / SENDS_PER_SECOND);
+const MAX_ATTEMPTS = 4;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+let queue: Promise<unknown> = Promise.resolve();
+let lastCallAt = 0;
+
+function throttled<T>(task: () => Promise<T>): Promise<T> {
+  const run = queue.then(async () => {
+    const wait = lastCallAt + MIN_GAP_MS - Date.now();
+    if (wait > 0) await sleep(wait);
+    lastCallAt = Date.now();
+    return task();
+  });
+  // The copy the next send chains off must never carry a rejection, or one bad
+  // address would fail every email queued behind it.
+  queue = run.catch(() => {});
+  return run;
+}
+
+let client: Resend | null = null;
+const resendClient = () => (client ??= new Resend(process.env.RESEND_API_KEY!));
+
+// Resend's SDK resolves with `{ data, error }` instead of rejecting, so an
+// unchecked `await resend.emails.send(...)` looks successful whatever came back.
+// Inspect the error, retry what's worth retrying, throw the rest.
+const RETRYABLE = new Set(['rate_limit_exceeded', 'internal_server_error', 'application_error']);
+
+async function sendViaResend(to: string, subject: string, html: string, text: string) {
+  for (let attempt = 1; ; attempt++) {
+    const { error } = await throttled(() =>
+      resendClient().emails.send({ from: FROM, to, subject, html, text }));
+    if (!error) return;
+    if (attempt >= MAX_ATTEMPTS || !RETRYABLE.has(error.name)) {
+      throw new Error(`Resend rejected the email to ${to}: ${error.name} — ${error.message}`);
+    }
+    await sleep(MIN_GAP_MS * 2 ** attempt);
+  }
+}
+
 // Use Resend in production (RESEND_API_KEY set), fall back to local Mailpit in dev
 async function send(to: string, subject: string, html: string, text: string) {
   if (process.env.RESEND_API_KEY) {
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({ from: FROM, to, subject, html, text });
+    await sendViaResend(to, subject, html, text);
   } else {
-    // Local dev: deliver to Mailpit on Supabase's bundled SMTP (port 54325)
+    // Local dev: deliver to Mailpit on Supabase's bundled SMTP (port 54325).
+    // No throttle here — Mailpit has no rate limit and the gap would just make
+    // the local suite crawl.
     const transporter = nodemailer.createTransport({
       host: '127.0.0.1',
       port: 54325,
@@ -20,22 +68,56 @@ async function send(to: string, subject: string, html: string, text: string) {
   }
 }
 
+// What a fan-out actually delivered. Callers that stamp "already notified" state
+// need this: stamping a run in which every send failed would drop the whole club
+// from that notification with nothing to show for it.
+export interface SendResult {
+  sent: number;
+  failed: { email: string; reason: string }[];
+}
+
+type Recipient = { name: string; email: string };
+
+// Fan one templated email out to many recipients. The throttle above serialises
+// the API calls, so this stays inside the rate limit however long the list is.
+async function sendMany(
+  recipients: Recipient[],
+  label: string,
+  build: (r: Recipient) => { subject: string; html: string; text: string },
+): Promise<SendResult> {
+  const settled = await Promise.allSettled(recipients.map(r => {
+    const { subject, html, text } = build(r);
+    return send(r.email, subject, html, text);
+  }));
+
+  const failed = settled.flatMap((outcome, i) => outcome.status === 'rejected'
+    ? [{
+        email: recipients[i].email,
+        reason: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
+      }]
+    : []);
+
+  if (failed.length > 0) {
+    console.error(`${label}: ${failed.length}/${recipients.length} email(s) failed`, failed);
+  }
+  return { sent: recipients.length - failed.length, failed };
+}
+
 // ─── Match selection ──────────────────────────────────────────────────────────
 
 export async function sendSelectionNotifications(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
-) {
+): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
-  await Promise.allSettled(players.map(p => send(
-    p.email,
-    `You're selected — ${dateStr}`,
-    `<p>Hi <strong>${p.name}</strong>,</p>
+  return sendMany(players, 'selection notifications', p => ({
+    subject: `You're selected — ${dateStr}`,
+    html: `<p>Hi <strong>${p.name}</strong>,</p>
      <p>You've been selected for the upcoming match.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
@@ -43,8 +125,8 @@ export async function sendSelectionNotifications(
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">View on dashboard →</a>`,
-    `Hi ${p.name},\n\nYou've been selected for the upcoming match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
-  )));
+    text: `Hi ${p.name},\n\nYou've been selected for the upcoming match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+  }));
 }
 
 // ─── Removed from squad ───────────────────────────────────────────────────────
@@ -53,25 +135,24 @@ export async function sendSelectionNotifications(
 export async function sendDeselectionNotifications(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
-) {
+): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
-  await Promise.allSettled(players.map(p => send(
-    p.email,
-    `Squad change — ${dateStr}`,
-    `<p>Hi <strong>${p.name}</strong>,</p>
+  return sendMany(players, 'deselection notifications', p => ({
+    subject: `Squad change — ${dateStr}`,
+    html: `<p>Hi <strong>${p.name}</strong>,</p>
      <p>The coach has updated the squad and you're no longer selected for this match.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>`,
-    `Hi ${p.name},\n\nThe coach has updated the squad and you're no longer selected for this match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}`,
-  )));
+    text: `Hi ${p.name},\n\nThe coach has updated the squad and you're no longer selected for this match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}`,
+  }));
 }
 
 // ─── Match cancellation ───────────────────────────────────────────────────────
@@ -79,25 +160,24 @@ export async function sendDeselectionNotifications(
 export async function sendCancellationNotifications(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
-) {
+): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
-  await Promise.allSettled(players.map(p => send(
-    p.email,
-    `Match cancelled — ${dateStr}`,
-    `<p>Hi <strong>${p.name}</strong>,</p>
+  return sendMany(players, 'cancellation notifications', p => ({
+    subject: `Match cancelled — ${dateStr}`,
+    html: `<p>Hi <strong>${p.name}</strong>,</p>
      <p>Unfortunately the match you were selected for has been cancelled.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>`,
-    `Hi ${p.name},\n\nUnfortunately the match you were selected for has been cancelled.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}`,
-  )));
+    text: `Hi ${p.name},\n\nUnfortunately the match you were selected for has been cancelled.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}`,
+  }));
 }
 
 // ─── Spot released ────────────────────────────────────────────────────────────
@@ -107,17 +187,16 @@ export async function sendReleaseNotification(
   playerName: string,
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
   matchId: string,
-) {
+): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
-  await Promise.allSettled(coaches.map(c => send(
-    c.email,
-    `Spot released — ${playerName} · ${dateStr}`,
-    `<p>Hi <strong>${c.name}</strong>,</p>
+  return sendMany(coaches, 'release notifications', c => ({
+    subject: `Spot released — ${playerName} · ${dateStr}`,
+    html: `<p>Hi <strong>${c.name}</strong>,</p>
      <p><strong>${playerName}</strong> has released their spot for the match on ${dateStr}.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
@@ -125,8 +204,8 @@ export async function sendReleaseNotification(
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/coach/matches/${matchId}/selections" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Manage squad →</a>`,
-    `Hi ${c.name},\n\n${playerName} has released their spot for the match on ${dateStr}.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
-  )));
+    text: `Hi ${c.name},\n\n${playerName} has released their spot for the match on ${dateStr}.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
+  }));
 }
 
 // ─── Open spot available ──────────────────────────────────────────────────────
@@ -134,17 +213,16 @@ export async function sendReleaseNotification(
 export async function sendSpotOpenNotification(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
-) {
+): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
-  await Promise.allSettled(players.map(p => send(
-    p.email,
-    `A spot opened up — ${dateStr}`,
-    `<p>Hi <strong>${p.name}</strong>,</p>
+  return sendMany(players, 'spot-open notifications', p => ({
+    subject: `A spot opened up — ${dateStr}`,
+    html: `<p>Hi <strong>${p.name}</strong>,</p>
      <p>A spot has opened up for the match on ${dateStr}. Want it? Claim it and the coach will confirm.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
@@ -152,8 +230,8 @@ export async function sendSpotOpenNotification(
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Claim the spot →</a>`,
-    `Hi ${p.name},\n\nA spot has opened up for the match on ${dateStr}. Claim it and the coach will confirm.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
-  )));
+    text: `Hi ${p.name},\n\nA spot has opened up for the match on ${dateStr}. Claim it and the coach will confirm.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+  }));
 }
 
 // ─── Spot claimed (to coaches) ────────────────────────────────────────────────
@@ -163,17 +241,16 @@ export async function sendSpotClaimNotification(
   claimantName: string,
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
   matchId: string,
-) {
+): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
-  await Promise.allSettled(coaches.map(c => send(
-    c.email,
-    `Spot claimed — ${claimantName} · ${dateStr}`,
-    `<p>Hi <strong>${c.name}</strong>,</p>
+  return sendMany(coaches, 'spot-claim notifications', c => ({
+    subject: `Spot claimed — ${claimantName} · ${dateStr}`,
+    html: `<p>Hi <strong>${c.name}</strong>,</p>
      <p><strong>${claimantName}</strong> wants to take an open spot for the match on ${dateStr}. Confirm them (or another claimant) in the squad.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
@@ -181,8 +258,8 @@ export async function sendSpotClaimNotification(
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/coach/matches/${matchId}/selections" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Review claimants →</a>`,
-    `Hi ${c.name},\n\n${claimantName} wants to take an open spot for the match on ${dateStr}.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
-  )));
+    text: `Hi ${c.name},\n\n${claimantName} wants to take an open spot for the match on ${dateStr}.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
+  }));
 }
 
 // ─── Claim resolved (to claimant) ─────────────────────────────────────────────
@@ -220,7 +297,7 @@ export async function sendClaimResolutionNotification(
 export async function sendSignupReminder(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null; signupCloseDate: string },
-) {
+): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
@@ -230,10 +307,9 @@ export async function sendSignupReminder(
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   });
 
-  await Promise.allSettled(players.map(p => send(
-    p.email,
-    `Signup closing soon — ${dateStr}`,
-    `<p>Hi <strong>${p.name}</strong>,</p>
+  return sendMany(players, 'signup reminders', p => ({
+    subject: `Signup closing soon — ${dateStr}`,
+    html: `<p>Hi <strong>${p.name}</strong>,</p>
      <p>Signups for the upcoming match close <strong>${deadlineStr}</strong> and you haven't signed up yet.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
@@ -242,8 +318,8 @@ export async function sendSignupReminder(
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Signup closes</td><td style="font-size:14px">${deadlineStr}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Sign up now →</a>`,
-    `Hi ${p.name},\n\nSignups for the upcoming match close ${deadlineStr} and you haven't signed up yet.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\nSignup closes: ${deadlineStr}\n\n${FRONTEND_URL}/dashboard`,
-  )));
+    text: `Hi ${p.name},\n\nSignups for the upcoming match close ${deadlineStr} and you haven't signed up yet.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\nSignup closes: ${deadlineStr}\n\n${FRONTEND_URL}/dashboard`,
+  }));
 }
 
 // ─── Sign-ups open ────────────────────────────────────────────────────────────
@@ -341,17 +417,16 @@ function matchLines(matches: ReminderMatch[]): { html: string; text: string } {
 export async function sendMatchdayReminder(
   players: { name: string; email: string }[],
   match: ReminderMatch,
-) {
+): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
-  await Promise.allSettled(players.map(p => send(
-    p.email,
-    `Match tomorrow — ${dateStr}`,
-    `<p>Hi <strong>${p.name}</strong>,</p>
+  return sendMany(players, 'match-day reminders', p => ({
+    subject: `Match tomorrow — ${dateStr}`,
+    html: `<p>Hi <strong>${p.name}</strong>,</p>
      <p>Reminder: you're in the squad for tomorrow's match.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
@@ -359,8 +434,8 @@ export async function sendMatchdayReminder(
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">View on dashboard →</a>`,
-    `Hi ${p.name},\n\nReminder: you're in the squad for tomorrow's match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
-  )));
+    text: `Hi ${p.name},\n\nReminder: you're in the squad for tomorrow's match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+  }));
 }
 
 // Pick-your-squad reminder to one coach — batched across every match whose

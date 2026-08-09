@@ -108,13 +108,13 @@ router.post('/signup-reminders', async (req, res) => {
         const recipients = recipientUsers.map((u: any) => ({ name: u.name, email: u.email }));
 
         if (recipients.length > 0) {
-          await sendSignupReminder(recipients, {
+          const result = await sendSignupReminder(recipients, {
             matchDate: m.match_date,
             matchTime: m.match_time,
             location: m.location,
             opponent: m.opponent ?? null,
             signupCloseDate: m.signup_close_date,
-          }).catch(err => console.error('Failed to send signup reminders:', err));
+          });
           await createNotifications(recipientUsers.map((u: any) => u.user_id), {
             type: 'signup_reminder',
             title: 'Signup closing soon',
@@ -122,7 +122,19 @@ router.post('/signup-reminders', async (req, res) => {
             link: '/dashboard',
             matchId: m.match_id,
           });
-          remindersSent += recipients.length;
+          remindersSent += result.sent;
+
+          // Every email failed — the provider is down or the key is bad, not a
+          // per-address problem. Leave the match unstamped so the next hourly
+          // run retries it; stamping here would bin the reminder for the whole
+          // club. A partial failure still stamps: re-running would re-mail
+          // everyone who did get it.
+          if (result.sent === 0) {
+            throw new Error(`all ${result.failed.length} signup reminder(s) failed: ${result.failed[0]?.reason}`);
+          }
+          if (result.failed.length > 0) {
+            failures.push(`${m.match_id}: ${result.failed.length}/${recipients.length} email(s) failed`);
+          }
         }
 
         // Stamp regardless of recipient count so we don't re-scan this match every run.

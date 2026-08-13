@@ -28,6 +28,9 @@ interface Match {
   userSignedUp: boolean;
   signupId: string | null;
   signupDeadlinePassed: boolean;
+  lateSignupOpen: boolean;
+  lateSignupSpotsLeft: number | null;
+  signupIsLate: boolean;
   isSelected: boolean;
   openSpot: boolean;
   myClaim: { claimId: string; status: string } | null;
@@ -162,9 +165,14 @@ function MatchCard({ match }: { match: Match }) {
   }
 
   const deadline = new Date(match.signupCloseDate);
+  const canSignUp =
+    !match.userSignedUp &&
+    ((match.status === 'signup_open' && !match.signupDeadlinePassed) || match.lateSignupOpen);
+  // Withdrawal normally stops at the deadline. A sign-up made *after* it stays
+  // withdrawable pre-publish, so a mistaken late sign-up isn't a trap.
   const canWithdraw =
     match.userSignedUp &&
-    !match.signupDeadlinePassed &&
+    (!match.signupDeadlinePassed || match.signupIsLate) &&
     match.status !== 'published' &&
     match.status !== 'completed';
 
@@ -247,6 +255,22 @@ function MatchCard({ match }: { match: Match }) {
           </div>
         )}
 
+        {/* Deadline passed but the match is short of players — sign-ups reopened
+            until enough people are in to field it. */}
+        {match.lateSignupOpen && !match.userSignedUp && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <p className="text-xs text-amber-800 flex items-start gap-1.5">
+              <Icon name="megaphone" className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <span>
+                Deadline passed but we're short of players — sign-ups are open again
+                {match.lateSignupSpotsLeft !== null && (
+                  <> for {match.lateSignupSpotsLeft} more {match.lateSignupSpotsLeft === 1 ? 'player' : 'players'}</>
+                )}.
+              </span>
+            </p>
+          </div>
+        )}
+
         {/* Open spot available — claimable by players not in the squad */}
         {match.status === 'published' && !match.isSelected && match.openSpot && !match.myClaim && (
           <div className="bg-brand-green-50 border border-brand-green/30 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
@@ -282,13 +306,13 @@ function MatchCard({ match }: { match: Match }) {
 
         {/* Actions */}
         <div className="flex gap-2 pt-1">
-          {!match.userSignedUp && !match.signupDeadlinePassed && match.status === 'signup_open' && (
+          {canSignUp && (
             <button
               onClick={() => signupMutation.mutate()}
               disabled={signupMutation.isPending}
               className="flex-1 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
             >
-              {signupMutation.isPending ? 'Signing up…' : 'Sign Up'}
+              {signupMutation.isPending ? 'Signing up…' : match.lateSignupOpen ? 'Sign Up (late)' : 'Sign Up'}
             </button>
           )}
 
@@ -311,7 +335,7 @@ function MatchCard({ match }: { match: Match }) {
             </button>
           )}
 
-          {match.signupDeadlinePassed && !match.userSignedUp && match.status !== 'published' && (
+          {match.signupDeadlinePassed && !match.lateSignupOpen && !match.userSignedUp && match.status !== 'published' && (
             <p className="text-xs text-gray-400 text-center w-full py-1">Signup closed</p>
           )}
         </div>

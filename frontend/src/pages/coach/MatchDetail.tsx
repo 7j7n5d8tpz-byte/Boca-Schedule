@@ -195,7 +195,13 @@ export default function MatchDetail() {
         )}
         {match.status === 'signup_open' && (
           <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
-            <p className="text-sm text-green-700">Signups are open — players can join this match.</p>
+            {/* Past the deadline the window stays open while the match is short of
+                players, so say so — the coach shouldn't think this is a bug. */}
+            <p className="text-sm text-green-700">
+              {new Date(match.signupCloseDate) < new Date() && summary.totalSignups < match.maxPlayers
+                ? `Deadline passed, but only ${summary.totalSignups} signed up — players can still join until ${match.maxPlayers} are in. Close signups to stop that.`
+                : 'Signups are open — players can join this match.'}
+            </p>
             <button
               onClick={() => statusMutation.mutate('signup_closed')}
               disabled={statusMutation.isPending}

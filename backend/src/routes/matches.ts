@@ -7,6 +7,7 @@ import { sendSelectionNotifications, sendCancellationNotifications, sendReleaseN
 import { createNotifications } from '../lib/notifications.js';
 import { notifySignupOpen } from '../lib/signupOpen.js';
 import { resolveOpponent } from '../lib/opponents.js';
+import { lateSignupOpen } from '../lib/lateSignup.js';
 
 // Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
 function matchLabel(m: { match_date: string; match_time?: string; opponent?: string | null }): string {
@@ -72,7 +73,7 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     // Fetch matches (left join signups so matches with 0 sign-ups still appear)
     let matchQuery = supabaseAdmin
       .from('matches')
-      .select('*, signups(signup_id, player_id, is_active), selections(player_id), match_results(result_id)', { count: 'exact' })
+      .select('*, signups(signup_id, player_id, is_active, signed_up_at), selections(player_id), match_results(result_id)', { count: 'exact' })
       .order('match_date', { ascending: true })
       .range(offset, offset + limit - 1);
 
@@ -125,6 +126,9 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
       const myClaim = claimByMatch.get(m.match_id);
       // An open spot = a published match whose squad is below capacity.
       const openSpot = m.status === 'published' && (m.selections ?? []).length < m.max_players;
+      // Past the deadline, sign-ups reopen while the match is short of players.
+      const deadlinePassed = new Date(m.signup_close_date) < new Date();
+      const lateOpen = deadlinePassed && lateSignupOpen(m, signups.length);
       return {
         matchId: m.match_id,
         matchDate: m.match_date,
@@ -142,7 +146,15 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
         currentSignups: signups.length,
         userSignedUp: !!mySignup,
         signupId: mySignup?.signup_id ?? null,
-        signupDeadlinePassed: new Date(m.signup_close_date) < new Date(),
+        signupDeadlinePassed: deadlinePassed,
+        // Sign-ups reopened because the match is short of players, and how many
+        // more can still come in. Null spots-left outside the late window — there
+        // is deliberately no cap on sign-ups before the deadline.
+        lateSignupOpen: lateOpen,
+        lateSignupSpotsLeft: lateOpen ? m.max_players - signups.length : null,
+        // A sign-up made after the deadline is still withdrawable pre-publish —
+        // otherwise a mistaken late sign-up would be stuck.
+        signupIsLate: !!mySignup && new Date(mySignup.signed_up_at) > new Date(m.signup_close_date),
         isSelected,
         openSpot,
         // match_results.match_id is UNIQUE, so PostgREST embeds it as a to-one

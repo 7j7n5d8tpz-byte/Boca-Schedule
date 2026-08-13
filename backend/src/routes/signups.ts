@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { lateSignupOpen, LATE_SIGNUP_COLUMNS, REOPENABLE_STATUSES } from '../lib/lateSignup.js';
 
 const router = Router();
 
@@ -14,14 +15,37 @@ router.post('/', authenticate, async (req, res, next) => {
       return;
     }
 
-    const { data: match } = await supabaseAdmin.from('matches').select('status, signup_close_date').eq('match_id', matchId).single();
+    const { data: match } = await supabaseAdmin.from('matches')
+      .select(`signup_close_date, ${LATE_SIGNUP_COLUMNS}`)
+      .eq('match_id', matchId).single();
     if (!match) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
       return;
     }
-    if (match.status !== 'signup_open' || new Date(match.signup_close_date) < new Date()) {
-      res.status(400).json({ success: false, error: { code: 'SIGNUP_CLOSED', message: 'Signup window has closed for this match' } });
-      return;
+
+    // Inside the normal window: open to everyone, no cap. After the deadline:
+    // only while the match is still short of the squad it needs. Either way the
+    // status gate comes first, so a published (or completed, cancelled, draft)
+    // match takes no sign-ups at all — once the squad is out, the way in is the
+    // spot-claim flow, which the coach approves.
+    const insideWindow = match.status === 'signup_open' && new Date(match.signup_close_date) >= new Date();
+    if (!insideWindow) {
+      const { count } = await supabaseAdmin.from('signups')
+        .select('signup_id', { count: 'exact', head: true })
+        .eq('match_id', matchId)
+        .eq('is_active', true);
+      const activeSignups = count ?? 0;
+
+      if (!lateSignupOpen(match, activeSignups)) {
+        const squadFull = REOPENABLE_STATUSES.includes(match.status) && activeSignups >= match.max_players;
+        res.status(400).json({
+          success: false,
+          error: squadFull
+            ? { code: 'SQUAD_FULL', message: `Signup has closed — ${match.max_players} players are already signed up, enough to field the match` }
+            : { code: 'SIGNUP_CLOSED', message: 'Signup window has closed for this match' },
+        });
+        return;
+      }
     }
 
     const { data: existing } = await supabaseAdmin.from('signups')

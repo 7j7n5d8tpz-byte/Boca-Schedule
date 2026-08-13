@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
-import { lateSignupOpen, LATE_SIGNUP_COLUMNS, PRE_PUBLISH_STATUSES } from '../lib/lateSignup.js';
+import { lateSignupOpen, LATE_SIGNUP_COLUMNS, REOPENABLE_STATUSES } from '../lib/lateSignup.js';
 
 const router = Router();
 
@@ -24,7 +24,10 @@ router.post('/', authenticate, async (req, res, next) => {
     }
 
     // Inside the normal window: open to everyone, no cap. After the deadline:
-    // only while the match is still short of the squad it needs.
+    // only while the match is still short of the squad it needs. Either way the
+    // status gate comes first, so a published (or completed, cancelled, draft)
+    // match takes no sign-ups at all — once the squad is out, the way in is the
+    // spot-claim flow, which the coach approves.
     const insideWindow = match.status === 'signup_open' && new Date(match.signup_close_date) >= new Date();
     if (!insideWindow) {
       const { count } = await supabaseAdmin.from('signups')
@@ -34,7 +37,7 @@ router.post('/', authenticate, async (req, res, next) => {
       const activeSignups = count ?? 0;
 
       if (!lateSignupOpen(match, activeSignups)) {
-        const squadFull = PRE_PUBLISH_STATUSES.includes(match.status) && activeSignups >= match.max_players;
+        const squadFull = REOPENABLE_STATUSES.includes(match.status) && activeSignups >= match.max_players;
         res.status(400).json({
           success: false,
           error: squadFull

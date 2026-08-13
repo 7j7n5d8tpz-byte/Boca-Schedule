@@ -9,11 +9,12 @@
 // Once the squad is published, an extra player goes through the spot-claim flow
 // instead (see routes/claims.ts), so the coach still approves who comes in.
 
-// Only a match still in `signup_open` reopens. The other pre-publish states are
-// reached by a deliberate coach action — "Close signups", or running the
-// optimizer on a squad — and that overrides the shortage. A coach who then finds
-// they're short reopens sign-ups from the match page, flipping the state back.
-export const PRE_PUBLISH_STATUSES = ['signup_open'];
+// Only a match still in `signup_open` reopens. Every other status means someone
+// already acted: the coach hit "Close signups", ran the optimizer, published the
+// squad, or the match is done or off. A deliberate act outranks the shortage — a
+// coach who then finds they're short reopens sign-ups from the match page, which
+// flips the status back and brings the window with it.
+export const REOPENABLE_STATUSES = ['signup_open'];
 
 export interface LateSignupMatch {
   status: string;
@@ -31,7 +32,7 @@ export function lateSignupOpen(
   activeSignups: number,
   now: Date = new Date(),
 ): boolean {
-  if (!PRE_PUBLISH_STATUSES.includes(m.status)) return false;
+  if (!REOPENABLE_STATUSES.includes(m.status)) return false;
   if (activeSignups >= m.max_players) return false;
   // Kick-off closes the window for good, whatever the state of the squad.
   return new Date(`${m.match_date}T${m.match_time}`) > now;

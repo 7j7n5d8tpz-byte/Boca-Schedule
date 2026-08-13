@@ -13,6 +13,7 @@ describe('Signups', () => {
   let fullMatchId: string;
   let coachClosedMatchId: string;
   let publishedMatchId: string;
+  let publishedLateMatchId: string;
 
   // A signup window entirely in the past — deadline passed.
   const PAST_WINDOW = { signup_open_date: '2000-01-01', signup_close_date: '2000-01-02' };
@@ -23,20 +24,25 @@ describe('Signups', () => {
       createTestUser('player', '-su2'),
       createTestUser('coach', '-su'),
     ]);
-    const [match, late, full, coachClosed, published] = await Promise.all([
+    const [match, late, full, coachClosed, published, publishedLate] = await Promise.all([
       createTestMatch({ status: 'signup_open' }),
       createTestMatch({ status: 'signup_open', ...PAST_WINDOW }),
       // Deadline passed and already at capacity (max_players 1).
       createTestMatch({ status: 'signup_open', min_players: 1, max_players: 1, ...PAST_WINDOW }),
       // Deadline passed, but the coach closed signups by hand.
       createTestMatch({ status: 'signup_closed', ...PAST_WINDOW }),
+      // Published while the deadline was still open — publishing has to close
+      // signups on its own, not lean on the deadline having passed.
       createTestMatch({ status: 'published' }),
+      // Published, deadline passed, squad short of max — the late-signup path.
+      createTestMatch({ status: 'published', ...PAST_WINDOW }),
     ]);
-    matchId            = match.match_id;
-    lateMatchId        = late.match_id;
-    fullMatchId        = full.match_id;
-    coachClosedMatchId = coachClosed.match_id;
-    publishedMatchId   = published.match_id;
+    matchId              = match.match_id;
+    lateMatchId          = late.match_id;
+    fullMatchId          = full.match_id;
+    coachClosedMatchId   = coachClosed.match_id;
+    publishedMatchId     = published.match_id;
+    publishedLateMatchId = publishedLate.match_id;
     // Seed player's signup into the published match so the withdrawal test can try to delete it
     await signupPlayer(publishedMatchId, player.userId);
     // Fill the capacity-1 match so late signup has nothing left to offer.
@@ -50,6 +56,7 @@ describe('Signups', () => {
       deleteTestMatch(fullMatchId),
       deleteTestMatch(coachClosedMatchId),
       deleteTestMatch(publishedMatchId),
+      deleteTestMatch(publishedLateMatchId),
     ]);
     await Promise.all([
       deleteTestUser(player.userId),
@@ -91,6 +98,30 @@ describe('Signups', () => {
       .send({ matchId: fullMatchId });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('SQUAD_FULL');
+  });
+
+  // Published means the squad is out. Getting in from there is the spot-claim
+  // flow (claims.test.ts), never a sign-up — no matter what the deadline says.
+  it('player cannot sign up once the squad is published, deadline or not', async () => {
+    for (const id of [publishedMatchId, publishedLateMatchId]) {
+      const res = await request(app)
+        .post('/api/signups')
+        .set('Authorization', `Bearer ${player2.token}`)
+        .send({ matchId: id });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('SIGNUP_CLOSED');
+    }
+  });
+
+  it('a published match never offers late signup', async () => {
+    const list = await request(app)
+      .get('/api/matches/upcoming?status=published&limit=200')
+      .set('Authorization', `Bearer ${player2.token}`);
+    expect(list.status).toBe(200);
+    const published = list.body.data.matches
+      .filter((m: any) => [publishedMatchId, publishedLateMatchId].includes(m.matchId));
+    expect(published).toHaveLength(2);
+    for (const m of published) expect(m.lateSignupOpen).toBe(false);
   });
 
   it('no late signup once the coach has closed signups', async () => {

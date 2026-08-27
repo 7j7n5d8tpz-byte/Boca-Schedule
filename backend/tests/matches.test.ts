@@ -79,7 +79,7 @@ describe('Matches', () => {
       rows => rows.length > 0,
     );
     expect(notes.length).toBeGreaterThan(0);
-    expect(notes[0].title).toBe('Sign-ups are open');
+    expect(notes[0].title).toBe('Tilmeldingen er åben');
     expect(notes.some(n => n.user_id === player.userId)).toBe(true);
 
     // In-app is stamped; the email is left for the batching cron.

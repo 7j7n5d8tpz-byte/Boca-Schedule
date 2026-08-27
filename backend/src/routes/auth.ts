@@ -29,7 +29,7 @@ router.post('/register', async (req, res, next) => {
   try {
     const body = RegisterSchema.safeParse(req.body);
     if (!body.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid input', details: body.error.issues } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Ugyldige oplysninger', details: body.error.issues } });
       return;
     }
 
@@ -74,8 +74,8 @@ router.post('/register', async (req, res, next) => {
           .then(({ data: admins }) => {
             createNotifications((admins ?? []).map((a: any) => a.user_id), {
               type: 'registration',
-              title: 'New registration',
-              body: `${name} is awaiting approval`,
+              title: 'Ny registrering',
+              body: `${name} afventer godkendelse`,
               link: '/admin',
             });
           });
@@ -86,7 +86,7 @@ router.post('/register', async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'If that email address is valid and not already in use, your registration request has been submitted. An administrator will review and activate your account.',
+      message: 'Hvis e-mailadressen er gyldig og ikke allerede i brug, er din anmodning sendt. En administrator gennemgår den og aktiverer din konto.',
     });
   } catch (err) {
     next(err);
@@ -98,7 +98,7 @@ router.post('/login', async (req, res, next) => {
   try {
     const body = LoginSchema.safeParse(req.body);
     if (!body.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid input' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Ugyldige oplysninger' } });
       return;
     }
 
@@ -107,7 +107,7 @@ router.post('/login', async (req, res, next) => {
     // Password grant must use the anon/publishable key — GoTrue forbids it with the service_role key.
     const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
     if (error || !data.session) {
-      res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' } });
+      res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Forkert e-mail eller adgangskode' } });
       return;
     }
 
@@ -116,7 +116,7 @@ router.post('/login', async (req, res, next) => {
     // Inactive accounts (pending admin approval) return the same error as bad credentials
     // to avoid revealing that the account exists but isn't approved yet.
     if (!profile?.is_active) {
-      res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' } });
+      res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Forkert e-mail eller adgangskode' } });
       return;
     }
 
@@ -133,6 +133,7 @@ router.post('/login', async (req, res, next) => {
           preferredPositions: profile?.preferred_positions,
           avatarUrl: profile?.avatar_url ?? null,
           isFineAdmin: profile?.role === 'admin' || (profile?.is_fine_admin ?? false),
+          language: profile?.language ?? 'da',
         },
         tokens: {
           accessToken: data.session.access_token,
@@ -161,7 +162,7 @@ router.post('/refresh', async (req, res, next) => {
     // rows under RLS. See lib/supabase.ts.
     const { data, error } = await supabaseAnon.auth.refreshSession({ refresh_token: refreshToken });
     if (error || !data.session) {
-      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid refresh token' } });
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Ugyldigt refresh-token' } });
       return;
     }
 
@@ -176,7 +177,7 @@ router.post('/forgot-password', async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email || typeof email !== 'string') {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Email is required' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'E-mail skal udfyldes' } });
       return;
     }
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -184,7 +185,7 @@ router.post('/forgot-password', async (req, res, next) => {
       redirectTo: `${frontendUrl}/reset-password`,
     });
     // Always return 200 — prevents email enumeration
-    res.json({ success: true, message: 'If that email is registered, a reset link has been sent.' });
+    res.json({ success: true, message: 'Hvis e-mailadressen er registreret, har vi sendt et link til nulstilling.' });
   } catch (err) {
     next(err);
   }
@@ -201,13 +202,13 @@ router.post('/reset-password', async (req, res, next) => {
 
     const passwordCheck = z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/).regex(/[!@#$%^&*]/).safeParse(newPassword);
     if (!passwordCheck.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Password must be at least 8 characters and include an uppercase letter, a number, and a special character (!@#$%^&*).' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Adgangskoden skal være på mindst 8 tegn og indeholde et stort bogstav, et tal og et specialtegn (!@#$%^&*).' } });
       return;
     }
 
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
     if (error || !user) {
-      res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Invalid or expired reset link — please request a new one.' } });
+      res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Linket er ugyldigt eller udløbet — bestil et nyt.' } });
       return;
     }
 
@@ -218,7 +219,7 @@ router.post('/reset-password', async (req, res, next) => {
       // Fall back to checking the amr claim for 'otp' which recovery tokens carry
       const isRecovery = (payload?.amr ?? []).some((a: any) => a.method === 'otp');
       if (!isRecovery) {
-        res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Invalid or expired reset link — please request a new one.' } });
+        res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Linket er ugyldigt eller udløbet — bestil et nyt.' } });
         return;
       }
     }
@@ -226,7 +227,7 @@ router.post('/reset-password', async (req, res, next) => {
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword });
     if (updateError) throw updateError;
 
-    res.json({ success: true, message: 'Password updated successfully.' });
+    res.json({ success: true, message: 'Adgangskoden er opdateret.' });
   } catch (err) {
     next(err);
   }
@@ -243,13 +244,13 @@ router.put('/change-password', authenticate, async (req, res, next) => {
 
     const passwordCheck = z.string().min(8).regex(/[A-Z]/).regex(/[0-9]/).regex(/[!@#$%^&*]/).safeParse(newPassword);
     if (!passwordCheck.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Password must be at least 8 characters and include an uppercase letter, a number, and a special character (!@#$%^&*).' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Adgangskoden skal være på mindst 8 tegn og indeholde et stort bogstav, et tal og et specialtegn (!@#$%^&*).' } });
       return;
     }
 
     const { data: profile } = await supabaseAdmin.from('users').select('email').eq('user_id', req.user!.userId).single();
     if (!profile?.email) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'User not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Brugeren blev ikke fundet' } });
       return;
     }
 
@@ -257,14 +258,14 @@ router.put('/change-password', authenticate, async (req, res, next) => {
     // which must never happen to the shared service_role supabaseAdmin.
     const { error: verifyError } = await supabaseAnon.auth.signInWithPassword({ email: profile.email, password: currentPassword });
     if (verifyError) {
-      res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Current password is incorrect' } });
+      res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Den nuværende adgangskode er forkert' } });
       return;
     }
 
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(req.user!.userId, { password: newPassword });
     if (updateError) throw updateError;
 
-    res.json({ success: true, message: 'Password updated successfully.' });
+    res.json({ success: true, message: 'Adgangskoden er opdateret.' });
   } catch (err) {
     next(err);
   }
@@ -274,7 +275,7 @@ router.put('/change-password', authenticate, async (req, res, next) => {
 router.post('/logout', authenticate, async (req, res, next) => {
   try {
     await supabaseAdmin.auth.admin.signOut(req.headers.authorization!.slice(7));
-    res.json({ success: true, message: 'Logged out successfully' });
+    res.json({ success: true, message: 'Du er logget ud' });
   } catch (err) {
     next(err);
   }

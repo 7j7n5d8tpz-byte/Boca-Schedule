@@ -28,6 +28,11 @@ for (const u of E2E_USERS) {
     .maybeSingle();
 
   if (existing) {
+    // The suite asserts on English labels (see frontend/e2e/fixtures.ts), and the
+    // account's own language wins over the fixture's localStorage seed the moment
+    // it logs in — so keep these accounts pinned to English even when they predate
+    // the language column.
+    await supabase.from('users').update({ language: 'en' }).eq('user_id', existing.user_id);
     console.log(`  skip  ${u.email} (already exists)`);
     continue;
   }
@@ -50,6 +55,7 @@ for (const u of E2E_USERS) {
     role:                u.role,
     is_active:           true,
     preferred_positions: u.role === 'player' ? ['MID', 'STR'] : [],
+    language:            'en',
   });
 
   console.log(`  created ${u.role}: ${u.email}`);

@@ -1,4 +1,5 @@
 import CountUp from '../CountUp';
+import { formatDate } from '../../i18n/format';
 
 // Shared building blocks for the statistics pages (team stats + player hub).
 
@@ -43,8 +44,10 @@ export function StatCard({ label, value, sub, color = 'text-gray-900' }: {
 
 // ─── Match label formatter ────────────────────────────────────────────────────
 
-export function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+// Chart axis / row labels. These end up as recharts data keys as well as text,
+// so the caller passes its current language rather than reading context here.
+export function fmtDate(d: string, lang: string) {
+  return formatDate(d, 'dayMonth', lang);
 }
 
 // ─── Custom chart tooltips ────────────────────────────────────────────────────

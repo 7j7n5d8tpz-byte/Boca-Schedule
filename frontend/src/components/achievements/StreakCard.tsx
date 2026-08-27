@@ -1,5 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import Crest, { TIER_META } from '../Crest';
-import type { CatalogEntry, GroupProgress, StreakResult } from '../../api/achievements';
+import { useCatalogText, type CatalogEntry, type GroupProgress, type StreakResult } from '../../api/achievements';
 
 // Each streak card IS its crest — same name on the card and in the modal it opens.
 // group.value / nextThreshold may be null (redacted for teammates on private
@@ -7,6 +8,8 @@ import type { CatalogEntry, GroupProgress, StreakResult } from '../../api/achiev
 export default function StreakCard({ entry, streak, group, onOpen }: {
   entry: CatalogEntry; streak: StreakResult; group?: GroupProgress; onOpen: (code: string) => void;
 }) {
+  const { t } = useTranslation();
+  const text = useCatalogText();
   const active = streak.current > 0;
   const hot = streak.current >= 4;
   const record = group?.value ?? streak.record;
@@ -28,14 +31,14 @@ export default function StreakCard({ entry, streak, group, onOpen }: {
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-gray-900 truncate">{entry.name}</span>
             {hot
-              ? <span className="ml-auto text-[10px] font-bold text-brand-red uppercase tracking-wide shrink-0">On fire</span>
-              : active ? <span className="ml-auto text-[10px] font-semibold text-brand-green uppercase tracking-wide shrink-0">Active</span> : null}
+              ? <span className="ml-auto text-[10px] font-bold text-brand-red uppercase tracking-wide shrink-0">{t('streak.onFire')}</span>
+              : active ? <span className="ml-auto text-[10px] font-semibold text-brand-green uppercase tracking-wide shrink-0">{t('streak.active')}</span> : null}
           </div>
-          <p className="text-[11px] text-gray-400 leading-snug">{entry.description}</p>
+          <p className="text-[11px] text-gray-400 leading-snug">{text.description(entry)}</p>
           <p className="text-3xl font-bold font-numeric text-gray-900 mt-1 leading-none">
-            {streak.current}<span className="text-sm font-medium text-gray-400"> now</span>
+            {streak.current}<span className="text-sm font-medium text-gray-400"> {t('streak.now')}</span>
           </p>
-          <p className="text-[11px] text-gray-400 mt-1">Best this season: {record}{tier ? ` · ${TIER_META[tier].label}` : ''}</p>
+          <p className="text-[11px] text-gray-400 mt-1">{t('streak.bestThisSeason', { record })}{tier ? ` · ${TIER_META[tier].label}` : ''}</p>
         </div>
       </div>
       {next !== null && (
@@ -43,7 +46,7 @@ export default function StreakCard({ entry, streak, group, onOpen }: {
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div className="h-full bg-brand-green rounded-full" style={{ width: `${pct}%` }} />
           </div>
-          <p className="text-[10px] text-gray-400 mt-1">{record} / {next} to next crest tier</p>
+          <p className="text-[10px] text-gray-400 mt-1">{t('streak.toNextTier', { record, next })}</p>
         </div>
       )}
     </button>

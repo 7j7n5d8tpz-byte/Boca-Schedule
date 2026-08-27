@@ -71,7 +71,7 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
     // Fetch user's can_enter_results flag
     const { data: userRow } = await supabaseAdmin.from('users').select('can_enter_results').eq('user_id', userId).single();
     if (!canEditResults(req.user!.role, userRow?.can_enter_results ?? false)) {
-      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'No permission to record results' } });
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du har ikke adgang til at registrere resultater' } });
       return;
     }
 
@@ -182,11 +182,11 @@ router.post('/result-permissions/request', authenticate, async (req, res, next) 
       .maybeSingle();
 
     if (existing?.status === 'approved') {
-      res.status(409).json({ success: false, error: { code: 'ALREADY_APPROVED', message: 'You already have edit permission' } });
+      res.status(409).json({ success: false, error: { code: 'ALREADY_APPROVED', message: 'Du har allerede redigeringsadgang' } });
       return;
     }
     if (existing?.status === 'pending') {
-      res.status(409).json({ success: false, error: { code: 'ALREADY_REQUESTED', message: 'You already have a pending request' } });
+      res.status(409).json({ success: false, error: { code: 'ALREADY_REQUESTED', message: 'Du har allerede en anmodning, der afventer' } });
       return;
     }
 
@@ -203,8 +203,8 @@ router.post('/result-permissions/request', authenticate, async (req, res, next) 
     ]).then(([{ data: player }, { data: staff }]) => {
       createNotifications((staff ?? []).map((s: any) => s.user_id), {
         type: 'result_permission_request',
-        title: 'Result access requested',
-        body: `${player?.name ?? 'A player'} wants permission to record match results`,
+        title: 'Anmodning om resultatadgang',
+        body: `${player?.name ?? 'En spiller'} vil gerne have adgang til at registrere kampresultater`,
         link: '/coach',
       });
     });
@@ -286,7 +286,7 @@ router.put('/result-permissions/:requestId/respond', authenticate, requireRole('
       .single();
 
     if (!req_) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Pending request not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Den afventende anmodning blev ikke fundet' } });
       return;
     }
 

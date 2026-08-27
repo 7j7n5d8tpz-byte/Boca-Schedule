@@ -9,7 +9,7 @@ const router = Router();
 
 function fineMatchLabel(m: { match_date: string; match_time?: string; opponent?: string | null }): string {
   const date = new Date(`${m.match_date}T${m.match_time ?? '00:00'}`)
-    .toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    .toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' });
   return m.opponent ? `${date} vs ${m.opponent}` : date;
 }
 
@@ -129,7 +129,7 @@ router.put('/fine-types/:id', authenticate, async (req, res, next) => {
     if (typeof active === 'boolean') patch.active = active;
     if (typeof sortOrder === 'number') patch.sort_order = sortOrder;
     if (Object.keys(patch).length === 0) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Nothing to update' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Intet at opdatere' } });
       return;
     }
     const { error } = await supabaseAdmin.from('fine_types').update(patch).eq('fine_type_id', req.params.id);
@@ -186,18 +186,18 @@ router.post('/fines', authenticate, async (req, res, next) => {
     let amount: number;
     if (isCustom) {
       if (typeof amountDkk !== 'number' || amountDkk < 0) {
-        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'A non-negative amountDkk is required for a custom fine' } });
+        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'En egen bøde kræver et beløb på 0 kr eller derover' } });
         return;
       }
       if (!reason?.trim()) {
-        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'A reason is required for a custom fine' } });
+        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'En egen bøde kræver en begrundelse' } });
         return;
       }
       amount = Math.round(amountDkk);
     } else {
       const { data: type } = await supabaseAdmin.from('fine_types').select('amount_dkk, active').eq('fine_type_id', fineTypeId).maybeSingle();
       if (!type) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Fine type not found' } });
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Bødetypen blev ikke fundet' } });
         return;
       }
       amount = type.amount_dkk;
@@ -223,16 +223,16 @@ router.post('/fines', authenticate, async (req, res, next) => {
     if (status === 'approved') {
       createNotifications([playerId], {
         type: 'fine_issued',
-        title: 'You received a fine',
-        body: `${amount} DKK — see your fines`,
+        title: 'Du har fået en bøde',
+        body: `${amount} kr — se dine bøder`,
         link: '/fines',
         refId: fine.fine_id,
       });
     } else {
       fineAdminIds().then(ids => createNotifications(ids, {
         type: 'fine_pending_approval',
-        title: 'Fine awaiting approval',
-        body: 'A new fine needs your approval',
+        title: 'Bøde afventer godkendelse',
+        body: 'En ny bøde skal godkendes',
         link: '/fines/manage',
         refId: fine.fine_id,
       }));
@@ -378,7 +378,7 @@ router.get('/fines/stats', authenticate, async (req, res, next) => {
 
     // Biggest single fine
     const biggest = fines.reduce((m, f) => (!m || f.amountDkk > m.amountDkk ? f : m), null as any);
-    const biggestFine = biggest ? { playerName: biggest.playerName, label: what(biggest), amountDkk: biggest.amountDkk, when: biggest.matchLabel ?? new Date(biggest.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) } : null;
+    const biggestFine = biggest ? { playerName: biggest.playerName, label: what(biggest), amountDkk: biggest.amountDkk, when: biggest.matchLabel ?? new Date(biggest.createdAt).toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' }) } : null;
 
     // Most expensive match
     const byMatch = new Map<string, { label: string; totalDkk: number }>();
@@ -399,7 +399,7 @@ router.get('/fines/stats', authenticate, async (req, res, next) => {
     }
     const overTime = [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([period, totalDkk]) => {
       const [y, m] = period.split('-');
-      return { period, label: new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }), totalDkk };
+      return { period, label: new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('da-DK', { month: 'short', year: '2-digit' }), totalDkk };
     });
 
     res.json({
@@ -440,8 +440,8 @@ router.post('/fines/pay-outstanding', authenticate, async (req, res, next) => {
       supabaseAdmin.from('users').select('name').eq('user_id', req.user!.userId).single().then(({ data: u }) => {
         fineAdminIds().then(ids => createNotifications(ids, {
           type: 'fine_payment_claimed',
-          title: 'Fine payment claimed',
-          body: `${u?.name ?? 'A player'} says they paid ${total} DKK (${count} fine${count === 1 ? '' : 's'})`,
+          title: 'Betaling angivet',
+          body: `${u?.name ?? 'En spiller'} har angivet en betaling på ${total} kr (${count} ${count === 1 ? 'bøde' : 'bøder'})`,
           link: '/fines/manage',
         }));
       });
@@ -459,7 +459,7 @@ router.post('/fines/:id/dispute', authenticate, async (req, res, next) => {
     const { note } = req.body as { note?: string };
     const { data: fine } = await supabaseAdmin.from('fines').select('player_id, status').eq('fine_id', req.params.id).single();
     if (!fine || fine.player_id !== req.user!.userId) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Fine not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Bøden blev ikke fundet' } });
       return;
     }
     await supabaseAdmin.from('fines')
@@ -467,8 +467,8 @@ router.post('/fines/:id/dispute', authenticate, async (req, res, next) => {
       .eq('fine_id', req.params.id);
     fineAdminIds().then(ids => createNotifications(ids, {
       type: 'fine_pending_approval',
-      title: 'Fine disputed',
-      body: 'A player disputed a fine',
+      title: 'Indsigelse mod bøde',
+      body: 'En spiller har gjort indsigelse mod en bøde',
       link: '/fines/manage',
       refId: String(req.params.id),
     }));
@@ -525,7 +525,7 @@ router.put('/fines/:id/approve', authenticate, async (req, res, next) => {
     const { approve } = req.body as { approve: boolean };
     const { data: fine } = await supabaseAdmin.from('fines').select('player_id, status, amount_dkk').eq('fine_id', req.params.id).single();
     if (!fine || fine.status !== 'pending_approval') {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Pending fine not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Den afventende bøde blev ikke fundet' } });
       return;
     }
     const now = new Date().toISOString();
@@ -539,8 +539,8 @@ router.put('/fines/:id/approve', authenticate, async (req, res, next) => {
     if (approve) {
       createNotifications([fine.player_id], {
         type: 'fine_issued',
-        title: 'You received a fine',
-        body: `${fine.amount_dkk} DKK — see your fines`,
+        title: 'Du har fået en bøde',
+        body: `${fine.amount_dkk} kr — se dine bøder`,
         link: '/fines',
         refId: String(req.params.id),
       });
@@ -557,15 +557,15 @@ router.put('/fines/:id/confirm-paid', authenticate, async (req, res, next) => {
     if (!(await isFineAdmin(req.user!.userId, req.user!.role))) return forbidden(res);
     const { data: fine } = await supabaseAdmin.from('fines').select('player_id, status').eq('fine_id', req.params.id).single();
     if (!fine || !['payment_claimed', 'approved'].includes(fine.status)) {
-      res.status(400).json({ success: false, error: { code: 'INVALID_STATE', message: 'Fine cannot be confirmed paid' } });
+      res.status(400).json({ success: false, error: { code: 'INVALID_STATE', message: 'Bøden kan ikke bekræftes som betalt' } });
       return;
     }
     const now = new Date().toISOString();
     await supabaseAdmin.from('fines').update({ status: 'paid', confirmed_by: req.user!.userId, confirmed_at: now, updated_at: now }).eq('fine_id', req.params.id);
     createNotifications([fine.player_id], {
       type: 'fine_payment_confirmed',
-      title: 'Fine payment confirmed',
-      body: 'Your fine payment was confirmed — thanks!',
+      title: 'Betaling bekræftet',
+      body: 'Din betaling er bekræftet — tak!',
       link: '/fines',
       refId: String(req.params.id),
     });
@@ -581,14 +581,14 @@ router.put('/fines/:id/reject-claim', authenticate, async (req, res, next) => {
     if (!(await isFineAdmin(req.user!.userId, req.user!.role))) return forbidden(res);
     const { data: fine } = await supabaseAdmin.from('fines').select('player_id, status').eq('fine_id', req.params.id).single();
     if (!fine || fine.status !== 'payment_claimed') {
-      res.status(400).json({ success: false, error: { code: 'INVALID_STATE', message: 'No payment claim to reject' } });
+      res.status(400).json({ success: false, error: { code: 'INVALID_STATE', message: 'Der er ingen angivet betaling at afvise' } });
       return;
     }
     await supabaseAdmin.from('fines').update({ status: 'approved', paid_claimed_at: null, updated_at: new Date().toISOString() }).eq('fine_id', req.params.id);
     createNotifications([fine.player_id], {
       type: 'fine_claim_rejected',
-      title: 'Payment not received',
-      body: 'A fine you marked paid is still outstanding — please check your payment',
+      title: 'Betaling ikke modtaget',
+      body: 'En bøde, du har markeret som betalt, står stadig som udestående — tjek din betaling',
       link: '/fines',
       refId: String(req.params.id),
     });
@@ -605,15 +605,15 @@ router.put('/fines/:id/void', authenticate, async (req, res, next) => {
     const { reason } = req.body as { reason?: string };
     const { data: fine } = await supabaseAdmin.from('fines').select('player_id, status').eq('fine_id', req.params.id).single();
     if (!fine || fine.status === 'voided') {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Fine not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Bøden blev ikke fundet' } });
       return;
     }
     const now = new Date().toISOString();
     await supabaseAdmin.from('fines').update({ status: 'voided', voided_by: req.user!.userId, voided_at: now, void_reason: reason?.trim() || null, updated_at: now }).eq('fine_id', req.params.id);
     createNotifications([fine.player_id], {
       type: 'fine_voided',
-      title: 'A fine was cancelled',
-      body: reason?.trim() ? `A fine was voided: ${reason.trim()}` : 'One of your fines was cancelled',
+      title: 'En bøde er annulleret',
+      body: reason?.trim() ? `En bøde er annulleret: ${reason.trim()}` : 'En af dine bøder er annulleret',
       link: '/fines',
       refId: String(req.params.id),
     });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import Crest, { TIER_META } from './Crest';
 import { useCatalog, type EarnedCrest } from '../api/achievements';
 
@@ -11,6 +12,7 @@ const key = (userId: string) => `boca-seen-crests-${userId}`;
 const crestKey = (c: EarnedCrest) => `${c.code}:${c.tier}`;
 
 export default function CrestUnlock({ userId, earned }: { userId: string; earned: EarnedCrest[] }) {
+  const { t } = useTranslation();
   const { data: catalog } = useCatalog();
   const [fresh, setFresh] = useState<EarnedCrest[]>([]);
 
@@ -39,7 +41,7 @@ export default function CrestUnlock({ userId, earned }: { userId: string; earned
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setFresh([])}>
       <div className="boca-pop bg-white rounded-2xl border border-gray-200 max-w-sm w-full p-6 text-center" onClick={e => e.stopPropagation()}>
         <p className="text-xs font-semibold uppercase tracking-wider text-brand-green">
-          {fresh.length > 1 ? `${fresh.length} new crests` : 'New crest unlocked'}
+          {fresh.length > 1 ? t('crests.newCrests', { count: fresh.length }) : t('crests.newCrest')}
         </p>
         <div className="flex flex-wrap items-end justify-center gap-4 my-5">
           {fresh.slice(0, 4).map(c => {
@@ -57,7 +59,7 @@ export default function CrestUnlock({ userId, earned }: { userId: string; earned
           onClick={() => setFresh([])}
           className="w-full bg-brand-green text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-brand-green-700 transition-colors"
         >
-          Nice!
+          {t('crests.nice')}
         </button>
       </div>
     </div>,

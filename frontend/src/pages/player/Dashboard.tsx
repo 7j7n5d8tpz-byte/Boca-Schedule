@@ -2,8 +2,11 @@ import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { useDateFormat } from '../../i18n/format';
+import { DASHBOARD_ORIGIN } from '../../hubOrigin';
 import { formatLocation } from '../../components/LocationPicker';
 import { meetingTime, mapsUrl, buildMatchIcs, downloadIcs } from '../../utils';
 import { CardListSkeleton } from '../../components/Skeleton';
@@ -68,28 +71,30 @@ function CantAttendDialog({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const [releaseError, setReleaseError] = useState('');
 
   const releaseMutation = useMutation({
     mutationFn: () => api.post(`/matches/${match.matchId}/release`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['matches'] }); onClose(); },
-    onError: (err: any) => setReleaseError(err.response?.data?.error?.message ?? 'Failed to release spot'),
+    onError: (err: any) => setReleaseError(err.response?.data?.error?.message ?? t('match.releaseFailed')),
   });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-900">Can't attend?</h2>
+          <h2 className="font-semibold text-gray-900">{t('match.cantAttendTitle')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
         </div>
         <p className="text-sm text-gray-500">
-          {new Date(match.matchDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {formatDate(match.matchDate, 'long')}
           {' — '}{match.matchTime.slice(0, 5)}
         </p>
 
         <p className="text-sm text-gray-500">
-          Release your spot and the coach plus any available teammates will be notified, so someone can claim it.
+          {t('match.cantAttendBody')}
         </p>
 
         <div className="space-y-2">
@@ -98,8 +103,8 @@ function CantAttendDialog({
             disabled={releaseMutation.isPending}
             className="w-full text-left px-4 py-3 rounded-xl border border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
           >
-            <p className="font-medium text-red-600 text-sm">{releaseMutation.isPending ? 'Releasing…' : 'Release my spot'}</p>
-            <p className="text-xs text-gray-400 mt-0.5">The coach and available teammates will be notified</p>
+            <p className="font-medium text-red-600 text-sm">{releaseMutation.isPending ? t('match.releasing') : t('match.releaseSpot')}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{t('match.releaseNote')}</p>
           </button>
         </div>
 
@@ -111,6 +116,8 @@ function CantAttendDialog({
 
 function MatchCard({ match }: { match: Match }) {
   const qc = useQueryClient();
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const [showCantAttend, setShowCantAttend] = useState(false);
   const [showSquad, setShowSquad] = useState(false);
   const [showSignups, setShowSignups] = useState(false);
@@ -147,7 +154,7 @@ function MatchCard({ match }: { match: Match }) {
   const claimMutation = useMutation({
     mutationFn: () => api.post(`/matches/${match.matchId}/claims`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['matches'] }),
-    onError: (err: any) => setClaimError(err.response?.data?.error?.message ?? 'Failed to claim spot'),
+    onError: (err: any) => setClaimError(err.response?.data?.error?.message ?? t('match.claimFailed')),
   });
 
   const cancelClaimMutation = useMutation({
@@ -160,6 +167,7 @@ function MatchCard({ match }: { match: Match }) {
       matchId: match.matchId, matchDate: match.matchDate, matchTime: match.matchTime,
       location: match.location, opponent: match.opponent,
     });
+    // Filename only — keep it ASCII-stable and locale-independent.
     const dateLabel = new Date(match.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).replace(' ', '-');
     downloadIcs(`boca-${dateLabel}.ics`, ics);
   }
@@ -189,11 +197,11 @@ function MatchCard({ match }: { match: Match }) {
         <div className="flex items-start justify-between">
           <div>
             <p className="font-semibold text-gray-900">
-              {new Date(match.matchDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {formatDate(match.matchDate, 'long')}
               {match.opponent && <span className="text-gray-500 font-normal"> · vs {match.opponent}</span>}
             </p>
             <p className="text-sm text-gray-700">
-              {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)})
+              {t('match.timeAndMeet', { time: match.matchTime.slice(0, 5), meet: meetingTime(match.matchTime) })}
             </p>
             <p className="text-sm text-gray-500">
               <a
@@ -201,24 +209,24 @@ function MatchCard({ match }: { match: Match }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-brand-green hover:underline"
-                title="Open in Maps"
+                title={t('match.openInMaps')}
               >
                 {formatLocation(match.location, match.matchType)}
               </a>
               <span className={`ml-2 text-xs font-medium px-1.5 py-0.5 rounded ${match.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-                {match.matchType}
+                {t(`matchTypes.${match.matchType}`, { defaultValue: match.matchType })}
               </span>
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
             {match.userSignedUp && match.status === 'published' && match.isSelected && (
-              <span className="bg-green-100 text-green-700 text-xs font-medium px-2.5 py-1 rounded-full">Selected ✓</span>
+              <span className="bg-green-100 text-green-700 text-xs font-medium px-2.5 py-1 rounded-full">{t('match.selected')}</span>
             )}
             {match.userSignedUp && match.status === 'published' && !match.isSelected && (
-              <span className="bg-gray-100 text-gray-500 text-xs font-medium px-2.5 py-1 rounded-full">Not selected</span>
+              <span className="bg-gray-100 text-gray-500 text-xs font-medium px-2.5 py-1 rounded-full">{t('match.notSelected')}</span>
             )}
             {match.userSignedUp && match.status !== 'published' && match.status !== 'completed' && (
-              <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">Signed up</span>
+              <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-1 rounded-full">{t('match.signedUp')}</span>
             )}
           </div>
         </div>
@@ -231,13 +239,13 @@ function MatchCard({ match }: { match: Match }) {
               onClick={() => setShowSignups(v => !v)}
               className="hover:text-brand-green transition-colors inline-flex items-center gap-1"
             >
-              {match.currentSignups} signed up
+              {t('match.signupCount', { count: match.currentSignups })}
               <Icon name="chevronDown" className={`w-3.5 h-3.5 transition-transform ${showSignups ? 'rotate-180' : ''}`} />
             </button>
           ) : (
-            <span>No one signed up yet</span>
+            <span>{t('match.noneSignedUp')}</span>
           )}
-          <span>Deadline: {deadline.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+          <span>{t('match.deadline', { date: formatDate(deadline, 'dayMonthTime') })}</span>
         </div>
 
         {showSignups && signupList && (
@@ -275,14 +283,14 @@ function MatchCard({ match }: { match: Match }) {
         {match.status === 'published' && !match.isSelected && match.openSpot && !match.myClaim && (
           <div className="bg-brand-green-50 border border-brand-green/30 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
             <p className="text-xs text-gray-700 flex items-center gap-1.5">
-              <Icon name="tag" className="w-4 h-4 text-brand-green shrink-0" /> A spot is open — claim it and the coach will confirm.
+              <Icon name="tag" className="w-4 h-4 text-brand-green shrink-0" /> {t('match.openSpot')}
             </p>
             <button
               onClick={() => { setClaimError(''); claimMutation.mutate(); }}
               disabled={claimMutation.isPending}
               className="text-xs bg-brand-green hover:bg-brand-green-700 text-white font-medium px-3 py-1.5 rounded-lg shrink-0 disabled:opacity-50 transition-colors"
             >
-              {claimMutation.isPending ? 'Claiming…' : 'Claim spot'}
+              {claimMutation.isPending ? t('match.claiming') : t('match.claimSpot')}
             </button>
           </div>
         )}
@@ -292,14 +300,14 @@ function MatchCard({ match }: { match: Match }) {
         {match.myClaim && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center justify-between gap-3">
             <p className="text-xs text-amber-700">
-              Spot claimed — waiting for the coach to confirm
+              {t('match.claimPending')}
             </p>
             <button
               onClick={() => cancelClaimMutation.mutate()}
               disabled={cancelClaimMutation.isPending}
               className="text-xs text-amber-600 hover:text-amber-800 font-medium shrink-0 disabled:opacity-50"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         )}
@@ -312,7 +320,7 @@ function MatchCard({ match }: { match: Match }) {
               disabled={signupMutation.isPending}
               className="flex-1 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
             >
-              {signupMutation.isPending ? 'Signing up…' : match.lateSignupOpen ? 'Sign Up (late)' : 'Sign Up'}
+              {signupMutation.isPending ? t('match.signingUp') : match.lateSignupOpen ? t('match.signUpLate') : t('match.signUp')}
             </button>
           )}
 
@@ -322,7 +330,7 @@ function MatchCard({ match }: { match: Match }) {
               disabled={withdrawMutation.isPending}
               className="flex-1 border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium py-2 rounded-lg transition-colors"
             >
-              {withdrawMutation.isPending ? 'Withdrawing…' : 'Withdraw'}
+              {withdrawMutation.isPending ? t('match.withdrawing') : t('match.withdraw')}
             </button>
           )}
 
@@ -331,12 +339,12 @@ function MatchCard({ match }: { match: Match }) {
               onClick={() => setShowCantAttend(true)}
               className="flex-1 border border-orange-300 text-orange-600 hover:bg-orange-50 text-sm font-medium py-2 rounded-lg transition-colors"
             >
-              Can't attend
+              {t('match.cantAttend')}
             </button>
           )}
 
           {match.signupDeadlinePassed && !match.lateSignupOpen && !match.userSignedUp && match.status !== 'published' && (
-            <p className="text-xs text-gray-400 text-center w-full py-1">Signup closed</p>
+            <p className="text-xs text-gray-400 text-center w-full py-1">{t('match.signupClosed')}</p>
           )}
         </div>
 
@@ -348,7 +356,7 @@ function MatchCard({ match }: { match: Match }) {
                 onClick={addToCalendar}
                 className="text-xs text-gray-400 hover:text-brand-green transition-colors inline-flex items-center gap-1.5"
               >
-                <Icon name="calendar" className="w-3.5 h-3.5" /> Add to calendar
+                <Icon name="calendar" className="w-3.5 h-3.5" /> {t('match.addToCalendar')}
               </button>
             )}
             {match.status === 'published' && (
@@ -356,7 +364,9 @@ function MatchCard({ match }: { match: Match }) {
                 onClick={() => setShowSquad(v => !v)}
                 className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
               >
-                {showSquad ? 'Hide squad' : `View squad${squad ? ` (${squad.count})` : ''}`}
+                {showSquad
+                  ? t('match.hideSquad')
+                  : squad ? t('match.viewSquadCount', { count: squad.count }) : t('match.viewSquad')}
               </button>
             )}
           </div>
@@ -381,11 +391,11 @@ function MatchCard({ match }: { match: Match }) {
                   <div key={`g${i}`} className="flex items-center gap-2 text-sm">
                     <span className="text-gray-700 flex-1 truncate">{g.name}</span>
                     <span className="flex gap-1 shrink-0">
-                      <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">guest{g.position ? ` · ${g.position}` : ''}</span>
+                      <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{t('match.guest')}{g.position ? ` · ${g.position}` : ''}</span>
                     </span>
                   </div>
                 ))}
-                {squad.count === 0 && <p className="text-xs text-gray-400">No players selected.</p>}
+                {squad.count === 0 && <p className="text-xs text-gray-400">{t('match.noPlayersSelected')}</p>}
               </div>
             )}
           </div>
@@ -404,13 +414,15 @@ function ResultMatchesList({
   pending: { matchId: string; matchDate: string; matchTime: string; location: string; opponent: string | null }[];
   recorded: { matchId: string; matchDate: string; matchTime: string; location: string; opponent: string | null }[];
 }) {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const [showRecorded, setShowRecorded] = useState(false);
 
   return (
     <div className="space-y-3">
-      <h2 className="text-lg font-semibold text-gray-900">Record results</h2>
+      <h2 className="text-lg font-semibold text-gray-900">{t('dashboard.resultsTitle')}</h2>
       {pending.length === 0 && (
-        <p className="text-sm text-gray-400">All results recorded.</p>
+        <p className="text-sm text-gray-400">{t('dashboard.resultsAllRecorded')}</p>
       )}
       {pending.map(m => (
         <Link
@@ -420,13 +432,13 @@ function ResultMatchesList({
         >
           <div>
             <p className="text-sm font-medium text-gray-900">
-              {new Date(m.matchDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+              {formatDate(m.matchDate, 'weekdayDayMonth')}
               {' · '}{m.matchTime.slice(0, 5)}
               {m.opponent && <span className="text-gray-400 font-normal"> vs {m.opponent}</span>}
             </p>
             <p className="text-xs text-gray-400">{m.location}</p>
           </div>
-          <span className="text-xs font-medium text-brand-green shrink-0">Enter result →</span>
+          <span className="text-xs font-medium text-brand-green shrink-0">{t('dashboard.enterResult')}</span>
         </Link>
       ))}
       {recorded.length > 0 && (
@@ -435,7 +447,7 @@ function ResultMatchesList({
             onClick={() => setShowRecorded(v => !v)}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
-            {showRecorded ? 'Hide recorded matches' : `+ ${recorded.length} already recorded`}
+            {showRecorded ? t('dashboard.hideRecorded') : t('dashboard.alreadyRecorded', { count: recorded.length })}
           </button>
           {showRecorded && recorded.map(m => (
             <Link
@@ -445,13 +457,13 @@ function ResultMatchesList({
             >
               <div>
                 <p className="text-sm font-medium text-gray-900">
-                  {new Date(m.matchDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  {formatDate(m.matchDate, 'weekdayDayMonth')}
                   {' · '}{m.matchTime.slice(0, 5)}
                   {m.opponent && <span className="text-gray-400 font-normal"> vs {m.opponent}</span>}
                 </p>
                 <p className="text-xs text-gray-400">{m.location}</p>
               </div>
-              <span className="text-xs font-medium text-gray-400 shrink-0">Edit result →</span>
+              <span className="text-xs font-medium text-gray-400 shrink-0">{t('dashboard.editResult')}</span>
             </Link>
           ))}
         </>
@@ -464,6 +476,8 @@ function ResultMatchesList({
 
 export default function PlayerDashboard() {
   const { user } = useAuth();
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -526,8 +540,8 @@ export default function PlayerDashboard() {
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Welcome back, {user?.name?.split(' ')[0]}!</h1>
-          <p className="text-gray-500 text-sm mt-1">Here's what's coming up.</p>
+          <h1 className="text-2xl font-extrabold text-gray-900">{t('dashboard.welcome', { name: user?.name?.split(' ')[0] })}</h1>
+          <p className="text-gray-500 text-sm mt-1">{t('dashboard.subtitle')}</p>
         </div>
 
         {/* Announcements */}
@@ -538,7 +552,7 @@ export default function PlayerDashboard() {
                 <p className="text-sm text-gray-800 whitespace-pre-wrap flex gap-1.5"><Icon name="megaphone" className="w-4 h-4 text-brand-green shrink-0 mt-0.5" /> <span>{a.body}</span></p>
                 <p className="text-xs text-gray-400 mt-1">
                   {a.author}
-                  {a.match && ` · for ${new Date(a.match.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${a.match.opponent ? ` vs ${a.match.opponent}` : ''}`}
+                  {a.match && ` · ${t('dashboard.announcementFor', { date: formatDate(a.match.matchDate, 'dayMonth') })}${a.match.opponent ? ` vs ${a.match.opponent}` : ''}`}
                 </p>
               </div>
             ))}
@@ -560,34 +574,34 @@ export default function PlayerDashboard() {
             <div className="space-y-4">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-sm font-semibold text-gray-700">
-                  Your season{season ? <span className="font-normal text-gray-400"> · {season}</span> : null}
+                  {t('dashboard.yourSeason')}{season ? <span className="font-normal text-gray-400"> · {season}</span> : null}
                 </h2>
                 <Link
                   to={`/players/${user?.userId}`}
-                  state={{ from: '/dashboard', fromLabel: 'Dashboard' }}
+                  state={DASHBOARD_ORIGIN}
                   className="text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
                 >
-                  Full profile →
+                  {t('dashboard.fullProfile')}
                 </Link>
               </div>
               {/* The whole stat block opens your player hub — the one place with
                   the full picture (stats, crests, streaks, match history). */}
               <Link
                 to={`/players/${user?.userId}`}
-                state={{ from: '/dashboard', fromLabel: 'Dashboard' }}
+                state={DASHBOARD_ORIGIN}
                 className="grid grid-cols-3 gap-3 group"
               >
                 {[
-                  { label: 'Played',        value: played, suffix: ` / ${teamGames}` },
-                  { label: 'Goals',         value: goals },
-                  { label: 'Assists',       value: assists },
-                  { label: 'Signed up',     value: signups },
-                  { label: 'Clean sheets',  value: sheets },
-                  { label: 'Attendance',    value: Math.round(attend), suffix: '%' },
+                  { key: 'played',      value: played, suffix: ` / ${teamGames}` },
+                  { key: 'goals',       value: goals },
+                  { key: 'assists',     value: assists },
+                  { key: 'signedUp',    value: signups },
+                  { key: 'cleanSheets', value: sheets },
+                  { key: 'attendance',  value: Math.round(attend), suffix: '%' },
                 ].map(s => (
-                  <div key={s.label} className="bg-white rounded-xl border border-gray-200 group-hover:border-brand-green p-4 text-center transition-colors">
+                  <div key={s.key} className="bg-white rounded-xl border border-gray-200 group-hover:border-brand-green p-4 text-center transition-colors">
                     <p className="text-2xl font-bold font-numeric text-gray-900"><CountUp value={s.value} />{s.suffix ?? ''}</p>
-                    <p className="text-xs text-gray-500 mt-1">{s.label}</p>
+                    <p className="text-xs text-gray-500 mt-1">{t(`dashboard.stats.${s.key}`)}</p>
                   </div>
                 ))}
               </Link>
@@ -596,18 +610,18 @@ export default function PlayerDashboard() {
               <div className="space-y-3">
                 <Link to="/statistics" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">Team Stats</p>
-                    <p className="text-xs text-gray-400 mt-0.5">Leaderboards &amp; match highlights</p>
+                    <p className="text-sm font-semibold text-gray-900">{t('dashboard.teamStatsTitle')}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t('dashboard.teamStatsSub')}</p>
                   </div>
                   <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
                 </Link>
                 <Link to="/achievements" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">Achievements</p>
+                    <p className="text-sm font-semibold text-gray-900">{t('dashboard.achievementsTitle')}</p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       {achievements && achievements.earned.length > 0
-                        ? `${achievements.earned.length} crest tier${achievements.earned.length > 1 ? 's' : ''} earned`
-                        : 'Earn crests, climb the tiers'}
+                        ? t('dashboard.achievementsEarned', { count: achievements.earned.length })
+                        : t('dashboard.achievementsEmpty')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -627,9 +641,9 @@ export default function PlayerDashboard() {
 
         {/* Fines */}
         {finesSummary && (() => {
-          const t = finesSummary.totals;
-          const due = t.outstandingDkk;
-          const awaiting = t.claimedDkk;
+          const totals = finesSummary.totals;
+          const due = totals.outstandingDkk;
+          const awaiting = totals.claimedDkk;
           return (
             <Link
               to="/fines"
@@ -638,13 +652,13 @@ export default function PlayerDashboard() {
               }`}
             >
               <div>
-                <p className="text-sm font-semibold text-gray-900">My Fines</p>
+                <p className="text-sm font-semibold text-gray-900">{t('dashboard.finesTitle')}</p>
                 <p className="text-xs mt-0.5 text-gray-500">
                   {due > 0
-                    ? <span className="text-amber-700 font-medium">{due.toLocaleString('da-DK')} kr outstanding — tap to pay</span>
+                    ? <span className="text-amber-700 font-medium">{t('dashboard.finesOutstanding', { amount: due.toLocaleString('da-DK') })}</span>
                     : awaiting > 0
-                      ? <span className="text-blue-600">{awaiting.toLocaleString('da-DK')} kr awaiting confirmation</span>
-                      : 'All settled — nice'}
+                      ? <span className="text-blue-600">{t('dashboard.finesAwaiting', { amount: awaiting.toLocaleString('da-DK') })}</span>
+                      : t('dashboard.finesSettled')}
                 </p>
               </div>
               <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
@@ -656,11 +670,11 @@ export default function PlayerDashboard() {
         {myPermission && !myPermission.canEnterResults && (
           <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-900">Record match results</p>
+              <p className="text-sm font-medium text-gray-900">{t('dashboard.permissionTitle')}</p>
               <p className="text-xs text-gray-400 mt-0.5">
                 {myPermission.pendingRequest
-                  ? 'Your request is pending coach approval'
-                  : 'Request permission to enter goals, assists and saves after matches'}
+                  ? t('dashboard.permissionPending')
+                  : t('dashboard.permissionHelp')}
               </p>
             </div>
             {!myPermission.pendingRequest && (
@@ -669,11 +683,11 @@ export default function PlayerDashboard() {
                 disabled={requestPermMutation.isPending}
                 className="shrink-0 text-xs bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-3 py-1.5 rounded-lg transition-colors"
               >
-                {requestPermMutation.isPending ? 'Requesting…' : 'Request access'}
+                {requestPermMutation.isPending ? t('dashboard.requesting') : t('dashboard.requestAccess')}
               </button>
             )}
             {myPermission.pendingRequest && (
-              <span className="shrink-0 text-xs text-amber-600 font-medium">Pending</span>
+              <span className="shrink-0 text-xs text-amber-600 font-medium">{t('dashboard.pending')}</span>
             )}
           </div>
         )}
@@ -688,10 +702,10 @@ export default function PlayerDashboard() {
 
         {/* Upcoming matches */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Matches</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('dashboard.upcomingTitle')}</h2>
           {isLoading && <CardListSkeleton />}
           {!isLoading && !data?.matches?.length && (
-            <p className="text-sm text-gray-400">No open matches right now.</p>
+            <p className="text-sm text-gray-400">{t('dashboard.upcomingEmpty')}</p>
           )}
           <div className="space-y-4">
             {(data?.matches ?? []).map((m: Match) => <MatchCard key={m.matchId} match={m} />)}

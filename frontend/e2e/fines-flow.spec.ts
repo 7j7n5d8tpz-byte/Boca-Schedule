@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { loginAs, TEST_USERS } from './helpers/auth';
 import { clearFines } from './helpers/cleanup';
 

@@ -43,8 +43,8 @@ interface IcsMatch {
 }
 
 function buildEvent(m: IcsMatch, stamp: string): string {
-  const summary = m.opponent ? `Boca Boldisch vs ${m.opponent}` : 'Boca Boldisch match';
-  const desc = `Kick-off ${m.match_time.slice(0, 5)} · meet at ${meetingTime(m.match_time)}`;
+  const summary = m.opponent ? `Boca Boldisch vs ${m.opponent}` : 'Boca Boldisch-kamp';
+  const desc = `Kampstart ${m.match_time.slice(0, 5)} · mødetid ${meetingTime(m.match_time)}`;
   return [
     'BEGIN:VEVENT',
     `UID:${m.match_id}@bocaboldisch.dk`,

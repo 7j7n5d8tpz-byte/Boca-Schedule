@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const VIEWPORT = 288;   // on-screen square crop area (px)
 const OUTPUT = 256;     // exported image size (px)
@@ -19,6 +20,7 @@ interface AvatarCropperProps {
  * squad's photos to a couple of MB of Supabase Storage.
  */
 export default function AvatarCropper({ src, busy, onCancel, onSave }: AvatarCropperProps) {
+  const { t } = useTranslation();
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -103,8 +105,8 @@ export default function AvatarCropper({ src, busy, onCancel, onSave }: AvatarCro
         className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4"
         onClick={e => e.stopPropagation()}
       >
-        <h2 className="text-lg font-extrabold text-gray-900">Adjust your photo</h2>
-        <p className="text-xs text-gray-500 -mt-2">Drag to reposition, slide to zoom.</p>
+        <h2 className="text-lg font-extrabold text-gray-900">{t('cropper.title')}</h2>
+        <p className="text-xs text-gray-500 -mt-2">{t('cropper.hint')}</p>
 
         {/* Crop viewport */}
         <div
@@ -134,19 +136,19 @@ export default function AvatarCropper({ src, busy, onCancel, onSave }: AvatarCro
             type="range" min={1} max={3} step={0.01} value={zoom}
             onChange={e => onZoom(Number(e.target.value))}
             className="flex-1 accent-brand-green"
-            aria-label="Zoom"
+            aria-label={t('cropper.zoom')}
           />
           <span className="text-xs text-gray-400">+</span>
         </div>
 
         <div className="flex gap-2 justify-end pt-1">
-          <button onClick={onCancel} className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">Cancel</button>
+          <button onClick={onCancel} className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">{t('common.cancel')}</button>
           <button
             onClick={handleSave}
             disabled={busy || !nat}
             className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
-            {busy ? 'Saving…' : 'Save photo'}
+            {busy ? t('cropper.saving') : t('cropper.savePhoto')}
           </button>
         </div>
       </div>

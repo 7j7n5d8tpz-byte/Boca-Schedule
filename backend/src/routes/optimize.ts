@@ -11,7 +11,7 @@ const router = Router({ mergeParams: true });
 // Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
 function matchLabel(m: { match_date: string; match_time?: string; opponent?: string | null }): string {
   const d = new Date(`${m.match_date}T${m.match_time ?? '00:00'}`);
-  const date = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  const date = d.toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' });
   return m.opponent ? `${date} vs ${m.opponent}` : date;
 }
 
@@ -42,7 +42,7 @@ function notifyPublishedSquadChange(
             .catch(err => console.error('Failed to send selection notifications:', err));
         }
         createNotifications(added.map((u: any) => u.user_id), {
-          type: 'selected', title: "You're selected", body: label, link: '/dashboard', matchId,
+          type: 'selected', title: 'Du er udtaget', body: label, link: '/dashboard', matchId,
         });
       }
 
@@ -54,7 +54,7 @@ function notifyPublishedSquadChange(
             .catch(err => console.error('Failed to send deselection notifications:', err));
         }
         createNotifications(removed.map((u: any) => u.user_id), {
-          type: 'deselected', title: 'Removed from squad', body: label, link: '/dashboard', matchId,
+          type: 'deselected', title: 'Fjernet fra truppen', body: label, link: '/dashboard', matchId,
         });
       }
     });
@@ -68,7 +68,7 @@ router.get('/selections', authenticate, async (req, res, next) => {
     if (role !== 'coach' && role !== 'admin') {
       const { data: userRow } = await supabaseAdmin.from('users').select('can_enter_results').eq('user_id', userId).single();
       if (!userRow?.can_enter_results) {
-        res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } });
+        res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du har ikke rettigheder til det' } });
         return;
       }
     }
@@ -97,7 +97,7 @@ router.get('/selections', authenticate, async (req, res, next) => {
     ]);
 
     if (!match) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Kampen blev ikke fundet' } });
       return;
     }
 
@@ -185,7 +185,7 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
 
     const { data: match } = await supabaseAdmin.from('matches').select('*').eq('match_id', matchId).single();
     if (!match) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Kampen blev ikke fundet' } });
       return;
     }
 
@@ -214,7 +214,7 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
       const validIds = new Set((validUsers ?? []).map((u: any) => u.user_id));
       const invalid = addedIds.filter(id => !validIds.has(id));
       if (invalid.length > 0) {
-        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'One or more player IDs are not selectable players.' } });
+        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'En eller flere spillere kan ikke udtages.' } });
         return;
       }
     }
@@ -296,7 +296,7 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
 
     const { data: match } = await supabaseAdmin.from('matches').select('*').eq('match_id', matchId).single();
     if (!match) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Kampen blev ikke fundet' } });
       return;
     }
 
@@ -307,7 +307,7 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
       .eq('is_active', true);
 
     if (!signups || signups.length === 0) {
-      res.status(400).json({ success: false, error: { code: 'NO_SIGNUPS', message: 'No active sign-ups for this match' } });
+      res.status(400).json({ success: false, error: { code: 'NO_SIGNUPS', message: 'Ingen aktive tilmeldinger til denne kamp' } });
       return;
     }
 
@@ -352,7 +352,7 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
       });
     } catch (optErr) {
       console.error('Optimizer error', optErr);
-      res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: 'Optimization service error — please try again.' } });
+      res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: 'Fejl i optimeringen — prøv igen.' } });
       return;
     }
 

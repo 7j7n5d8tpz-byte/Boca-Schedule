@@ -110,23 +110,23 @@ export async function sendSelectionNotifications(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
 ): Promise<SendResult> {
-  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
   return sendMany(players, 'selection notifications', p => ({
-    subject: `You're selected — ${dateStr}`,
-    html: `<p>Hi <strong>${p.name}</strong>,</p>
-     <p>You've been selected for the upcoming match.</p>
+    subject: `Du er udtaget — ${dateStr}`,
+    html: `<p>Hej <strong>${p.name}</strong>,</p>
+     <p>Du er udtaget til den kommende kamp.</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
-     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">View on dashboard →</a>`,
-    text: `Hi ${p.name},\n\nYou've been selected for the upcoming match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se på oversigten →</a>`,
+    text: `Hej ${p.name},\n\nDu er udtaget til den kommende kamp.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
   }));
 }
 
@@ -137,22 +137,22 @@ export async function sendDeselectionNotifications(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
 ): Promise<SendResult> {
-  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
   return sendMany(players, 'deselection notifications', p => ({
-    subject: `Squad change — ${dateStr}`,
-    html: `<p>Hi <strong>${p.name}</strong>,</p>
-     <p>The coach has updated the squad and you're no longer selected for this match.</p>
+    subject: `Ændring i truppen — ${dateStr}`,
+    html: `<p>Hej <strong>${p.name}</strong>,</p>
+     <p>Træneren har ændret truppen, og du er ikke længere udtaget til denne kamp.</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>`,
-    text: `Hi ${p.name},\n\nThe coach has updated the squad and you're no longer selected for this match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}`,
+    text: `Hej ${p.name},\n\nTræneren har ændret truppen, og du er ikke længere udtaget til denne kamp.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}`,
   }));
 }
 
@@ -163,7 +163,7 @@ export async function sendCancellationNotifications(
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
   cancelledBy: 'us' | 'opponent' | null = null,
 ): Promise<SendResult> {
-  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
@@ -171,22 +171,22 @@ export async function sendCancellationNotifications(
 
   // A side that calls the match off forfeits it, so say how it was scored.
   const outcomeText = cancelledBy === 'opponent'
-    ? 'The opponent called it off, so the match is scored as a 3–0 win to us.'
+    ? 'Modstanderen aflyste, så kampen tælles som en 3–0-sejr til os.'
     : cancelledBy === 'us'
-      ? 'We called it off, so the match is scored as a 0–3 loss.'
+      ? 'Vi aflyste, så kampen tælles som et 0–3-nederlag.'
       : '';
 
   return sendMany(players, 'cancellation notifications', p => ({
-    subject: `Match cancelled — ${dateStr}`,
-    html: `<p>Hi <strong>${p.name}</strong>,</p>
-     <p>Unfortunately the match you were selected for has been cancelled.</p>
+    subject: `Kamp aflyst — ${dateStr}`,
+    html: `<p>Hej <strong>${p.name}</strong>,</p>
+     <p>Desværre er den kamp, du var udtaget til, blevet aflyst.</p>
      ${outcomeText ? `<p>${outcomeText}</p>` : ''}
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>`,
-    text: `Hi ${p.name},\n\nUnfortunately the match you were selected for has been cancelled.\n${outcomeText ? `${outcomeText}\n` : ''}\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}`,
+    text: `Hej ${p.name},\n\nDesværre er den kamp, du var udtaget til, blevet aflyst.\n${outcomeText ? `${outcomeText}\n` : ''}\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}`,
   }));
 }
 
@@ -198,23 +198,23 @@ export async function sendReleaseNotification(
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
   matchId: string,
 ): Promise<SendResult> {
-  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
   return sendMany(coaches, 'release notifications', c => ({
-    subject: `Spot released — ${playerName} · ${dateStr}`,
-    html: `<p>Hi <strong>${c.name}</strong>,</p>
-     <p><strong>${playerName}</strong> has released their spot for the match on ${dateStr}.</p>
+    subject: `Plads frigivet — ${playerName} · ${dateStr}`,
+    html: `<p>Hej <strong>${c.name}</strong>,</p>
+     <p><strong>${playerName}</strong> har frigivet sin plads til kampen den ${dateStr}.</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
-     <a href="${FRONTEND_URL}/coach/matches/${matchId}/selections" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Manage squad →</a>`,
-    text: `Hi ${c.name},\n\n${playerName} has released their spot for the match on ${dateStr}.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
+     <a href="${FRONTEND_URL}/coach/matches/${matchId}/selections" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Administrér trup →</a>`,
+    text: `Hej ${c.name},\n\n${playerName} har frigivet sin plads til kampen den ${dateStr}.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
   }));
 }
 
@@ -224,23 +224,23 @@ export async function sendSpotOpenNotification(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
 ): Promise<SendResult> {
-  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
   return sendMany(players, 'spot-open notifications', p => ({
-    subject: `A spot opened up — ${dateStr}`,
-    html: `<p>Hi <strong>${p.name}</strong>,</p>
-     <p>A spot has opened up for the match on ${dateStr}. Want it? Claim it and the coach will confirm.</p>
+    subject: `En plads er blevet ledig — ${dateStr}`,
+    html: `<p>Hej <strong>${p.name}</strong>,</p>
+     <p>Der er blevet en plads ledig til kampen den ${dateStr}. Vil du have den? Overtag den, så bekræfter træneren.</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
-     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Claim the spot →</a>`,
-    text: `Hi ${p.name},\n\nA spot has opened up for the match on ${dateStr}. Claim it and the coach will confirm.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Overtag pladsen →</a>`,
+    text: `Hej ${p.name},\n\nDer er blevet en plads ledig til kampen den ${dateStr}. Overtag den, så bekræfter træneren.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
   }));
 }
 
@@ -252,23 +252,23 @@ export async function sendSpotClaimNotification(
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
   matchId: string,
 ): Promise<SendResult> {
-  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
   return sendMany(coaches, 'spot-claim notifications', c => ({
-    subject: `Spot claimed — ${claimantName} · ${dateStr}`,
-    html: `<p>Hi <strong>${c.name}</strong>,</p>
-     <p><strong>${claimantName}</strong> wants to take an open spot for the match on ${dateStr}. Confirm them (or another claimant) in the squad.</p>
+    subject: `Plads ønsket — ${claimantName} · ${dateStr}`,
+    html: `<p>Hej <strong>${c.name}</strong>,</p>
+     <p><strong>${claimantName}</strong> vil gerne overtage en ledig plads til kampen den ${dateStr}. Bekræft vedkommende (eller en anden ansøger) i truppen.</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
-     <a href="${FRONTEND_URL}/coach/matches/${matchId}/selections" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Review claimants →</a>`,
-    text: `Hi ${c.name},\n\n${claimantName} wants to take an open spot for the match on ${dateStr}.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
+     <a href="${FRONTEND_URL}/coach/matches/${matchId}/selections" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se ansøgerne →</a>`,
+    text: `Hej ${c.name},\n\n${claimantName} vil gerne overtage en ledig plads til kampen den ${dateStr}.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
   }));
 }
 
@@ -279,7 +279,7 @@ export async function sendClaimResolutionNotification(
   accepted: boolean,
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
 ) {
-  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
@@ -287,18 +287,18 @@ export async function sendClaimResolutionNotification(
 
   await send(
     claimant.email,
-    `Spot claim ${accepted ? 'confirmed' : 'not selected'} — ${dateStr}`,
-    `<p>Hi <strong>${claimant.name}</strong>,</p>
+    `Plads ${accepted ? 'bekræftet' : 'gik til en anden'} — ${dateStr}`,
+    `<p>Hej <strong>${claimant.name}</strong>,</p>
      <p>${accepted
-        ? `You're in the squad for the match on ${dateStr}!`
-        : `The open spot for the match on ${dateStr} went to another player this time.`}</p>
+        ? `Du er med i truppen til kampen den ${dateStr}!`
+        : `Den ledige plads til kampen den ${dateStr} gik til en anden spiller denne gang.`}</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
-     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">View on dashboard →</a>`,
-    `Hi ${claimant.name},\n\n${accepted ? `You're in the squad for the match on ${dateStr}!` : `The open spot for the match on ${dateStr} went to another player this time.`}\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se på oversigten →</a>`,
+    `Hej ${claimant.name},\n\n${accepted ? `Du er med i truppen til kampen den ${dateStr}!` : `Den ledige plads til kampen den ${dateStr} gik til en anden spiller denne gang.`}\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
   );
 }
 
@@ -308,7 +308,7 @@ export async function sendSignupReminder(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null; signupCloseDate: string },
 ): Promise<SendResult> {
-  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
@@ -316,17 +316,17 @@ export async function sendSignupReminder(
   const deadlineStr = formatClubDeadline(match.signupCloseDate);
 
   return sendMany(players, 'signup reminders', p => ({
-    subject: `Signup closing soon — ${dateStr}`,
-    html: `<p>Hi <strong>${p.name}</strong>,</p>
-     <p>Signups for the upcoming match close <strong>${deadlineStr}</strong> and you haven't signed up yet.</p>
+    subject: `Tilmeldingen lukker snart — ${dateStr}`,
+    html: `<p>Hej <strong>${p.name}</strong>,</p>
+     <p>Tilmeldingen til den kommende kamp lukker <strong>${deadlineStr}</strong>, og du har ikke meldt dig til endnu.</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Signup closes</td><td style="font-size:14px">${deadlineStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tilmelding lukker</td><td style="font-size:14px">${deadlineStr}</td></tr>
      </table>
-     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Sign up now →</a>`,
-    text: `Hi ${p.name},\n\nSignups for the upcoming match close ${deadlineStr} and you haven't signed up yet.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\nSignup closes: ${deadlineStr}\n\n${FRONTEND_URL}/dashboard`,
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Tilmeld dig nu →</a>`,
+    text: `Hej ${p.name},\n\nTilmeldingen til den kommende kamp lukker ${deadlineStr}, og du har ikke meldt dig til endnu.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\nTilmelding lukker: ${deadlineStr}\n\n${FRONTEND_URL}/dashboard`,
   }));
 }
 
@@ -342,7 +342,7 @@ export async function sendSignupOpenAnnouncement(
 ) {
   const n = matches.length;
   const rows = matches.map(m => {
-    const dateStr = new Date(`${m.matchDate}T${m.matchTime}`).toLocaleDateString('en-GB', {
+    const dateStr = new Date(`${m.matchDate}T${m.matchTime}`).toLocaleDateString('da-DK', {
       weekday: 'long', day: 'numeric', month: 'long',
     });
     const opponent = m.opponent ? ` vs ${m.opponent}` : '';
@@ -352,27 +352,27 @@ export async function sendSignupOpenAnnouncement(
       html: `<li style="margin:10px 0;font-size:14px">
                <strong>${dateStr}</strong>${opponent}<br>
                <span style="color:#6b7280">${m.matchTime.slice(0, 5)} · ${m.location}</span><br>
-               <span style="color:#6b7280">Sign up by ${deadline}</span>
+               <span style="color:#6b7280">Tilmeld dig senest ${deadline}</span>
              </li>`,
-      text: `- ${dateStr}${opponent}\n  ${m.matchTime.slice(0, 5)} · ${m.location}\n  Sign up by ${deadline}`,
+      text: `- ${dateStr}${opponent}\n  ${m.matchTime.slice(0, 5)} · ${m.location}\n  Tilmeld dig senest ${deadline}`,
     };
   });
 
   const subject = n === 1
-    ? `Sign-ups open — ${rows[0].label}`
-    : `Sign-ups open — ${n} new matches`;
+    ? `Tilmelding åben — ${rows[0].label}`
+    : `Tilmelding åben — ${n} nye kampe`;
   const intro = n === 1
-    ? 'Sign-ups are open for a new match:'
-    : `Sign-ups are open for ${n} new matches:`;
+    ? 'Tilmeldingen er åben til en ny kamp:'
+    : `Tilmeldingen er åben til ${n} nye kampe:`;
 
   await send(
     player.email,
     subject,
-    `<p>Hi <strong>${player.name}</strong>,</p>
+    `<p>Hej <strong>${player.name}</strong>,</p>
      <p>${intro}</p>
      <ul style="padding-left:18px;margin:12px 0">${rows.map(r => r.html).join('')}</ul>
-     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Sign up now →</a>`,
-    `Hi ${player.name},\n\n${intro}\n${rows.map(r => r.text).join('\n')}\n\n${FRONTEND_URL}/dashboard`,
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Tilmeld dig nu →</a>`,
+    `Hej ${player.name},\n\n${intro}\n${rows.map(r => r.text).join('\n')}\n\n${FRONTEND_URL}/dashboard`,
   );
 }
 
@@ -382,14 +382,14 @@ export async function sendAdminRegistrationNotification(playerName: string, play
   const adminEmail = process.env.ADMIN_EMAIL || 'andreas@brendstrup.dk';
   await send(
     adminEmail,
-    `New registration: ${playerName}`,
-    `<p>A new player has registered and is waiting for approval.</p>
+    `Ny registrering: ${playerName}`,
+    `<p>En ny spiller har registreret sig og afventer godkendelse.</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Name</td><td style="font-size:14px;font-weight:600">${playerName}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Email</td><td style="font-size:14px">${playerEmail}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Navn</td><td style="font-size:14px;font-weight:600">${playerName}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">E-mail</td><td style="font-size:14px">${playerEmail}</td></tr>
      </table>
-     <a href="${FRONTEND_URL}/admin" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Review in admin panel →</a>`,
-    `A new player has registered and is waiting for approval.\n\nName: ${playerName}\nEmail: ${playerEmail}\n\n${FRONTEND_URL}/admin`,
+     <a href="${FRONTEND_URL}/admin" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se i adminpanelet →</a>`,
+    `En ny spiller har registreret sig og afventer godkendelse.\n\nNavn: ${playerName}\nE-mail: ${playerEmail}\n\n${FRONTEND_URL}/admin`,
   );
 }
 
@@ -404,7 +404,7 @@ interface ReminderMatch {
 
 function matchLines(matches: ReminderMatch[]): { html: string; text: string } {
   const rows = matches.map(m => {
-    const dateStr = new Date(`${m.matchDate}T${m.matchTime}`).toLocaleDateString('en-GB', {
+    const dateStr = new Date(`${m.matchDate}T${m.matchTime}`).toLocaleDateString('da-DK', {
       weekday: 'short', day: 'numeric', month: 'short',
     });
     const opponent = m.opponent ? ` vs ${m.opponent}` : '';
@@ -424,23 +424,23 @@ export async function sendMatchdayReminder(
   players: { name: string; email: string }[],
   match: ReminderMatch,
 ): Promise<SendResult> {
-  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
   return sendMany(players, 'match-day reminders', p => ({
-    subject: `Match tomorrow — ${dateStr}`,
-    html: `<p>Hi <strong>${p.name}</strong>,</p>
-     <p>Reminder: you're in the squad for tomorrow's match.</p>
+    subject: `Kamp i morgen — ${dateStr}`,
+    html: `<p>Hej <strong>${p.name}</strong>,</p>
+     <p>Husk: du er i truppen til morgendagens kamp.</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>
-     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">View on dashboard →</a>`,
-    text: `Hi ${p.name},\n\nReminder: you're in the squad for tomorrow's match.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se på oversigten →</a>`,
+    text: `Hej ${p.name},\n\nHusk: du er i truppen til morgendagens kamp.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
   }));
 }
 
@@ -455,12 +455,12 @@ export async function sendSelectionReminder(
   const { html, text } = matchLines(matches);
   await send(
     coach.email,
-    n === 1 ? 'A squad still needs picking' : `${n} squads still need picking`,
-    `<p>Hi <strong>${coach.name}</strong>,</p>
-     <p>Sign-ups have closed for ${n === 1 ? 'this match' : 'these matches'} and the squad isn't published yet:</p>
+    n === 1 ? 'En trup mangler at blive udtaget' : `${n} trupper mangler at blive udtaget`,
+    `<p>Hej <strong>${coach.name}</strong>,</p>
+     <p>Tilmeldingen er lukket til ${n === 1 ? 'denne kamp' : 'disse kampe'}, og truppen er ikke offentliggjort endnu:</p>
      ${html}
-     <a href="${FRONTEND_URL}/coach" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Pick the squad →</a>`,
-    `Hi ${coach.name},\n\nSign-ups have closed and the squad isn't published yet for:\n${text}\n\n${FRONTEND_URL}/coach`,
+     <a href="${FRONTEND_URL}/coach" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Sammensæt truppen →</a>`,
+    `Hej ${coach.name},\n\nTilmeldingen er lukket, og truppen er ikke offentliggjort endnu for:\n${text}\n\n${FRONTEND_URL}/coach`,
   );
 }
 
@@ -474,11 +474,11 @@ export async function sendResultReminder(
   const { html, text } = matchLines(matches);
   await send(
     recipient.email,
-    n === 1 ? "Record yesterday's result" : `Record ${n} match results`,
-    `<p>Hi <strong>${recipient.name}</strong>,</p>
-     <p>${n === 1 ? 'This match has' : 'These matches have'} been played but the result isn't recorded yet:</p>
+    n === 1 ? 'Registrér gårsdagens resultat' : `Registrér ${n} kampresultater`,
+    `<p>Hej <strong>${recipient.name}</strong>,</p>
+     <p>${n === 1 ? 'Denne kamp er' : 'Disse kampe er'} spillet, men resultatet er ikke registreret endnu:</p>
      ${html}
-     <a href="${FRONTEND_URL}/coach" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Record the result →</a>`,
-    `Hi ${recipient.name},\n\n${n === 1 ? 'This match has' : 'These matches have'} been played but the result isn't recorded yet:\n${text}\n\n${FRONTEND_URL}/coach`,
+     <a href="${FRONTEND_URL}/coach" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Registrér resultatet →</a>`,
+    `Hej ${recipient.name},\n\n${n === 1 ? 'Denne kamp er' : 'Disse kampe er'} spillet, men resultatet er ikke registreret endnu:\n${text}\n\n${FRONTEND_URL}/coach`,
   );
 }

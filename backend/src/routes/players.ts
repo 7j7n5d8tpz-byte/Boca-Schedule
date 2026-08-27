@@ -12,6 +12,7 @@ const router = Router();
 const UpdateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   preferredPositions: z.array(z.enum(['GK', 'DEF', 'WIN', 'MID', 'STR'])).optional(),
+  language: z.enum(['da', 'en']).optional(),
 });
 
 // GET /api/players — all registered players except self
@@ -429,7 +430,7 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
     ]);
 
     if (!profile) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Player not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Spilleren blev ikke fundet' } });
       return;
     }
 
@@ -553,24 +554,25 @@ router.put('/:playerId/profile', authenticate, async (req, res, next) => {
     const { playerId } = req.params;
 
     if (playerId !== req.user!.userId && req.user!.role !== 'admin') {
-      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Cannot edit another user\'s profile' } });
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du kan ikke redigere en anden brugers profil' } });
       return;
     }
 
     const body = UpdateProfileSchema.safeParse(req.body);
     if (!body.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid input' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Ugyldige oplysninger' } });
       return;
     }
 
     const updates: Record<string, unknown> = {};
     if (body.data.name) updates.name = body.data.name;
     if (body.data.preferredPositions) updates.preferred_positions = body.data.preferredPositions;
+    if (body.data.language) updates.language = body.data.language;
 
     const { data, error } = await supabaseAdmin.from('users').update(updates).eq('user_id', playerId).select().single();
     if (error) throw error;
 
-    res.json({ success: true, data: { userId: data.user_id, name: data.name, preferredPositions: data.preferred_positions, updatedAt: data.updated_at } });
+    res.json({ success: true, data: { userId: data.user_id, name: data.name, preferredPositions: data.preferred_positions, language: data.language, updatedAt: data.updated_at } });
   } catch (err) {
     next(err);
   }
@@ -587,13 +589,13 @@ router.put('/:playerId/avatar', authenticate, async (req, res, next) => {
   try {
     const { playerId } = req.params;
     if (playerId !== req.user!.userId && req.user!.role !== 'admin') {
-      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Cannot edit another user\'s photo' } });
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du kan ikke redigere en anden brugers billede' } });
       return;
     }
 
     const body = AvatarSchema.safeParse(req.body);
     if (!body.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid image' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Ugyldigt billede' } });
       return;
     }
 
@@ -602,7 +604,7 @@ router.put('/:playerId/avatar', authenticate, async (req, res, next) => {
       avatarUrl = await storeAvatar(playerId as string, body.data.image);
     } catch (err) {
       if (err instanceof AvatarTooLargeError) {
-        res.status(413).json({ success: false, error: { code: 'TOO_LARGE', message: 'Image too large' } });
+        res.status(413).json({ success: false, error: { code: 'TOO_LARGE', message: 'Billedet er for stort' } });
         return;
       }
       throw err;
@@ -622,7 +624,7 @@ router.delete('/:playerId/avatar', authenticate, async (req, res, next) => {
   try {
     const { playerId } = req.params;
     if (playerId !== req.user!.userId && req.user!.role !== 'admin') {
-      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Cannot edit another user\'s photo' } });
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du kan ikke redigere en anden brugers billede' } });
       return;
     }
 

@@ -42,8 +42,8 @@ interface IcsMatch {
 export function buildMatchIcs(m: IcsMatch): string {
   const now = new Date();
   const stamp = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}T${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}${pad(now.getUTCSeconds())}Z`;
-  const summary = m.opponent ? `Boca Boldisch vs ${m.opponent}` : 'Boca Boldisch match';
-  const desc = `Kick-off ${m.matchTime.slice(0, 5)} · meet at ${meetingTime(m.matchTime)}`;
+  const summary = m.opponent ? `Boca Boldisch vs ${m.opponent}` : 'Boca Boldisch-kamp';
+  const desc = `Kampstart ${m.matchTime.slice(0, 5)} · mødetid ${meetingTime(m.matchTime)}`;
   return [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',

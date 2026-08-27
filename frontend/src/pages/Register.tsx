@@ -1,18 +1,13 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import AvatarCropper from '../components/AvatarCropper';
 
+// The codes themselves stay English — they're what the optimizer and the squad
+// views speak. Only the descriptive label beside them is translated.
 const POSITIONS = ['GK', 'DEF', 'WIN', 'MID', 'STR'] as const;
 type Position = (typeof POSITIONS)[number];
-
-const POSITION_LABELS: Record<Position, string> = {
-  GK: 'Goalkeeper',
-  DEF: 'Defensive',
-  WIN: 'Winger',
-  MID: 'Midfielder',
-  STR: 'Striker',
-};
 
 interface FormState {
   name: string;
@@ -23,11 +18,12 @@ interface FormState {
 }
 
 function PasswordStrength({ password }: { password: string }) {
+  const { t } = useTranslation();
   const checks = [
-    { label: '8+ characters', ok: password.length >= 8 },
-    { label: 'Uppercase letter', ok: /[A-Z]/.test(password) },
-    { label: 'Number', ok: /[0-9]/.test(password) },
-    { label: 'Special character', ok: /[!@#$%^&*]/.test(password) },
+    { label: t('password.min8'), ok: password.length >= 8 },
+    { label: t('password.uppercase'), ok: /[A-Z]/.test(password) },
+    { label: t('password.number'), ok: /[0-9]/.test(password) },
+    { label: t('password.special'), ok: /[!@#$%^&*]/.test(password) },
   ];
   const score = checks.filter((c) => c.ok).length;
   const colors = ['bg-red-400', 'bg-orange-400', 'bg-yellow-400', 'bg-green-500'];
@@ -57,6 +53,7 @@ function PasswordStrength({ password }: { password: string }) {
 
 export default function Register() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [form, setForm] = useState<FormState>({
     name: '',
     email: '',
@@ -79,7 +76,7 @@ export default function Register() {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file
     if (!file) return;
-    if (!file.type.startsWith('image/')) { setAvatarError('Please choose an image file.'); return; }
+    if (!file.type.startsWith('image/')) { setAvatarError(t('common.chooseImageFile')); return; }
     setAvatarError('');
     const reader = new FileReader();
     reader.onload = () => setCropSrc(reader.result as string);
@@ -96,13 +93,13 @@ export default function Register() {
   }
 
   function validate(): string {
-    if (form.name.trim().length < 2) return 'Name must be at least 2 characters.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return 'Enter a valid email address.';
-    if (form.password.length < 8) return 'Password must be at least 8 characters.';
-    if (!/[A-Z]/.test(form.password)) return 'Password needs an uppercase letter.';
-    if (!/[0-9]/.test(form.password)) return 'Password needs a number.';
-    if (!/[!@#$%^&*]/.test(form.password)) return 'Password needs a special character (!@#$%^&*).';
-    if (form.password !== form.confirmPassword) return 'Passwords do not match.';
+    if (form.name.trim().length < 2) return t('auth.nameTooShort');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return t('auth.invalidEmail');
+    if (form.password.length < 8) return t('auth.passwordTooShort');
+    if (!/[A-Z]/.test(form.password)) return t('auth.passwordNeedsUppercase');
+    if (!/[0-9]/.test(form.password)) return t('auth.passwordNeedsNumber');
+    if (!/[!@#$%^&*]/.test(form.password)) return t('auth.passwordNeedsSpecial');
+    if (form.password !== form.confirmPassword) return t('auth.passwordsDoNotMatch');
     return '';
   }
 
@@ -136,16 +133,15 @@ export default function Register() {
       <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-md p-8 w-full max-w-md text-center space-y-4">
           <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto text-2xl">✓</div>
-          <h2 className="text-xl font-bold text-gray-900">Request submitted</h2>
+          <h2 className="text-xl font-bold text-gray-900">{t('auth.requestSubmitted')}</h2>
           <p className="text-gray-500 text-sm leading-relaxed">
-            Your registration request has been received. An administrator will review it and activate your account.
-            You'll be able to log in once approved.
+            {t('auth.requestSubmittedBody')}
           </p>
           <button
             onClick={() => navigate('/login')}
             className="text-brand-green hover:underline text-sm"
           >
-            Back to login
+            {t('auth.backToLogin')}
           </button>
         </div>
       </div>
@@ -163,12 +159,12 @@ export default function Register() {
           </div>
           <img src="/boca-logo.png" alt="Boca Boldisch" className="relative w-28 h-28 drop-shadow-xl" />
           <h1 className="relative mt-4 font-display font-extrabold uppercase tracking-wide text-white text-2xl leading-none text-center">Boca Boldisch</h1>
-          <p className="relative mt-1.5 text-white/50 text-xs tracking-wide">Create account</p>
+          <p className="relative mt-1.5 text-white/50 text-xs tracking-wide">{t('auth.taglineCreate')}</p>
         </div>
         <div className="bg-white rounded-b-2xl shadow-md p-8">
         <p className="text-gray-500 text-sm mb-6">
-          Already have one?{' '}
-          <Link to="/login" className="text-brand-green hover:underline">Sign in</Link>
+          {t('auth.alreadyHaveOne')}{' '}
+          <Link to="/login" className="text-brand-green hover:underline">{t('auth.signIn')}</Link>
         </p>
 
         {clientError && (
@@ -184,7 +180,7 @@ export default function Register() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="w-20 h-20 rounded-full overflow-hidden bg-brand-green/15 text-brand-green text-2xl font-bold flex items-center justify-center ring-1 ring-gray-200 hover:ring-brand-green transition"
-              aria-label={avatar ? 'Change profile picture' : 'Add a profile picture'}
+              aria-label={avatar ? t('auth.changeProfilePicture') : t('auth.addProfilePicture')}
             >
               {avatar
                 ? <img src={avatar} alt="" className="w-full h-full object-cover" />
@@ -196,8 +192,8 @@ export default function Register() {
                 onClick={() => fileInputRef.current?.click()}
                 className="text-sm font-medium text-brand-green hover:underline"
               >
-                {avatar ? 'Change photo' : 'Add a photo'}
-                <span className="text-gray-400 font-normal"> (optional)</span>
+                {avatar ? t('auth.changePhoto') : t('auth.addPhoto')}
+                <span className="text-gray-400 font-normal"> {t('common.optional')}</span>
               </button>
               {avatar && (
                 <button
@@ -205,7 +201,7 @@ export default function Register() {
                   onClick={() => setAvatar(null)}
                   className="text-sm text-gray-400 hover:text-red-500"
                 >
-                  Remove
+                  {t('common.remove')}
                 </button>
               )}
             </div>
@@ -215,7 +211,7 @@ export default function Register() {
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.fullName')}</label>
             <input
               type="text"
               required
@@ -223,13 +219,13 @@ export default function Register() {
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-              placeholder="John Doe"
+              placeholder={t('auth.namePlaceholder')}
             />
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.emailAddress')}</label>
             <input
               type="email"
               required
@@ -237,13 +233,13 @@ export default function Register() {
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
             />
           </div>
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.password')}</label>
             <input
               type="password"
               required
@@ -258,7 +254,7 @@ export default function Register() {
 
           {/* Confirm password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.confirmPassword')}</label>
             <input
               type="password"
               required
@@ -273,14 +269,14 @@ export default function Register() {
               placeholder="••••••••"
             />
             {form.confirmPassword && form.confirmPassword !== form.password && (
-              <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+              <p className="text-xs text-red-500 mt-1">{t('auth.passwordsDoNotMatchShort')}</p>
             )}
           </div>
 
           {/* Preferred positions */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Preferred positions <span className="text-gray-400 font-normal">(optional)</span>
+              {t('auth.preferredPositions')} <span className="text-gray-400 font-normal">{t('common.optional')}</span>
             </label>
             <div className="flex gap-2 flex-wrap">
               {POSITIONS.map((pos) => {
@@ -298,7 +294,7 @@ export default function Register() {
                   >
                     {pos}
                     <span className="hidden sm:inline text-xs ml-1 opacity-70">
-                      {POSITION_LABELS[pos]}
+                      {t(`positions.${pos}`)}
                     </span>
                   </button>
                 );
@@ -311,7 +307,7 @@ export default function Register() {
             disabled={loading}
             className="w-full bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium py-2 rounded-lg text-sm transition-colors mt-2"
           >
-            {loading ? 'Submitting...' : 'Create account'}
+            {loading ? t('auth.submitting') : t('auth.createAccount')}
           </button>
         </form>
         </div>

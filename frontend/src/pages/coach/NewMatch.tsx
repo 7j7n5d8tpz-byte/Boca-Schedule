@@ -2,11 +2,13 @@ import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import LocationPicker, { encodeLocation } from '../../components/LocationPicker';
 import OpponentPicker from '../../components/OpponentPicker';
 
 export default function NewMatch() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -50,30 +52,30 @@ export default function NewMatch() {
       navigate('/coach');
     },
     onError: (err: any) => {
-      setError(err.response?.data?.error?.message ?? 'Failed to create match');
+      setError(err.response?.data?.error?.message ?? t('coach.createFailed'));
     },
   });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (!matchDate || !signupCloseDate) { setError('Match date and signup deadline are required'); return; }
-    if (!venue) { setError('Please select a venue'); return; }
-    if (minPlayers > maxPlayers) { setError('Min players cannot exceed max players'); return; }
+    if (!matchDate || !signupCloseDate) { setError(t('coach.dateAndDeadlineRequired')); return; }
+    if (!venue) { setError(t('coach.selectVenue')); return; }
+    if (minPlayers > maxPlayers) { setError(t('coach.minExceedsMax')); return; }
     mutation.mutate();
   }
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref="/coach" backLabel="Matches" />
+      <AppNav backHref="/coach" backLabel={t('coach.matches')} />
 
       <main className="max-w-lg mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">New match</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('coach.newMatch')}</h1>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="matchDate" className="block text-sm font-medium text-gray-700 mb-1">Match date</label>
+              <label htmlFor="matchDate" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchDate')}</label>
               <input
                 id="matchDate"
                 type="date"
@@ -84,7 +86,7 @@ export default function NewMatch() {
               />
             </div>
             <div>
-              <label htmlFor="matchTime" className="block text-sm font-medium text-gray-700 mb-1">Kick-off time</label>
+              <label htmlFor="matchTime" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.kickOff')}</label>
               <input
                 id="matchTime"
                 type="time"
@@ -98,8 +100,8 @@ export default function NewMatch() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Venue <span className="text-gray-400 font-normal text-xs">
-                · {matchType === 'futsal' ? 'Hall (optional)' : 'Court number (optional)'}
+              {t('matchForm.venue')} <span className="text-gray-400 font-normal text-xs">
+                · {matchType === 'futsal' ? t('matchForm.hallOptional') : t('matchForm.courtNumberOptional')}
               </span>
             </label>
             <LocationPicker
@@ -113,13 +115,13 @@ export default function NewMatch() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Opponent team <span className="text-gray-400 font-normal">(optional)</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.opponentTeam')} <span className="text-gray-400 font-normal">{t('common.optional')}</span></label>
             <OpponentPicker opponentId={opponentId} onChange={(id) => setOpponentId(id)} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Match type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchType')}</label>
               <select
                 value={matchType}
                 onChange={e => {
@@ -131,27 +133,27 @@ export default function NewMatch() {
                 }}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               >
-                <option value="7-player">7-player</option>
-                <option value="futsal">Futsal</option>
-                <option value="11-player">11-player</option>
+                <option value="7-player">{t('matchTypes.7-player')}</option>
+                <option value="futsal">{t('matchTypes.futsal')}</option>
+                <option value="11-player">{t('matchTypes.11-player')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.category')}</label>
               <select
                 value={matchCategory}
                 onChange={e => setMatchCategory(e.target.value as 'serie' | 'pokal')}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               >
-                <option value="serie">Serie</option>
-                <option value="pokal">Pokal</option>
+                <option value="serie">{t('matchForm.serie')}</option>
+                <option value="pokal">{t('matchForm.pokal')}</option>
               </select>
             </div>
           </div>
 
           {matchCategory === 'serie' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Serie letter</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.serieLetter')}</label>
               <select
                 value={serieLetter}
                 onChange={e => setSerieLetter(e.target.value)}
@@ -166,7 +168,7 @@ export default function NewMatch() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Signup opens</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.signupOpens')}</label>
               <input
                 type="date"
                 required
@@ -176,7 +178,7 @@ export default function NewMatch() {
               />
             </div>
             <div>
-              <label htmlFor="signupClose" className="block text-sm font-medium text-gray-700 mb-1">Signup deadline</label>
+              <label htmlFor="signupClose" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.signupDeadline')}</label>
               <input
                 id="signupClose"
                 type="date"
@@ -185,13 +187,13 @@ export default function NewMatch() {
                 onChange={e => setSignupCloseDate(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               />
-              <p className="text-xs text-gray-400 mt-1">Closes 20:00 (8 PM) local time</p>
+              <p className="text-xs text-gray-400 mt-1">{t('matchForm.closesAt')}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Min players</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.minPlayers')}</label>
               <input
                 type="number"
                 min={1}
@@ -202,7 +204,7 @@ export default function NewMatch() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max players</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.maxPlayers')}</label>
               <input
                 type="number"
                 min={1}
@@ -222,13 +224,13 @@ export default function NewMatch() {
               disabled={mutation.isPending}
               className="flex-1 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
             >
-              {mutation.isPending ? 'Creating…' : 'Create match'}
+              {mutation.isPending ? t('coach.creating') : t('coach.createMatch')}
             </button>
             <Link
               to="/coach"
               className="flex-1 text-center border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </Link>
           </div>
         </form>

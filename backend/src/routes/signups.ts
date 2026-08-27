@@ -19,7 +19,7 @@ router.post('/', authenticate, async (req, res, next) => {
       .select(`signup_close_date, ${LATE_SIGNUP_COLUMNS}`)
       .eq('match_id', matchId).single();
     if (!match) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Kampen blev ikke fundet' } });
       return;
     }
 
@@ -41,8 +41,8 @@ router.post('/', authenticate, async (req, res, next) => {
         res.status(400).json({
           success: false,
           error: squadFull
-            ? { code: 'SQUAD_FULL', message: `Signup has closed — ${match.max_players} players are already signed up, enough to field the match` }
-            : { code: 'SIGNUP_CLOSED', message: 'Signup window has closed for this match' },
+            ? { code: 'SQUAD_FULL', message: `Tilmeldingen er lukket — ${match.max_players} spillere er allerede tilmeldt, nok til at stille hold` }
+            : { code: 'SIGNUP_CLOSED', message: 'Tilmeldingen til denne kamp er lukket' },
         });
         return;
       }
@@ -56,7 +56,7 @@ router.post('/', authenticate, async (req, res, next) => {
       .maybeSingle();
 
     if (existing) {
-      res.status(409).json({ success: false, error: { code: 'ALREADY_SIGNED_UP', message: 'You are already signed up for this match' } });
+      res.status(409).json({ success: false, error: { code: 'ALREADY_SIGNED_UP', message: 'Du er allerede tilmeldt denne kamp' } });
       return;
     }
 
@@ -84,23 +84,23 @@ router.delete('/:signupId', authenticate, async (req, res, next) => {
       .single();
 
     if (!signup) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Signup not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Tilmeldingen blev ikke fundet' } });
       return;
     }
     if (signup.player_id !== req.user!.userId) {
-      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Cannot withdraw from another player\'s signup' } });
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du kan ikke afmelde en anden spillers tilmelding' } });
       return;
     }
 
     const matchStatus = (signup.matches as any)?.status;
     if (matchStatus === 'published' || matchStatus === 'completed') {
-      res.status(403).json({ success: false, error: { code: 'WITHDRAWAL_NOT_ALLOWED', message: 'Cannot withdraw after selection has been published' } });
+      res.status(403).json({ success: false, error: { code: 'WITHDRAWAL_NOT_ALLOWED', message: 'Du kan ikke afmelde dig, efter truppen er offentliggjort' } });
       return;
     }
 
     await supabaseAdmin.from('signups').update({ withdrawn_at: new Date().toISOString() }).eq('signup_id', signupId);
 
-    res.json({ success: true, message: 'Successfully withdrawn from match' });
+    res.json({ success: true, message: 'Du er afmeldt kampen' });
   } catch (err) {
     next(err);
   }

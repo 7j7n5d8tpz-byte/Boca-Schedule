@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { api } from './client';
 import { tierRank, type Tier, type GlyphName } from '../components/Crest';
 
@@ -97,6 +98,24 @@ export function overallRank(points: number): { tier: Tier | null; floor: number;
     }
   }
   return { tier, floor, next };
+}
+
+/**
+ * Catalog prose in the reader's language.
+ *
+ * Crest `name`s stay as the backend sends them — they're branded, English by
+ * design. Descriptions and units are translated by code, falling back to the
+ * server's own text so a crest added to the backend catalog still renders
+ * sensibly before it has a translation.
+ */
+export function useCatalogText() {
+  const { t } = useTranslation();
+  return {
+    description: (e: { code: string; description: string }) =>
+      t(`achievementDefs.${e.code}.description`, { defaultValue: e.description }),
+    unit: (e: { code: string; unit: string }) =>
+      t(`achievementDefs.${e.code}.unit`, { defaultValue: e.unit }),
+  };
 }
 
 /** Shared catalog query — cached so the page and the unlock modal reuse it. */

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { api } from '../api/client';
+import { DEFAULT_LANGUAGE, setLanguage, type Language } from '../i18n';
 
 const INACTIVITY_MS = 60 * 60 * 1000; // 1 hour
 const ACTIVITY_KEY  = 'lastActivity';
@@ -24,6 +25,9 @@ interface User {
   preferredPositions: string[];
   avatarUrl?: string | null;
   isFineAdmin?: boolean;
+  // Absent on sessions stored before the language toggle shipped; the i18n
+  // module falls back to Danish for those until the next login refreshes it.
+  language?: Language;
 }
 
 interface AuthContextValue {
@@ -60,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!prev) return prev;
       const next = { ...prev, ...patch };
       localStorage.setItem('user', JSON.stringify(next));
+      if (patch.language) setLanguage(patch.language);
       return next;
     });
   }, []);
@@ -71,6 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('refreshToken', tokens.refreshToken);
     localStorage.setItem('user', JSON.stringify(u));
     localStorage.setItem(ACTIVITY_KEY, String(Date.now()));
+    // Mirror the account's language so the login screen paints in it next time,
+    // before any profile fetch has happened.
+    setLanguage(u.language ?? DEFAULT_LANGUAGE);
     setUser(u);
     return u.role;
   }, []);

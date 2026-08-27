@@ -116,8 +116,8 @@ router.post('/signup-reminders', async (req, res) => {
           });
           await createNotifications(recipientUsers.map((u: any) => u.user_id), {
             type: 'signup_reminder',
-            title: 'Signup closing soon',
-            body: `${new Date(`${m.match_date}T${m.match_time}`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}${m.opponent ? ` vs ${m.opponent}` : ''}`,
+            title: 'Tilmeldingen lukker snart',
+            body: `${new Date(`${m.match_date}T${m.match_time}`).toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' })}${m.opponent ? ` vs ${m.opponent}` : ''}`,
             link: '/dashboard',
             matchId: m.match_id,
           });
@@ -386,10 +386,10 @@ async function runMatchdayReminders(matchDate: string) {
         const mr = { matchDate: m.match_date, matchTime: m.match_time, location: m.location, opponent: m.opponent ?? null };
         await sendMatchdayReminder(ids.map((id: string) => usersById.get(id)!), mr)
           .catch(err => console.error('matchday email failed:', err));
-        const dateStr = new Date(`${m.match_date}T${m.match_time}`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+        const dateStr = new Date(`${m.match_date}T${m.match_time}`).toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' });
         await createNotifications(ids, {
           type: 'matchday_reminder',
-          title: 'Match tomorrow',
+          title: 'Kamp i morgen',
           body: `${dateStr}${m.opponent ? ` vs ${m.opponent}` : ''} · ${m.match_time.slice(0, 5)} · ${m.location}`,
           link: '/dashboard',
           matchId: m.match_id,
@@ -433,8 +433,8 @@ async function runSelectionReminders(today: string, now: Date) {
   const n = matches.length;
   await createNotifications((coaches ?? []).map((c: any) => c.user_id), {
     type: 'selection_reminder',
-    title: n === 1 ? 'A squad needs picking' : `${n} squads need picking`,
-    body: "Sign-ups have closed — publish the squad.",
+    title: n === 1 ? 'En trup skal udtages' : `${n} trupper skal udtages`,
+    body: 'Tilmeldingen er lukket — offentliggør truppen.',
     link: '/coach',
   });
 
@@ -474,8 +474,8 @@ async function runResultReminders(today: string) {
   const n = pending.length;
   await createNotifications((recipients ?? []).map((r: any) => r.user_id), {
     type: 'result_reminder',
-    title: n === 1 ? 'Record the result' : `Record ${n} results`,
-    body: "Played, but the result isn't recorded yet.",
+    title: n === 1 ? 'Registrér resultatet' : `Registrér ${n} resultater`,
+    body: 'Spillet, men resultatet er ikke registreret endnu.',
     link: '/coach',
   });
 

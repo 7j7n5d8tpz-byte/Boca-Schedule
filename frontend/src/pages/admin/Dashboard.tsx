@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
+import { useDateFormat } from '../../i18n/format';
 import AppNav from '../../components/AppNav';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -55,17 +57,19 @@ const ACTION_COLORS: Record<string, string> = {
   match_published: 'bg-purple-100 text-purple-700',
 };
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function fmtDatetime(iso: string) {
-  return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+function useAdminDates() {
+  const { formatDate } = useDateFormat();
+  return {
+    fmtDate: (iso: string) => formatDate(iso, 'dayMonthYear'),
+    fmtDatetime: (iso: string) => formatDate(iso, 'dayMonthTime'),
+  };
 }
 
 // ─── Users Tab ───────────────────────────────────────────────────────────────
 
 function UsersTab({ inactiveCount }: { inactiveCount: number }) {
+  const { t } = useTranslation();
+  const { fmtDate } = useAdminDates();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -140,7 +144,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
       setMergeFor(null); setMergeTarget(''); setMergeError('');
       qc.invalidateQueries({ queryKey: ['admin-users'] });
     },
-    onError: (err: any) => setMergeError(err.response?.data?.error?.message ?? 'Merge failed'),
+    onError: (err: any) => setMergeError(err.response?.data?.error?.message ?? t('admin.mergeFailed')),
   });
 
   const createMutation = useMutation({
@@ -152,7 +156,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
       qc.invalidateQueries({ queryKey: ['admin-users'] });
     },
     onError: (err: any) => {
-      setCreateError(err.response?.data?.error?.message ?? 'Failed to create user');
+      setCreateError(err.response?.data?.error?.message ?? t('admin.createFailed'));
     },
   });
 
@@ -164,13 +168,13 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
       {inactiveCount > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
           <p className="text-sm text-amber-700">
-            <span className="font-semibold">{inactiveCount} inactive {inactiveCount === 1 ? 'account' : 'accounts'}</span> — pending activation or deactivated.
+            <span className="font-semibold">{t('admin.inactiveAccounts', { count: inactiveCount })}</span> {t('admin.inactiveSuffix')}
           </p>
           <button
             onClick={() => setShowInactiveOnly(v => !v)}
             className="shrink-0 text-xs font-medium border border-amber-300 text-amber-700 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
           >
-            {showInactiveOnly ? 'Show all' : 'Show only inactive'}
+            {showInactiveOnly ? t('admin.showAll') : t('admin.showOnlyInactive')}
           </button>
         </div>
       )}
@@ -180,7 +184,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
         <div className="flex gap-2 flex-1 min-w-0">
           <input
             type="text"
-            placeholder="Search name or email…"
+            placeholder={t('admin.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -190,10 +194,10 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
             onChange={e => { setRoleFilter(e.target.value); setShowPlaceholdersOnly(false); }}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
           >
-            <option value="">All roles</option>
-            <option value="player">Player</option>
-            <option value="coach">Coach</option>
-            <option value="admin">Admin</option>
+            <option value="">{t('admin.allRoles')}</option>
+            <option value="player">{t('admin.roles.player')}</option>
+            <option value="coach">{t('admin.roles.coach')}</option>
+            <option value="admin">{t('admin.roles.admin')}</option>
           </select>
           <button
             onClick={() => { setShowPlaceholdersOnly(v => !v); setRoleFilter(''); setShowInactiveOnly(false); }}
@@ -203,24 +207,24 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                 : 'border-gray-300 text-gray-600 hover:bg-gray-50'
             }`}
           >
-            Placeholders
+            {t('admin.placeholders')}
           </button>
         </div>
         <button
           onClick={() => setShowCreate(v => !v)}
           className="shrink-0 bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
-          {showCreate ? 'Cancel' : '+ Add user'}
+          {showCreate ? t('common.cancel') : t('admin.addUser')}
         </button>
       </div>
 
       {/* Create form */}
       {showCreate && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-5 space-y-4">
-          <h3 className="font-semibold text-gray-900">Create new user</h3>
+          <h3 className="font-semibold text-gray-900">{t('admin.createNewUser')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Full name</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.fullName')}</label>
               <input
                 type="text"
                 value={createForm.name}
@@ -229,7 +233,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Email</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.email')}</label>
               <input
                 type="email"
                 value={createForm.email}
@@ -238,7 +242,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Temporary password</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.tempPassword')}</label>
               <input
                 type="text"
                 value={createForm.password}
@@ -247,15 +251,15 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Role</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.role')}</label>
               <select
                 value={createForm.role}
                 onChange={e => setCreateForm(f => ({ ...f, role: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               >
-                <option value="player">Player</option>
-                <option value="coach">Coach</option>
-                <option value="admin">Admin</option>
+                <option value="player">{t('admin.roles.player')}</option>
+                <option value="coach">{t('admin.roles.coach')}</option>
+                <option value="admin">{t('admin.roles.admin')}</option>
               </select>
             </div>
           </div>
@@ -265,31 +269,31 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
               onClick={() => { setShowCreate(false); setCreateError(''); }}
               className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               onClick={() => createMutation.mutate()}
               disabled={createMutation.isPending || !createForm.name || !createForm.email || !createForm.password}
               className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              {createMutation.isPending ? 'Creating…' : 'Create user'}
+              {createMutation.isPending ? t('admin.creating') : t('admin.createUser')}
             </button>
           </div>
         </div>
       )}
 
       {/* User count */}
-      <p className="text-xs text-gray-400">{data?.pagination.total ?? 0} users</p>
+      <p className="text-xs text-gray-400">{t('admin.usersCount', { count: data?.pagination.total ?? 0 })}</p>
 
       {/* Table */}
       {isLoading ? (
-        <p className="text-sm text-gray-400">Loading…</p>
+        <p className="text-sm text-gray-400">{t('common.loading')}</p>
       ) : (
         <>
         {/* Mobile cards */}
         <div className="sm:hidden space-y-3">
           {users.length === 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-400 text-sm">No users found</div>
+            <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-400 text-sm">{t('admin.noUsersFound')}</div>
           )}
           {users.map(u => (
             <div key={u.userId} className={`bg-white rounded-xl border border-gray-200 p-4 space-y-3 ${u.isActive ? '' : 'opacity-50'}`}>
@@ -297,7 +301,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                 <div className="min-w-0">
                   <p className="font-medium text-gray-900 truncate flex items-center gap-2">
                     {u.name}
-                    {u.isPlaceholder && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Placeholder</span>}
+                    {u.isPlaceholder && <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">{t('admin.placeholder')}</span>}
                   </p>
                   <p className="text-xs text-gray-500 truncate">{u.email}</p>
                 </div>
@@ -306,23 +310,23 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                     onClick={() => { setMergeFor(u); setMergeTarget(''); setMergeError(''); }}
                     className="shrink-0 text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
                   >
-                    Merge →
+                    {t('admin.mergeArrow')}
                   </button>
                 ) : confirmDelete === u.userId ? (
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-red-600 font-medium">Delete?</span>
+                    <span className="text-xs text-red-600 font-medium">{t('admin.deleteQ')}</span>
                     <button
                       onClick={() => deleteMutation.mutate(u.userId)}
                       disabled={deleteMutation.isPending}
                       className="text-xs bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-2 py-1 rounded transition-colors"
                     >
-                      Yes
+                      {t('admin.yes')}
                     </button>
                     <button
                       onClick={() => setConfirmDelete(null)}
                       className="text-xs border border-gray-300 text-gray-500 hover:bg-gray-50 font-medium px-2 py-1 rounded transition-colors"
                     >
-                      No
+                      {t('admin.no')}
                     </button>
                   </div>
                 ) : (
@@ -336,19 +340,19 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Role</label>
+                  <label className="block text-xs text-gray-400 mb-1">{t('admin.role')}</label>
                   <select
                     value={u.role}
                     onChange={e => roleMutation.mutate({ userId: u.userId, role: e.target.value })}
                     className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-green ${ROLE_COLORS[u.role]}`}
                   >
-                    <option value="player">Player</option>
-                    <option value="coach">Coach</option>
-                    <option value="admin">Admin</option>
+                    <option value="player">{t('admin.roles.player')}</option>
+                    <option value="coach">{t('admin.roles.coach')}</option>
+                    <option value="admin">{t('admin.roles.admin')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Status</label>
+                  <label className="block text-xs text-gray-400 mb-1">{t('admin.status')}</label>
                   <button
                     onClick={() => activeMutation.mutate({ userId: u.userId, isActive: !u.isActive })}
                     className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg transition-colors ${
@@ -357,13 +361,13 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                         : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                     }`}
                   >
-                    {u.isActive ? 'Active' : 'Inactive'}
+                    {u.isActive ? t('admin.active') : t('admin.inactive')}
                   </button>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Results</label>
+                  <label className="block text-xs text-gray-400 mb-1">{t('admin.results')}</label>
                   {u.role === 'coach' || u.role === 'admin' ? (
-                    <p className="text-xs text-gray-300 py-1.5">Always</p>
+                    <p className="text-xs text-gray-300 py-1.5">{t('admin.always')}</p>
                   ) : (
                     <button
                       onClick={() => resultsMutation.mutate({ userId: u.userId, canEnterResults: !u.canEnterResults })}
@@ -374,14 +378,14 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                           : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                       }`}
                     >
-                      {u.canEnterResults ? 'Enabled' : 'Disabled'}
+                      {u.canEnterResults ? t('admin.enabled') : t('admin.disabled')}
                     </button>
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Fine admin</label>
+                  <label className="block text-xs text-gray-400 mb-1">{t('admin.fineAdmin')}</label>
                   {u.role === 'admin' ? (
-                    <p className="text-xs text-gray-300 py-1.5">Always</p>
+                    <p className="text-xs text-gray-300 py-1.5">{t('admin.always')}</p>
                   ) : (
                     <button
                       onClick={() => fineAdminMutation.mutate({ userId: u.userId, isFineAdmin: !u.isFineAdmin })}
@@ -392,12 +396,12 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                           : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                       }`}
                     >
-                      {u.isFineAdmin ? 'Enabled' : 'Disabled'}
+                      {u.isFineAdmin ? t('admin.enabled') : t('admin.disabled')}
                     </button>
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Joined</label>
+                  <label className="block text-xs text-gray-400 mb-1">{t('admin.joined')}</label>
                   <p className="text-xs text-gray-500 py-1.5">{fmtDate(u.createdAt)}</p>
                 </div>
               </div>
@@ -410,18 +414,18 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Results</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Fine admin</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Joined</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.name')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.role')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.status')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">{t('admin.results')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">{t('admin.fineAdmin')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">{t('admin.joined')}</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {users.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No users found</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">{t('admin.noUsersFound')}</td></tr>
               )}
               {users.map(u => (
                 <tr key={u.userId} className={u.isActive ? '' : 'opacity-50'}>
@@ -430,7 +434,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                       <span className="truncate">{u.name}</span>
                       {u.isPlaceholder && (
                         <>
-                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Placeholder</span>
+                          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">{t('admin.placeholder')}</span>
                           <button
                             onClick={() => { setMergeFor(u); setMergeTarget(''); setMergeError(''); }}
                             className="shrink-0 text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
@@ -448,9 +452,9 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                       onChange={e => roleMutation.mutate({ userId: u.userId, role: e.target.value })}
                       className={`text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-green ${ROLE_COLORS[u.role]}`}
                     >
-                      <option value="player">Player</option>
-                      <option value="coach">Coach</option>
-                      <option value="admin">Admin</option>
+                      <option value="player">{t('admin.roles.player')}</option>
+                      <option value="coach">{t('admin.roles.coach')}</option>
+                      <option value="admin">{t('admin.roles.admin')}</option>
                     </select>
                   </td>
                   <td className="px-4 py-3">
@@ -462,12 +466,12 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                           : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                       }`}
                     >
-                      {u.isActive ? 'Active' : 'Inactive'}
+                      {u.isActive ? t('admin.active') : t('admin.inactive')}
                     </button>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     {u.role === 'coach' || u.role === 'admin' ? (
-                      <span className="text-xs text-gray-300">Always</span>
+                      <span className="text-xs text-gray-300">{t('admin.always')}</span>
                     ) : (
                       <button
                         onClick={() => resultsMutation.mutate({ userId: u.userId, canEnterResults: !u.canEnterResults })}
@@ -478,13 +482,13 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                             : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                         }`}
                       >
-                        {u.canEnterResults ? 'Enabled' : 'Disabled'}
+                        {u.canEnterResults ? t('admin.enabled') : t('admin.disabled')}
                       </button>
                     )}
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     {u.role === 'admin' ? (
-                      <span className="text-xs text-gray-300">Always</span>
+                      <span className="text-xs text-gray-300">{t('admin.always')}</span>
                     ) : (
                       <button
                         onClick={() => fineAdminMutation.mutate({ userId: u.userId, isFineAdmin: !u.isFineAdmin })}
@@ -495,7 +499,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                             : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                         }`}
                       >
-                        {u.isFineAdmin ? 'Enabled' : 'Disabled'}
+                        {u.isFineAdmin ? t('admin.enabled') : t('admin.disabled')}
                       </button>
                     )}
                   </td>
@@ -505,19 +509,19 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                       <span className="text-xs text-gray-300">—</span>
                     ) : confirmDelete === u.userId ? (
                       <div className="flex items-center gap-2 justify-end">
-                        <span className="text-xs text-red-600 font-medium">Delete?</span>
+                        <span className="text-xs text-red-600 font-medium">{t('admin.deleteQ')}</span>
                         <button
                           onClick={() => deleteMutation.mutate(u.userId)}
                           disabled={deleteMutation.isPending}
                           className="text-xs bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-2 py-1 rounded transition-colors"
                         >
-                          Yes
+                          {t('admin.yes')}
                         </button>
                         <button
                           onClick={() => setConfirmDelete(null)}
                           className="text-xs border border-gray-300 text-gray-500 hover:bg-gray-50 font-medium px-2 py-1 rounded transition-colors"
                         >
-                          No
+                          {t('admin.no')}
                         </button>
                       </div>
                     ) : (
@@ -525,7 +529,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                         onClick={() => setConfirmDelete(u.userId)}
                         className="text-xs text-red-400 hover:text-red-600 transition-colors"
                       >
-                        Delete
+                        {t('admin.delete')}
                       </button>
                     )}
                   </td>
@@ -546,26 +550,24 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
           onClick={() => setMergeFor(null)}
         >
           <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-900">Merge placeholder</h3>
+            <h3 className="font-semibold text-gray-900">{t('admin.mergePlaceholder')}</h3>
             <p className="text-sm text-gray-600">
-              Move <span className="font-medium text-gray-900">{mergeFor.name}</span>'s match history,
-              fines, and appearances into a real registered account. The placeholder is then
-              retired — this can't be undone.
+              {t('admin.mergeBody1')} <span className="font-medium text-gray-900">{mergeFor.name}</span>{t('admin.mergeBody2')}
             </p>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Merge into</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.mergeInto')}</label>
               <select
                 value={mergeTarget}
                 onChange={e => setMergeTarget(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               >
-                <option value="">Select an account…</option>
+                <option value="">{t('admin.selectAccount')}</option>
                 {mergeCandidates.map(c => (
                   <option key={c.userId} value={c.userId}>{c.name} ({c.email})</option>
                 ))}
               </select>
               {mergeCandidates.length === 0 && (
-                <p className="text-xs text-gray-400 mt-1">No registered accounts available to merge into yet.</p>
+                <p className="text-xs text-gray-400 mt-1">{t('admin.noMergeTargets')}</p>
               )}
             </div>
             {mergeError && <p className="text-sm text-red-600">{mergeError}</p>}
@@ -574,14 +576,14 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                 onClick={() => setMergeFor(null)}
                 className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={() => mergeMutation.mutate({ placeholderId: mergeFor.userId, targetUserId: mergeTarget })}
                 disabled={!mergeTarget || mergeMutation.isPending}
                 className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
               >
-                {mergeMutation.isPending ? 'Merging…' : 'Merge'}
+                {mergeMutation.isPending ? t('admin.merging') : t('admin.merge')}
               </button>
             </div>
           </div>
@@ -595,6 +597,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
 // ─── Health Tab ───────────────────────────────────────────────────────────────
 
 function HealthTab() {
+  const { t } = useTranslation();
   const { data, isLoading, refetch, isFetching } = useQuery<HealthData>({
     queryKey: ['admin-health'],
     queryFn: () => api.get('/admin/system/health').then(r => r.data.data),
@@ -615,41 +618,41 @@ function HealthTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <h2 className="font-semibold text-gray-900">System health</h2>
+        <h2 className="font-semibold text-gray-900">{t('admin.systemHealth')}</h2>
         <button
           onClick={() => refetch()}
           disabled={isFetching}
           className="text-xs text-brand-green hover:underline disabled:opacity-50"
         >
-          {isFetching ? 'Refreshing…' : 'Refresh'}
+          {isFetching ? t('admin.refreshing') : t('admin.refresh')}
         </button>
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-gray-400">Loading…</p>
+        <p className="text-sm text-gray-400">{t('common.loading')}</p>
       ) : data ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Database</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('admin.database')}</p>
             <p className="text-sm font-medium text-gray-900 flex items-center">
               {statusDot(data.database.status)}
-              {data.database.status === 'healthy' ? 'Healthy' : 'Unhealthy'}
+              {data.database.status === 'healthy' ? t('admin.healthy') : t('admin.unhealthy')}
             </p>
             {data.database.message && <p className="text-xs text-red-500 mt-1">{data.database.message}</p>}
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">API Server</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('admin.apiServer')}</p>
             <p className="text-sm font-medium text-gray-900 flex items-center">
               {statusDot('healthy')}
-              Online
+              {t('admin.online')}
             </p>
-            <p className="text-xs text-gray-400 mt-1">Uptime: {data.api.uptimeHuman}</p>
+            <p className="text-xs text-gray-400 mt-1">{t('admin.uptime', { value: data.api.uptimeHuman })}</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Optimizer</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('admin.optimizer')}</p>
             <p className="text-sm font-medium text-gray-900 flex items-center">
               {statusDot(data.optimizationService.status === 'healthy' ? 'healthy' : data.optimizationService.status === 'unhealthy' ? 'unhealthy' : 'unknown')}
-              {data.optimizationService.status === 'healthy' ? 'Online' : data.optimizationService.status === 'unhealthy' ? 'Offline' : 'Not configured'}
+              {data.optimizationService.status === 'healthy' ? t('admin.online') : data.optimizationService.status === 'unhealthy' ? t('admin.offline') : t('admin.notConfigured')}
             </p>
           </div>
         </div>
@@ -658,7 +661,7 @@ function HealthTab() {
       {/* System config */}
       {config && config.length > 0 && (
         <div className="space-y-2">
-          <h2 className="font-semibold text-gray-900">System configuration</h2>
+          <h2 className="font-semibold text-gray-900">{t('admin.systemConfig')}</h2>
 
           {/* Mobile cards */}
           <div className="sm:hidden space-y-3">
@@ -676,9 +679,9 @@ function HealthTab() {
             <table className="w-full text-sm">
               <thead className="border-b border-gray-100 bg-gray-50">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Key</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Value</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.key')}</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.value')}</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.description')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -701,6 +704,8 @@ function HealthTab() {
 // ─── Audit Log Tab ────────────────────────────────────────────────────────────
 
 function AuditLogTab() {
+  const { t } = useTranslation();
+  const { fmtDatetime } = useAdminDates();
   const [actionFilter, setActionFilter] = useState('');
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 50;
@@ -729,19 +734,19 @@ function AuditLogTab() {
           onChange={e => { setActionFilter(e.target.value); setPage(0); }}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
         >
-          <option value="">All actions</option>
+          <option value="">{t('admin.allActions')}</option>
           {KNOWN_ACTIONS.map(a => (
             <option key={a} value={a}>{a.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
           ))}
         </select>
-        <p className="text-xs text-gray-400">{total} entries</p>
+        <p className="text-xs text-gray-400">{t('admin.entriesCount', { count: total })}</p>
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-gray-400">Loading…</p>
+        <p className="text-sm text-gray-400">{t('common.loading')}</p>
       ) : logs.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-          No audit log entries yet
+          {t('admin.noAuditEntries')}
         </div>
       ) : (
         <>
@@ -782,11 +787,11 @@ function AuditLogTab() {
           <table className="w-full text-sm">
             <thead className="border-b border-gray-100 bg-gray-50">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">When</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actor</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Entity</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Changes</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.when')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.actor')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.action')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.entity')}</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('admin.changes')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -850,6 +855,7 @@ function AuditLogTab() {
 type Tab = 'users' | 'health' | 'audit';
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('users');
 
   const { data: inactiveData } = useQuery<{ pagination: { total: number } }>({
@@ -864,14 +870,14 @@ export default function AdminDashboard() {
       <AppNav />
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <h1 className="text-2xl font-extrabold text-gray-900">Admin panel</h1>
+        <h1 className="text-2xl font-extrabold text-gray-900">{t('admin.title')}</h1>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 w-fit">
           {([
-            ['users',  'Users'],
-            ['health', 'System health'],
-            ['audit',  'Audit log'],
+            ['users',  t('admin.tabUsers')],
+            ['health', t('admin.tabHealth')],
+            ['audit',  t('admin.tabAudit')],
           ] as [Tab, string][]).map(([id, label]) => (
             <button
               key={id}

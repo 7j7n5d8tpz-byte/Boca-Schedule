@@ -12,7 +12,7 @@ export const CLUB_TZ = 'Europe/Copenhagen';
 // a zone gives whatever the server happens to be set to — UTC on Fly, which
 // printed a 21:00 Copenhagen deadline as "19:00" in every email.
 export function formatClubDeadline(instant: string): string {
-  return new Date(instant).toLocaleString('en-GB', {
+  return new Date(instant).toLocaleString('da-DK', {
     weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
     timeZone: CLUB_TZ,
   });

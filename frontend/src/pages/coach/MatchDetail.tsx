@@ -2,10 +2,12 @@ import AppNav from '../../components/AppNav';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { formatLocation } from '../../components/LocationPicker';
 import MatchEditForm, { initialMatchFields, matchUpdatePayload, type MatchEditFields } from '../../components/MatchEditForm';
 import { meetingTime, mapsUrl } from '../../utils';
+import { useDateFormat } from '../../i18n/format';
 import Icon, { Star } from '../../components/Icon';
 
 interface SignupPlayer {
@@ -44,19 +46,23 @@ interface SignupsResponse {
 // (weather, postponed, mutually agreed) is recorded with no result at all.
 type CancelledBy = 'us' | 'opponent' | null;
 
-const CANCEL_OPTIONS: { value: CancelledBy; label: string; hint: string }[] = [
-  { value: 'opponent', label: 'The opponent cancelled',   hint: 'Scored as a 3–0 win to us' },
-  { value: 'us',       label: 'We cancelled',             hint: 'Scored as a 0–3 loss' },
-  { value: null,       label: 'Neither — called off',     hint: 'Postponed, weather or mutually agreed. No result recorded.' },
+const CANCEL_OPTIONS: { value: CancelledBy; labelKey: string; hintKey: string }[] = [
+  { value: 'opponent', labelKey: 'coach.outcomeOpponent',  hintKey: 'coach.cancelHintOpponent' },
+  { value: 'us',       labelKey: 'coach.outcomeUs',        hintKey: 'coach.cancelHintUs' },
+  { value: null,       labelKey: 'coach.cancelNeither',    hintKey: 'coach.outcomePostponed' },
 ];
 
-function cancelOutcomeText(cancelledBy: CancelledBy) {
-  if (cancelledBy === 'opponent') return 'The opponent cancelled — scored as a 3–0 win to us.';
-  if (cancelledBy === 'us')       return 'We cancelled — scored as a 0–3 loss.';
-  return 'Called off by neither side — no result recorded.';
+function useCancelOutcomeText() {
+  const { t } = useTranslation();
+  return (cancelledBy: CancelledBy) => {
+    if (cancelledBy === 'opponent') return t('coach.outcomeTextOpponent');
+    if (cancelledBy === 'us')       return t('coach.outcomeTextUs');
+    return t('coach.outcomeTextNeither');
+  };
 }
 
 function CancelledByPicker({ value, onChange, disabled }: { value: CancelledBy; onChange: (v: CancelledBy) => void; disabled?: boolean }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-2">
       {CANCEL_OPTIONS.map(o => (
@@ -75,8 +81,8 @@ function CancelledByPicker({ value, onChange, disabled }: { value: CancelledBy; 
             onChange={() => onChange(o.value)}
           />
           <span className="min-w-0">
-            <span className="block text-sm font-medium text-gray-900">{o.label}</span>
-            <span className="block text-xs text-gray-500">{o.hint}</span>
+            <span className="block text-sm font-medium text-gray-900">{t(o.labelKey)}</span>
+            <span className="block text-xs text-gray-500">{t(o.hintKey)}</span>
           </span>
         </label>
       ))}
@@ -93,6 +99,9 @@ const POS_COLOR: Record<string, string> = {
 };
 
 export default function MatchDetail() {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
+  const cancelOutcomeText = useCancelOutcomeText();
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -176,7 +185,7 @@ export default function MatchDetail() {
       navigate(`/coach/matches/${matchId}/selections`);
     },
     onError: (err: any) => {
-      setOptimizeError(err.response?.data?.error?.message ?? 'Optimization failed');
+      setOptimizeError(err.response?.data?.error?.message ?? t('coach.optimizeFailed'));
     },
   });
 
@@ -191,11 +200,11 @@ export default function MatchDetail() {
   }
 
   if (isLoading) {
-    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
+    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">{t('common.loading')}</div>;
   }
 
   if (!data) {
-    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
+    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">{t('coach.matchNotFound')}</div>;
   }
 
   const { match, signups, summary } = data;
@@ -203,23 +212,23 @@ export default function MatchDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref="/coach" backLabel="Matches" />
+      <AppNav backHref="/coach" backLabel={t('coach.matches')} />
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-900">
-              {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {formatDate(date, 'long')}
             </h1>
             <p className="text-gray-500 mt-1">
-              {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) ·{' '}
-              <a href={mapsUrl(match.location)} target="_blank" rel="noopener noreferrer" className="hover:text-brand-green hover:underline" title="Open in Maps">
-                {formatLocation(match.location, match.matchType)}
+              {t('match.timeAndMeet', { time: match.matchTime.slice(0, 5), meet: meetingTime(match.matchTime) })} ·{' '}
+              <a href={mapsUrl(match.location)} target="_blank" rel="noopener noreferrer" className="hover:text-brand-green hover:underline" title={t('match.openInMaps')}>
+                {formatLocation(match.location, match.matchType, t)}
               </a>
               {match.opponent && <span className="text-gray-700 font-medium"> vs {match.opponent}</span>}
-              {' '}· {summary.totalSignups} signed up
+              {' '}{t('coach.signedUpCount', { count: summary.totalSignups })}
               {summary.prioritySignups > 0 && (
-                <span className="ml-2 text-amber-600 font-medium">· {summary.prioritySignups} priority</span>
+                <span className="ml-2 text-amber-600 font-medium">{t('coach.priorityCount', { count: summary.prioritySignups })}</span>
               )}
             </p>
           </div>
@@ -228,14 +237,14 @@ export default function MatchDetail() {
               onClick={openEdit}
               className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
             >
-              Edit
+              {t('coach.edit')}
             </button>
             {match.status !== 'cancelled' && (
               <button
                 onClick={() => setShowCancelConfirm(true)}
                 className="text-sm border border-red-200 text-red-600 hover:bg-red-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
               >
-                Cancel match
+                {t('coach.cancelMatch')}
               </button>
             )}
           </div>
@@ -244,13 +253,13 @@ export default function MatchDetail() {
         {/* Status controls */}
         {match.status === 'draft' && (
           <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
-            <p className="text-sm text-gray-500">Signups are not open yet — players cannot see or join this match.</p>
+            <p className="text-sm text-gray-500">{t('coach.signupsNotOpen')}</p>
             <button
               onClick={() => statusMutation.mutate('signup_open')}
               disabled={statusMutation.isPending}
               className="shrink-0 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              Open signups
+              {t('coach.openSignups')}
             </button>
           </div>
         )}
@@ -260,69 +269,69 @@ export default function MatchDetail() {
                 players, so say so — the coach shouldn't think this is a bug. */}
             <p className="text-sm text-green-700">
               {new Date(match.signupCloseDate) < new Date() && summary.totalSignups < match.maxPlayers
-                ? `Deadline passed, but only ${summary.totalSignups} signed up — players can still join until ${match.maxPlayers} are in. Close signups to stop that.`
-                : 'Signups are open — players can join this match.'}
+                ? t('coach.signupsOpenLate', { count: summary.totalSignups, max: match.maxPlayers })
+                : t('coach.signupsOpen')}
             </p>
             <button
               onClick={() => statusMutation.mutate('signup_closed')}
               disabled={statusMutation.isPending}
               className="shrink-0 border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              Close signups
+              {t('coach.closeSignups')}
             </button>
           </div>
         )}
         {match.status === 'signup_closed' && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
-            <p className="text-sm text-yellow-700">Signups are closed — ready to run the optimizer.</p>
+            <p className="text-sm text-yellow-700">{t('coach.signupsClosed')}</p>
             <button
               onClick={() => statusMutation.mutate('signup_open')}
               disabled={statusMutation.isPending}
               className="shrink-0 border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              Reopen signups
+              {t('coach.reopenSignups')}
             </button>
           </div>
         )}
         {match.status === 'optimized' && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
-            <p className="text-sm text-blue-700">Optimizer has selected players — review the squad and publish.</p>
+            <p className="text-sm text-blue-700">{t('coach.optimizerSelected')}</p>
             <Link
               to={`/coach/matches/${matchId}/selections`}
               className="shrink-0 bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              Review &amp; publish squad
+              {t('coach.reviewPublish')}
             </Link>
           </div>
         )}
         {match.status === 'published' && (
           <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
-            <p className="text-sm text-green-700">Match is published — players can see the squad.</p>
+            <p className="text-sm text-green-700">{t('coach.matchPublished')}</p>
             <Link
               to={`/coach/matches/${matchId}/selections`}
               className="shrink-0 border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              Manage squad
+              {t('coach.manageSquad')}
             </Link>
           </div>
         )}
         {match.status === 'completed' && (
           <div className="bg-gray-100 border border-gray-200 rounded-xl px-4 py-3">
-            <p className="text-sm text-gray-500">This match is completed.</p>
+            <p className="text-sm text-gray-500">{t('coach.completedNotice')}</p>
           </div>
         )}
         {match.status === 'cancelled' && (
           <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold text-red-800">This match is cancelled.</p>
+                <p className="text-sm font-semibold text-red-800">{t('coach.cancelledNotice')}</p>
                 <p className="text-sm text-red-600 mt-0.5">{cancelOutcomeText(match.cancelledBy)}</p>
               </div>
               <button
                 onClick={() => { setShowOutcomeEdit(v => !v); setCancelledBy(match.cancelledBy); }}
                 className="shrink-0 text-sm border border-red-200 text-red-600 hover:bg-red-100 font-medium px-3 py-1.5 rounded-lg transition-colors"
               >
-                {showOutcomeEdit ? 'Close' : 'Change'}
+                {showOutcomeEdit ? t('coach.close') : t('coach.change')}
               </button>
             </div>
             {showOutcomeEdit && (
@@ -333,9 +342,9 @@ export default function MatchDetail() {
                   disabled={outcomeMutation.isPending}
                   className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
                 >
-                  {outcomeMutation.isPending ? 'Saving…' : 'Save outcome'}
+                  {outcomeMutation.isPending ? t('coach.saving') : t('coach.saveOutcome')}
                 </button>
-                {outcomeMutation.isError && <p className="text-sm text-red-500">Failed to save the outcome.</p>}
+                {outcomeMutation.isError && <p className="text-sm text-red-500">{t('coach.outcomeFailed')}</p>}
               </>
             )}
           </div>
@@ -344,33 +353,33 @@ export default function MatchDetail() {
         {/* Edit form */}
         {showEdit && editFields && (
           <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            <h2 className="font-semibold text-gray-900">Edit match details</h2>
+            <h2 className="font-semibold text-gray-900">{t('coach.editMatchDetails')}</h2>
             <MatchEditForm value={editFields} onChange={setEditFields} matchType={match.matchType} />
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => { setShowEdit(false); setEditFields(null); }}
                 className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
               >
-                Discard
+                {t('coach.discard2')}
               </button>
               <button
                 onClick={() => editMutation.mutate()}
                 disabled={editMutation.isPending}
                 className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
               >
-                {editMutation.isPending ? 'Saving…' : 'Save changes'}
+                {editMutation.isPending ? t('coach.saving') : t('coach.saveChanges')}
               </button>
             </div>
-            {editMutation.isError && <p className="text-sm text-red-500">Failed to save changes.</p>}
+            {editMutation.isError && <p className="text-sm text-red-500">{t('coach.saveChangesFailed')}</p>}
           </div>
         )}
 
         {/* Cancel confirmation */}
         {showCancelConfirm && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-3">
-            <p className="font-semibold text-red-800">Cancel this match?</p>
-            <p className="text-sm text-red-600">The match is removed from the active list and everyone selected is notified.</p>
-            <p className="text-sm font-medium text-red-800">Who cancelled?</p>
+            <p className="font-semibold text-red-800">{t('coach.cancelMatchQ')}</p>
+            <p className="text-sm text-red-600">{t('coach.cancelMatchBody')}</p>
+            <p className="text-sm font-medium text-red-800">{t('coach.whoCancelled')}</p>
             <CancelledByPicker value={cancelledBy} onChange={setCancelledBy} disabled={cancelMutation.isPending} />
             <div className="flex gap-2">
               <button
@@ -378,13 +387,13 @@ export default function MatchDetail() {
                 disabled={cancelMutation.isPending}
                 className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
               >
-                {cancelMutation.isPending ? 'Cancelling…' : 'Yes, cancel match'}
+                {cancelMutation.isPending ? t('coach.cancelling') : t('coach.yesCancelMatch')}
               </button>
               <button
                 onClick={() => setShowCancelConfirm(false)}
                 className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
               >
-                Keep match
+                {t('coach.keepMatch')}
               </button>
             </div>
           </div>
@@ -395,9 +404,9 @@ export default function MatchDetail() {
         <div id="optimize" className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 scroll-mt-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="font-semibold text-gray-900">Run optimizer</p>
+              <p className="font-semibold text-gray-900">{t('coach.runOptimizer')}</p>
               <p className="text-sm text-gray-500 mt-0.5">
-                Selects the best {match.minPlayers}–{match.maxPlayers} players based on fairness and formation fit.
+                {t('coach.optimizerHint', { min: match.minPlayers, max: match.maxPlayers })}
               </p>
             </div>
             <button
@@ -405,18 +414,18 @@ export default function MatchDetail() {
               disabled={optimizeMutation.isPending || signups.length === 0}
               className="shrink-0 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              {optimizeMutation.isPending ? 'Optimizing…' : 'Optimize'}
+              {optimizeMutation.isPending ? t('coach.optimizing') : t('coach.optimize')}
             </button>
           </div>
 
           {/* Weight lever */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs text-gray-500">
-              <span className="flex items-center gap-1"><Icon name="scale" className="w-3.5 h-3.5" /> Fairness</span>
+              <span className="flex items-center gap-1"><Icon name="scale" className="w-3.5 h-3.5" /> {t('coach.fairness')}</span>
               <span className="font-medium text-gray-600">
-                {fairnessWeight === 50 ? 'Balanced' : fairnessWeight < 50 ? 'Fairness priority' : 'Positions priority'}
+                {fairnessWeight === 50 ? t('coach.balanced') : fairnessWeight < 50 ? t('coach.fairnessPriority') : t('coach.positionsPriority')}
               </span>
-              <span className="flex items-center gap-1"><Icon name="puzzle" className="w-3.5 h-3.5" /> Positions</span>
+              <span className="flex items-center gap-1"><Icon name="puzzle" className="w-3.5 h-3.5" /> {t('coach.positions')}</span>
             </div>
             <input
               type="range"
@@ -428,7 +437,7 @@ export default function MatchDetail() {
               className="w-full accent-brand-green h-2 cursor-pointer"
             />
             <p className="text-xs text-gray-400">
-              Balances playing-time fairness against formation fit.
+              {t('coach.balanceHint')}
             </p>
           </div>
 
@@ -442,10 +451,10 @@ export default function MatchDetail() {
                 to={`/coach/matches/${matchId}/selections`}
                 className="text-sm font-medium text-brand-green hover:text-brand-green-700"
               >
-                Or pick the squad manually →
+                {t('coach.pickManually')}
               </Link>
               <p className="text-xs text-gray-400 mt-0.5">
-                Choose players yourself instead of running the optimizer.
+                {t('coach.pickManuallyHint')}
               </p>
             </div>
           )}
@@ -455,10 +464,10 @@ export default function MatchDetail() {
         {/* Sign-ups list */}
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-700">
-            Signed up — {summary.totalSignups}
+            {t('coach.signedUpHeading', { count: summary.totalSignups })}
           </h2>
           {signups.length === 0 && (
-            <p className="text-sm text-gray-400">No players signed up yet.</p>
+            <p className="text-sm text-gray-400">{t('coach.noSignupsYet')}</p>
           )}
           {signups.map(({ signupId, player, isPriority: dbPriority }) => {
             const isPriority = priorityMap[signupId] ?? dbPriority;
@@ -482,7 +491,7 @@ export default function MatchDetail() {
                       : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
                   }`}
                 >
-                  <span className="flex items-center gap-1"><Star filled={isPriority} className="w-3.5 h-3.5" /> Priority</span>
+                  <span className="flex items-center gap-1"><Star filled={isPriority} className="w-3.5 h-3.5" /> {t('coach.priority')}</span>
                 </button>
               </div>
             );

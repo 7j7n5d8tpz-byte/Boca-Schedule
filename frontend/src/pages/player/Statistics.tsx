@@ -1,6 +1,7 @@
 import AppNav from '../../components/AppNav';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -17,6 +18,7 @@ import {
   StatCard, ResultTooltip, fmtDate, CHART_COLORS, seasonStartYearClient,
 } from '../../components/stats/statShared';
 import { PLAYERS_HUB_ORIGIN } from '../../hubOrigin';
+import { useDateFormat } from '../../i18n/format';
 
 interface PlayerStat {
   userId: string;
@@ -41,13 +43,14 @@ interface PlayerStat {
 type Walkover = 'us' | 'opponent' | null;
 
 function WalkoverBadge({ walkover }: { walkover: Walkover }) {
+  const { t } = useTranslation();
   if (!walkover) return null;
   return (
     <span
       className="text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"
-      title={walkover === 'opponent' ? 'Opponent cancelled — awarded 3–0' : 'We cancelled — forfeited 0–3'}
+      title={walkover === 'opponent' ? t('stats.walkoverOppTitle') : t('stats.walkoverUsTitle')}
     >
-      Walkover
+      {t('stats.walkover')}
     </span>
   );
 }
@@ -157,13 +160,13 @@ interface TeamStats {
   matchHistory: MatchHistory[];
 }
 
-const ASSESSMENT_LABEL: Record<string, { label: string; color: string }> = {
-  dominated:          { label: 'We dominated',      color: 'text-green-700' },
-  strong_performance: { label: 'Strong performance', color: 'text-green-600' },
-  even_game:          { label: 'Even game',          color: 'text-gray-600'  },
-  unlucky:            { label: 'Unlucky',            color: 'text-amber-600' },
-  tough_game:         { label: 'Tough game',         color: 'text-orange-600'},
-  off_day:            { label: 'Off day',            color: 'text-red-600'   },
+const ASSESSMENT_COLOR: Record<string, string> = {
+  dominated:          'text-green-700',
+  strong_performance: 'text-green-600',
+  even_game:          'text-gray-600',
+  unlucky:            'text-amber-600',
+  tough_game:         'text-orange-600',
+  off_day:            'text-red-600',
 };
 
 // ─── Player-name link → profile hub ───────────────────────────────────────────
@@ -187,6 +190,8 @@ type View = 'team' | 'players' | 'highlights' | 'opponents';
 
 export default function Statistics() {
   const { user } = useAuth();
+  const { t, i18n } = useTranslation();
+  const { formatDate } = useDateFormat();
   const navigate = useNavigate();
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [matchTypeFilter, setMatchTypeFilter] = useState<'all' | '7-player' | 'futsal'>('all');
@@ -286,8 +291,8 @@ export default function Statistics() {
 
   // Build data for goals/against chart
   const goalsChartData = matchHistory.map(m => ({
-    name: m.opponent ? `vs ${m.opponent}` : fmtDate(m.matchDate),
-    date: fmtDate(m.matchDate),
+    name: m.opponent ? `vs ${m.opponent}` : fmtDate(m.matchDate, i18n.language),
+    date: fmtDate(m.matchDate, i18n.language),
     opponent: m.opponent,
     matchId: m.matchId,
     'Goals for': m.goalsFor,
@@ -297,7 +302,7 @@ export default function Statistics() {
 
   // Per-meeting goals chart for the selected opponent (chronological).
   const opponentChartData = (opponentHistory?.matches ?? []).map(m => ({
-    name: fmtDate(m.matchDate),
+    name: fmtDate(m.matchDate, i18n.language),
     matchId: m.matchId,
     'Goals for': m.goalsFor,
     'Goals against': m.goalsAgainst,
@@ -353,7 +358,7 @@ export default function Statistics() {
         {/* Desktop (sm+): title + year + segmented match-type. */}
         <div className="hidden sm:flex items-center justify-between gap-4 flex-wrap mb-8">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-extrabold text-gray-900">Team Statistics</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900">{t('stats.title')}</h1>
             {(data?.availableSeasons ?? []).length > 0 && (
               <select
                 value={selectedYear ?? data?.year ?? ''}
@@ -378,7 +383,7 @@ export default function Statistics() {
                       : 'bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  {type === 'all' ? 'All' : type === '7-player' ? '7-player' : 'Futsal'}
+                  {type === 'all' ? t('hub.filterAll') : t(`matchTypes.${type}`)}
                 </button>
               ))}
             </div>
@@ -389,11 +394,11 @@ export default function Statistics() {
             box. Match type is a dropdown here (not segmented buttons) so both
             selects fit on the same row and the header stays compact. */}
         <div className="sm:hidden mb-8">
-          <h1 className="text-2xl font-extrabold text-gray-900 mb-3">Team Statistics</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900 mb-3">{t('stats.title')}</h1>
           <div className="flex items-center gap-2 bg-gray-100 border border-gray-200 rounded-xl p-2">
             {(data?.availableSeasons ?? []).length > 0 && (
               <select
-                aria-label="Season"
+                aria-label={t('hub.season')}
                 value={selectedYear ?? data?.year ?? ''}
                 onChange={e => setSelectedYear(Number(e.target.value))}
                 className="shrink-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
@@ -404,14 +409,14 @@ export default function Statistics() {
               </select>
             )}
             <select
-              aria-label="Match type"
+              aria-label={t('stats.matchTypeAria')}
               value={matchTypeFilter}
               onChange={e => { setMatchTypeFilter(e.target.value as 'all' | '7-player' | 'futsal'); setSelectedYear(null); }}
               className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
             >
-              <option value="all">All types</option>
-              <option value="7-player">7-player</option>
-              <option value="futsal">Futsal</option>
+              <option value="all">{t('stats.allTypes')}</option>
+              <option value="7-player">{t('matchTypes.7-player')}</option>
+              <option value="futsal">{t('matchTypes.futsal')}</option>
             </select>
           </div>
         </div>
@@ -428,8 +433,8 @@ export default function Statistics() {
               }`}
             >
               {/* Short label on mobile so four tabs share the row without wrapping. */}
-              <span className="sm:hidden">Team</span>
-              <span className="hidden sm:inline">Team stats</span>
+              <span className="sm:hidden">{t('stats.tabTeamShort')}</span>
+              <span className="hidden sm:inline">{t('stats.tabTeam')}</span>
             </button>
             <button
               onClick={() => setView('players')}
@@ -437,7 +442,7 @@ export default function Statistics() {
                 view === 'players' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <span>Players</span>
+              <span>{t('stats.tabPlayers')}</span>
             </button>
             <button
               onClick={() => setView('highlights')}
@@ -445,8 +450,8 @@ export default function Statistics() {
                 view === 'highlights' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <span className="sm:hidden">Highlights</span>
-              <span className="hidden sm:inline">Match highlights</span>
+              <span className="sm:hidden">{t('stats.tabHighlightsShort')}</span>
+              <span className="hidden sm:inline">{t('stats.tabHighlights')}</span>
             </button>
             <button
               onClick={() => setView('opponents')}
@@ -454,8 +459,8 @@ export default function Statistics() {
                 view === 'opponents' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <span className="sm:hidden">Opponents</span>
-              <span className="hidden sm:inline">Opponent breakdown</span>
+              <span className="sm:hidden">{t('stats.tabOpponentsShort')}</span>
+              <span className="hidden sm:inline">{t('stats.tabOpponents')}</span>
             </button>
           </nav>
 
@@ -474,14 +479,14 @@ export default function Statistics() {
             )}
             {!highlightsLoading && (highlightsData?.highlights ?? []).length === 0 && (
               <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                No completed matches with results yet.
+                {t('stats.noHighlights')}
               </div>
             )}
             {(highlightsData?.highlights ?? []).map(h => {
               const date = new Date(h.matchDate + 'T' + h.matchTime);
               const result = h.goalsFor > h.goalsAgainst ? 'W' : h.goalsFor < h.goalsAgainst ? 'L' : 'D';
               const resultColor = result === 'W' ? 'bg-green-100 text-green-700' : result === 'L' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600';
-              const assessment = h.gameAssessment ? ASSESSMENT_LABEL[h.gameAssessment] : null;
+              const assessmentColor = h.gameAssessment ? ASSESSMENT_COLOR[h.gameAssessment] : null;
               const isHighlighted = h.matchId === selectedMatchId;
               return (
                 <div
@@ -492,13 +497,13 @@ export default function Statistics() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="font-semibold text-gray-900">
-                        {date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                        {formatDate(date, 'weekdayDayMonthYear')}
                         {h.opponent && <span className="text-gray-500 font-normal"> · vs {h.opponent}</span>}
                       </p>
                       <p className="text-sm text-gray-500 mt-0.5">
                         {h.location}
                         <span className={`ml-2 text-xs font-medium px-1.5 py-0.5 rounded ${h.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-                          {h.matchType}
+                          {t(`matchTypes.${h.matchType}`, { defaultValue: h.matchType })}
                         </span>
                       </p>
                     </div>
@@ -509,19 +514,19 @@ export default function Statistics() {
                     </div>
                   </div>
 
-                  {assessment && (
-                    <p className={`text-sm font-medium ${assessment.color}`}>{assessment.label}</p>
+                  {assessmentColor && (
+                    <p className={`text-sm font-medium ${assessmentColor}`}>{t(`stats.assessment.${h.gameAssessment}`)}</p>
                   )}
 
                   {h.goals.length > 0 && (
                     <div className="space-y-1">
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Goals</p>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('stats.goals')}</p>
                       {h.goals.map((g, i) => (
                         <p key={i} className="text-sm text-gray-700">
                           <span className="text-gray-400 mr-1">{i + 1}.</span>
-                          <PlayerLink to={g.scorerId ? hubUrl(g.scorerId) : null} name={g.scorerName ?? 'Unknown'} className="font-medium" />
+                          <PlayerLink to={g.scorerId ? hubUrl(g.scorerId) : null} name={g.scorerName ?? t('stats.unknown')} className="font-medium" />
                           {g.assisterName && (
-                            <span className="text-gray-400"> · assist: <PlayerLink to={g.assisterId ? hubUrl(g.assisterId) : null} name={g.assisterName} className="text-gray-600" /></span>
+                            <span className="text-gray-400"> · {t('stats.assist')}: <PlayerLink to={g.assisterId ? hubUrl(g.assisterId) : null} name={g.assisterName} className="text-gray-600" /></span>
                           )}
                         </p>
                       ))}
@@ -530,17 +535,17 @@ export default function Statistics() {
                   {h.walkover && (
                     <p className="text-sm text-gray-500">
                       {h.walkover === 'opponent'
-                        ? 'The opponent cancelled — awarded to us as a 3–0 walkover.'
-                        : 'We cancelled — forfeited as a 0–3 walkover.'}
+                        ? t('stats.walkoverOppBody')
+                        : t('stats.walkoverUsBody')}
                     </p>
                   )}
                   {!h.walkover && h.goals.length === 0 && h.goalsFor > 0 && (
-                    <p className="text-xs text-gray-400 italic">Goal details not recorded.</p>
+                    <p className="text-xs text-gray-400 italic">{t('stats.goalDetailsMissing')}</p>
                   )}
 
                   {h.cleanSheets.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Clean sheets</p>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('stats.cleanSheets')}</p>
                       <p className="text-sm text-gray-700 mt-0.5">
                         {h.cleanSheets.map((cs, i) => (
                           <span key={cs.playerId}>
@@ -556,7 +561,7 @@ export default function Statistics() {
                     <div className="flex gap-4 flex-wrap">
                       {h.yellowCards.length > 0 && (
                         <div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><CardChip color="yellow" /> Yellow cards</p>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><CardChip color="yellow" /> {t('stats.yellowCards')}</p>
                           <p className="text-sm text-gray-700 mt-0.5">
                             {h.yellowCards.map((c, i) => (
                               <span key={c.playerId}>
@@ -569,7 +574,7 @@ export default function Statistics() {
                       )}
                       {h.redCards.length > 0 && (
                         <div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><CardChip color="red" /> Red cards</p>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center gap-1.5"><CardChip color="red" /> {t('stats.redCards')}</p>
                           <p className="text-sm text-gray-700 mt-0.5">
                             {h.redCards.map((c, i) => (
                               <span key={c.playerId}>
@@ -587,7 +592,7 @@ export default function Statistics() {
                     <div className="flex items-center gap-2">
                       <Star className="w-5 h-5 text-amber-500" />
                       <div>
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Man of the match</p>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('stats.manOfMatch')}</p>
                         <p className="text-sm font-semibold text-amber-600 mt-0.5">
                           <PlayerLink to={hubUrl(h.manOfMatch.playerId)} name={h.manOfMatch.name} />
                         </p>
@@ -598,11 +603,11 @@ export default function Statistics() {
                   <details className="group">
                     <summary className="cursor-pointer text-xs font-semibold text-gray-400 uppercase tracking-wide select-none list-none flex items-center gap-1">
                       <span className="transition-transform group-open:rotate-90 inline-block">›</span>
-                      Match Details
+                      {t('stats.matchDetails')}
                     </summary>
                     <div className="mt-2 space-y-3">
                       {h.players.length === 0 ? (
-                        <p className="text-xs text-gray-400 italic">No player data recorded.</p>
+                        <p className="text-xs text-gray-400 italic">{t('stats.noPlayerData')}</p>
                       ) : (
                         <div className="space-y-1">
                           {h.players.map((p, i) => (
@@ -614,7 +619,7 @@ export default function Statistics() {
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-700 font-semibold">GK</span>
                               )}
                               {p.isScorer && (
-                                <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-semibold inline-flex items-center gap-1"><StatIcon name="ball" className="w-3 h-3" /> Goal</span>
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-semibold inline-flex items-center gap-1"><StatIcon name="ball" className="w-3 h-3" /> {t('stats.goal')}</span>
                               )}
                               {p.isAssister && (
                                 <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-semibold">A</span>
@@ -625,7 +630,7 @@ export default function Statistics() {
                       )}
                       {h.longRead && (
                         <div className="pt-2 border-t border-gray-100">
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Match Report</p>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{t('stats.matchReport')}</p>
                           <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{h.longRead}</p>
                         </div>
                       )}
@@ -638,7 +643,7 @@ export default function Statistics() {
                         to={`/matches/${h.matchId}/results`}
                         className="inline-flex items-center gap-1 text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
                       >
-                        Edit result →
+                        {t('dashboard.editResult')}
                       </Link>
                     </div>
                   )}
@@ -656,7 +661,7 @@ export default function Statistics() {
             {!selectedOpponent ? (
               opponentsList.length === 0 ? (
                 <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                  No opponents recorded yet — add an opponent when creating a match.
+                  {t('stats.noOpponents')}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -677,11 +682,11 @@ export default function Statistics() {
                             <span className="text-gray-300 shrink-0">›</span>
                           </div>
                           {o.matchesPlayed === 0 ? (
-                            <span className="text-xs text-gray-400">No results yet</span>
+                            <span className="text-xs text-gray-400">{t('stats.noResultsYet')}</span>
                           ) : (
                             <>
                               <div className="flex items-center gap-2 text-xs flex-wrap">
-                                <span className="text-gray-500">{o.matchesPlayed} {o.matchesPlayed === 1 ? 'game' : 'games'}</span>
+                                <span className="text-gray-500">{t('stats.games', { count: o.matchesPlayed })}</span>
                                 <span className="text-gray-300">·</span>
                                 <span className="font-medium"><span className="text-green-600">{o.wins}W</span> <span className="text-gray-500">{o.draws}D</span> <span className="text-red-500">{o.losses}L</span></span>
                                 <span className="text-gray-300">·</span>
@@ -689,10 +694,10 @@ export default function Statistics() {
                               </div>
                               {last && (
                                 <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                                  <span>Last:</span>
+                                  <span>{t('stats.lastLabel')}</span>
                                   <span className={`font-bold px-1.5 py-0.5 rounded-full ${lastColor}`}>{lastRes}</span>
                                   <span className="font-numeric text-gray-600">{last.goalsFor}–{last.goalsAgainst}</span>
-                                  <span>· {new Date(last.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                  <span>· {formatDate(last.date, 'dayMonthYear')}</span>
                                 </div>
                               )}
                             </>
@@ -707,7 +712,7 @@ export default function Statistics() {
                 onClick={() => setSelectedOpponent('')}
                 className="text-sm font-medium text-brand-green hover:text-brand-green-700 transition-colors"
               >
-                ← All opponents
+                ← {t('stats.allOpponents')}
               </button>
             )}
 
@@ -723,33 +728,37 @@ export default function Statistics() {
             {selectedOpponent && !opponentLoading && opponentHistory && (
               opponentHistory.summary.played === 0 ? (
                 <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                  No completed matches with results against {opponentHistory.name} yet.
+                  {t('stats.noResultsVs', { name: opponentHistory.name })}
                 </div>
               ) : (
                 <>
                   {/* Record & goals summary */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <StatCard label="Wins"   value={opponentHistory.summary.wins}   color="text-green-600" />
-                    <StatCard label="Draws"  value={opponentHistory.summary.draws} />
-                    <StatCard label="Losses" value={opponentHistory.summary.losses} color="text-red-500" />
+                    <StatCard label={t('stats.wins')}   value={opponentHistory.summary.wins}   color="text-green-600" />
+                    <StatCard label={t('stats.draws')}  value={opponentHistory.summary.draws} />
+                    <StatCard label={t('stats.losses')} value={opponentHistory.summary.losses} color="text-red-500" />
                     <StatCard
-                      label="Goals (for / against)"
+                      label={t('stats.goalsForAgainstParen')}
                       value={`${opponentHistory.summary.goalsFor} / ${opponentHistory.summary.goalsAgainst}`}
-                      sub={`Avg ${opponentHistory.summary.avgGoalsFor} / ${opponentHistory.summary.avgGoalsAgainst}`}
+                      sub={t('stats.avg', { for: opponentHistory.summary.avgGoalsFor, against: opponentHistory.summary.avgGoalsAgainst })}
                       color={opponentHistory.summary.goalsFor >= opponentHistory.summary.goalsAgainst ? 'text-green-600' : 'text-red-500'}
                     />
                   </div>
 
                   <p className="text-sm text-gray-500">
-                    Played {opponentHistory.summary.played} ·{' '}
+                    {t('stats.playedCount', { count: opponentHistory.summary.played })} ·{' '}
                     {opponentHistory.summary.lastResult && (
-                      <>Last: {opponentHistory.summary.lastResult.goalsFor}–{opponentHistory.summary.lastResult.goalsAgainst} ({fmtDate(opponentHistory.summary.lastResult.matchDate)})</>
+                      <>{t('stats.lastResult', {
+                        for: opponentHistory.summary.lastResult.goalsFor,
+                        against: opponentHistory.summary.lastResult.goalsAgainst,
+                        date: fmtDate(opponentHistory.summary.lastResult.matchDate, i18n.language),
+                      })}</>
                     )}
                   </p>
 
                   {/* Goals trend over meetings */}
                   <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h2 className="text-sm font-semibold text-gray-700 mb-4">Goals for vs against — each meeting</h2>
+                    <h2 className="text-sm font-semibold text-gray-700 mb-4">{t('stats.goalsEachMeeting')}</h2>
                     <ResponsiveContainer width="100%" height={200}>
                       <BarChart data={opponentChartData} barCategoryGap="30%">
                         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -757,8 +766,8 @@ export default function Statistics() {
                         <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                         <Tooltip content={<ResultTooltip />} />
                         <Legend wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="Goals for"     fill={CHART_COLORS.goals}   radius={[3, 3, 0, 0]} />
-                        <Bar dataKey="Goals against" fill={CHART_COLORS.against} radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="Goals for"     name={t('stats.goalsFor')}     fill={CHART_COLORS.goals}   radius={[3, 3, 0, 0]} />
+                        <Bar dataKey="Goals against" name={t('stats.goalsAgainst')} fill={CHART_COLORS.against} radius={[3, 3, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -768,7 +777,7 @@ export default function Statistics() {
                     {opponentHistory.matches.map(m => {
                       const result = m.goalsFor > m.goalsAgainst ? 'W' : m.goalsFor < m.goalsAgainst ? 'L' : 'D';
                       const resultColor = result === 'W' ? 'bg-green-100 text-green-700' : result === 'L' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600';
-                      const assessment = m.gameAssessment ? ASSESSMENT_LABEL[m.gameAssessment] : null;
+                      const assessmentColor = m.gameAssessment ? ASSESSMENT_COLOR[m.gameAssessment] : null;
                       return (
                         <button
                           key={m.matchId}
@@ -776,10 +785,10 @@ export default function Statistics() {
                           className="w-full text-left bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between gap-3"
                         >
                           <div className="min-w-0">
-                            <p className="font-medium text-gray-900">{new Date(m.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+                            <p className="font-medium text-gray-900">{formatDate(m.matchDate, 'dayMonthYear')}</p>
                             <p className="text-xs text-gray-500 mt-0.5">
-                              <span className={`mr-2 px-1.5 py-0.5 rounded ${m.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>{m.matchType}</span>
-                              {assessment && <span className={assessment.color}>{assessment.label}</span>}
+                              <span className={`mr-2 px-1.5 py-0.5 rounded ${m.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>{t(`matchTypes.${m.matchType}`, { defaultValue: m.matchType })}</span>
+                              {assessmentColor && <span className={assessmentColor}>{t(`stats.assessment.${m.gameAssessment}`)}</span>}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
@@ -795,37 +804,37 @@ export default function Statistics() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="text-left text-gray-400 border-b border-gray-100">
-                          <th className="px-4 py-2 font-medium">Date</th>
-                          <th className="px-4 py-2 font-medium">Type</th>
-                          <th className="px-4 py-2 font-medium">Result</th>
-                          <th className="px-4 py-2 font-medium">Assessment</th>
+                          <th className="px-4 py-2 font-medium">{t('stats.date')}</th>
+                          <th className="px-4 py-2 font-medium">{t('stats.type')}</th>
+                          <th className="px-4 py-2 font-medium">{t('stats.result')}</th>
+                          <th className="px-4 py-2 font-medium">{t('stats.assessmentCol')}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {opponentHistory.matches.map(m => {
                           const result = m.goalsFor > m.goalsAgainst ? 'W' : m.goalsFor < m.goalsAgainst ? 'L' : 'D';
                           const resultColor = result === 'W' ? 'bg-green-100 text-green-700' : result === 'L' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600';
-                          const assessment = m.gameAssessment ? ASSESSMENT_LABEL[m.gameAssessment] : null;
+                          const assessmentColor = m.gameAssessment ? ASSESSMENT_COLOR[m.gameAssessment] : null;
                           return (
                             <tr
                               key={m.matchId}
                               onClick={() => openHighlight(m.matchId, m.matchDate)}
                               className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50 cursor-pointer"
                             >
-                              <td className="px-4 py-2 text-gray-700">{new Date(m.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                              <td className="px-4 py-2 text-gray-500">{m.matchType}</td>
+                              <td className="px-4 py-2 text-gray-700">{formatDate(m.matchDate, 'dayMonthYear')}</td>
+                              <td className="px-4 py-2 text-gray-500">{t(`matchTypes.${m.matchType}`, { defaultValue: m.matchType })}</td>
                               <td className="px-4 py-2">
                                 <span className="font-numeric font-semibold text-gray-900 mr-2">{m.goalsFor}–{m.goalsAgainst}</span>
                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${resultColor}`}>{result}</span>
                                 <span className="ml-2"><WalkoverBadge walkover={m.walkover} /></span>
                               </td>
-                              <td className={`px-4 py-2 ${assessment ? assessment.color : 'text-gray-300'}`}>{assessment ? assessment.label : '—'}</td>
+                              <td className={`px-4 py-2 ${assessmentColor ?? 'text-gray-300'}`}>{assessmentColor ? t(`stats.assessment.${m.gameAssessment}`) : '—'}</td>
                             </tr>
                           );
                         })}
                       </tbody>
                     </table>
-                    <p className="text-xs text-gray-400 px-4 py-2 text-right">Click a match to view its highlights</p>
+                    <p className="text-xs text-gray-400 px-4 py-2 text-right">{t('stats.clickMatch')}</p>
                   </div>
                 </>
               )
@@ -852,13 +861,13 @@ export default function Statistics() {
           <>
             {/* Overview cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <StatCard label="Wins"   value={overview.gamesWithResults > 0 ? overview.wins   : '—'} color="text-green-600" />
-              <StatCard label="Draws"  value={overview.gamesWithResults > 0 ? overview.draws  : '—'} />
-              <StatCard label="Losses" value={overview.gamesWithResults > 0 ? overview.losses : '—'} color="text-red-500" />
+              <StatCard label={t('stats.wins')}   value={overview.gamesWithResults > 0 ? overview.wins   : '—'} color="text-green-600" />
+              <StatCard label={t('stats.draws')}  value={overview.gamesWithResults > 0 ? overview.draws  : '—'} />
+              <StatCard label={t('stats.losses')} value={overview.gamesWithResults > 0 ? overview.losses : '—'} color="text-red-500" />
               <StatCard
-                label="Goals for / against"
+                label={t('stats.goalsForAgainst')}
                 value={overview.gamesWithResults > 0 ? `${overview.totalGoals} / ${overview.totalGoalsAgainst}` : '—'}
-                sub={overview.gamesWithResults > 0 ? `Avg ${overview.avgGoalsFor} / ${overview.avgGoalsAgainst}` : undefined}
+                sub={overview.gamesWithResults > 0 ? t('stats.avg', { for: overview.avgGoalsFor, against: overview.avgGoalsAgainst }) : undefined}
                 color={overview.totalGoals >= overview.totalGoalsAgainst ? 'text-green-600' : 'text-red-500'}
               />
             </div>
@@ -868,37 +877,37 @@ export default function Statistics() {
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
                 <StatIcon name="ball" className="w-7 h-7" />
                 <div>
-                  <p className="text-xs text-gray-500">Top scorer</p>
+                  <p className="text-xs text-gray-500">{t('stats.topScorer')}</p>
                   {overview.topScorer
-                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topScorer.userId ? hubUrl(overview.topScorer.userId) : null} name={overview.topScorer.name} /></p><p className="text-sm text-brand-green">{overview.topScorer.value} goals</p></>
-                    : <p className="text-sm text-gray-300">No data yet</p>}
+                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topScorer.userId ? hubUrl(overview.topScorer.userId) : null} name={overview.topScorer.name} /></p><p className="text-sm text-brand-green">{t('stats.goalsCount', { count: overview.topScorer.value })}</p></>
+                    : <p className="text-sm text-gray-300">{t('stats.noDataYet')}</p>}
                 </div>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
                 <StatIcon name="target" className="w-7 h-7" />
                 <div>
-                  <p className="text-xs text-gray-500">Most assists</p>
+                  <p className="text-xs text-gray-500">{t('stats.mostAssists')}</p>
                   {overview.topAssister
-                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topAssister.userId ? hubUrl(overview.topAssister.userId) : null} name={overview.topAssister.name} /></p><p className="text-sm text-purple-600">{overview.topAssister.value} assists</p></>
-                    : <p className="text-sm text-gray-300">No data yet</p>}
+                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topAssister.userId ? hubUrl(overview.topAssister.userId) : null} name={overview.topAssister.name} /></p><p className="text-sm text-purple-600">{t('stats.assistsCount', { count: overview.topAssister.value })}</p></>
+                    : <p className="text-sm text-gray-300">{t('stats.noDataYet')}</p>}
                 </div>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
                 <StatIcon name="glove" className="w-7 h-7" />
                 <div>
-                  <p className="text-xs text-gray-500">Most time in goal</p>
+                  <p className="text-xs text-gray-500">{t('stats.mostTimeInGoal')}</p>
                   {overview.topGk
-                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topGk.userId ? hubUrl(overview.topGk.userId) : null} name={overview.topGk.name} /></p><p className="text-sm text-green-600">{overview.topGk.halves} halves in goal{overview.topGk.cleanSheets > 0 && ` · ${overview.topGk.cleanSheets} clean sheet${overview.topGk.cleanSheets === 1 ? '' : 's'}`}</p></>
-                    : <p className="text-sm text-gray-300">No data yet</p>}
+                    ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topGk.userId ? hubUrl(overview.topGk.userId) : null} name={overview.topGk.name} /></p><p className="text-sm text-green-600">{t('stats.halvesInGoal', { count: overview.topGk.halves })}{overview.topGk.cleanSheets > 0 && ` · ${t('stats.cleanSheetsCount', { count: overview.topGk.cleanSheets })}`}</p></>
+                    : <p className="text-sm text-gray-300">{t('stats.noDataYet')}</p>}
                 </div>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
                 <Star className="w-7 h-7 text-gray-900" />
                 <div>
-                  <p className="text-xs text-gray-500">Top man of match</p>
+                  <p className="text-xs text-gray-500">{t('stats.topMotm')}</p>
                   {overview.topMotm
                     ? <><p className="font-semibold text-gray-900"><PlayerLink to={overview.topMotm.userId ? hubUrl(overview.topMotm.userId) : null} name={overview.topMotm.name} /></p><p className="text-sm text-amber-500">{overview.topMotm.value}×</p></>
-                    : <p className="text-sm text-gray-300">No data yet</p>}
+                    : <p className="text-sm text-gray-300">{t('stats.noDataYet')}</p>}
                 </div>
               </div>
             </div>
@@ -907,7 +916,7 @@ export default function Statistics() {
             {/* Goals for vs against chart */}
             {hasMatchResults ? (
               <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h2 className="text-sm font-semibold text-gray-700 mb-4">Goals for vs against — per match</h2>
+                <h2 className="text-sm font-semibold text-gray-700 mb-4">{t('stats.goalsPerMatch')}</h2>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={goalsChartData}
                     onClick={(state: any) => {
@@ -923,15 +932,15 @@ export default function Statistics() {
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip content={<ResultTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="Goals for"     stroke={CHART_COLORS.goals}   strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="Goals against" stroke={CHART_COLORS.against} strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="Goals for"     name={t('stats.goalsFor')}     stroke={CHART_COLORS.goals}   strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="Goals against" name={t('stats.goalsAgainst')} stroke={CHART_COLORS.against} strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
-                <p className="text-xs text-gray-400 mt-2 text-right">Click a point to view match highlights</p>
+                <p className="text-xs text-gray-400 mt-2 text-right">{t('stats.clickPoint')}</p>
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                No match results recorded yet — results will appear here once matches are entered.
+                {t('stats.noMatchResults')}
               </div>
             )}
 
@@ -944,27 +953,27 @@ export default function Statistics() {
                 <div className="grid grid-cols-2 gap-3">
                   {[
                     {
-                      label: 'Wins',
+                      label: t('stats.wins'),
                       curr: data.overview.gamesWithResults > 0 ? data.overview.wins : '—',
                       prev: data.prevOverview.gamesWithResults > 0 ? data.prevOverview.wins : '—',
                     },
                     {
-                      label: 'Draws',
+                      label: t('stats.draws'),
                       curr: data.overview.gamesWithResults > 0 ? data.overview.draws : '—',
                       prev: data.prevOverview.gamesWithResults > 0 ? data.prevOverview.draws : '—',
                     },
                     {
-                      label: 'Losses',
+                      label: t('stats.losses'),
                       curr: data.overview.gamesWithResults > 0 ? data.overview.losses : '—',
                       prev: data.prevOverview.gamesWithResults > 0 ? data.prevOverview.losses : '—',
                     },
                     {
-                      label: 'Goals for',
+                      label: t('stats.goalsFor'),
                       curr: data.overview.totalGoals || '—',
                       prev: data.prevOverview.totalGoals || '—',
                     },
                     {
-                      label: 'Goals against',
+                      label: t('stats.goalsAgainst'),
                       curr: data.overview.totalGoalsAgainst || '—',
                       prev: data.prevOverview.totalGoalsAgainst || '—',
                     },
@@ -990,7 +999,7 @@ export default function Statistics() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Top scorers */}
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="ball" className="w-4 h-4" /> Top scorers</h2>
+                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="ball" className="w-4 h-4" /> {t('stats.topScorers')}</h2>
                   {topScorers.map(p => (
                     <LeaderBar key={p.userId} name={p.name} value={p.totalGoals} hubTo={hubUrl(p.userId)}
                       max={maxGoals} color={CHART_COLORS.goals} isMe={p.userId === user?.userId} />
@@ -999,7 +1008,7 @@ export default function Statistics() {
 
                 {/* Top assisters */}
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="target" className="w-4 h-4" /> Top assisters</h2>
+                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="target" className="w-4 h-4" /> {t('stats.topAssisters')}</h2>
                   {topAssisters.map(p => (
                     <LeaderBar key={p.userId} name={p.name} value={p.totalAssists} hubTo={hubUrl(p.userId)}
                       max={maxAssists} color={CHART_COLORS.assists} isMe={p.userId === user?.userId} />
@@ -1009,7 +1018,7 @@ export default function Statistics() {
                 {/* Clean sheets */}
                 {topCleanSheets.length > 0 && topCleanSheets[0].totalCleanSheets > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="glove" className="w-4 h-4" /> Clean sheets</h2>
+                    <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="glove" className="w-4 h-4" /> {t('stats.cleanSheets')}</h2>
                     {topCleanSheets.map(p => (
                       <LeaderBar key={p.userId} name={p.name} value={p.totalCleanSheets} hubTo={hubUrl(p.userId)}
                         max={maxCleanSheets} color={CHART_COLORS.cleanSheets} isMe={p.userId === user?.userId} />
@@ -1020,13 +1029,13 @@ export default function Statistics() {
                 {/* GK leaderboard */}
                 {gkLeaderboard.length > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="glove" className="w-4 h-4" /> Goalkeepers</h2>
+                    <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><StatIcon name="glove" className="w-4 h-4" /> {t('stats.goalkeepers')}</h2>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-                        <span className="text-xs text-gray-400 w-28 shrink-0">Player</span>
-                        <span className="text-xs text-gray-400 w-16 text-center">Halves</span>
-                        <span className="text-xs text-gray-400 w-16 text-center">Clean sheets</span>
-                        <span className="text-xs text-gray-400 flex-1 text-right">CS rate</span>
+                        <span className="text-xs text-gray-400 w-28 shrink-0">{t('stats.player')}</span>
+                        <span className="text-xs text-gray-400 w-16 text-center">{t('stats.halves')}</span>
+                        <span className="text-xs text-gray-400 w-16 text-center">{t('stats.cleanSheets')}</span>
+                        <span className="text-xs text-gray-400 flex-1 text-right">{t('stats.csRate')}</span>
                       </div>
                       {gkLeaderboard.map(p => {
                         const isMe = p.userId === user?.userId;
@@ -1034,7 +1043,7 @@ export default function Statistics() {
                         return (
                           <div key={p.userId} className={`flex items-center gap-2 py-0.5 ${isMe ? 'font-semibold' : ''}`}>
                             <span className="text-xs text-gray-700 w-28 truncate shrink-0">
-                              <PlayerLink to={hubUrl(p.userId)} name={p.name} />{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
+                              <PlayerLink to={hubUrl(p.userId)} name={p.name} />{isMe && <span className="text-brand-green ml-1 text-[10px]">{t('hub.you')}</span>}
                             </span>
                             <span className="text-xs text-gray-600 w-16 text-center">{p.gkAppearances}</span>
                             <span className="text-xs text-gray-600 w-16 text-center">{p.totalCleanSheets}</span>
@@ -1050,7 +1059,7 @@ export default function Statistics() {
 
                 {/* Attendance */}
                 <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><Icon name="calendar" className="w-4 h-4 text-gray-400" /> Attendance rate</h2>
+                  <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><Icon name="calendar" className="w-4 h-4 text-gray-400" /> {t('stats.attendanceRate')}</h2>
                   {topAttenders.filter(p => p.totalSignups > 0).map(p => (
                     <LeaderBar key={p.userId} name={p.name} value={Math.round(p.attendanceRate)} hubTo={hubUrl(p.userId)}
                       max={maxAttend} color={CHART_COLORS.attendance} isMe={p.userId === user?.userId} />
@@ -1060,14 +1069,14 @@ export default function Statistics() {
                 {/* Cards */}
                 {cardedPlayers.length > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-5">
-                    <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><CardChip color="yellow" /><CardChip color="red" /> Cards</h2>
+                    <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5"><CardChip color="yellow" /><CardChip color="red" /> {t('stats.cards')}</h2>
                     <div className="space-y-1.5">
                       {cardedPlayers.map(p => {
                         const isMe = p.userId === user?.userId;
                         return (
                           <div key={p.userId} className={`flex items-center gap-3 py-1 ${isMe ? 'font-semibold' : ''}`}>
                             <span className="text-xs text-gray-700 w-28 truncate shrink-0">
-                              <PlayerLink to={hubUrl(p.userId)} name={p.name} />{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
+                              <PlayerLink to={hubUrl(p.userId)} name={p.name} />{isMe && <span className="text-brand-green ml-1 text-[10px]">{t('hub.you')}</span>}
                             </span>
                             <div className="flex gap-2">
                               {p.totalYellowCards > 0 && (
@@ -1105,21 +1114,21 @@ export default function Statistics() {
                   type="search"
                   value={playerSearch}
                   onChange={e => setPlayerSearch(e.target.value)}
-                  placeholder="Search players by name or position"
-                  aria-label="Search players"
+                  placeholder={t('stats.searchPlaceholder')}
+                  aria-label={t('stats.searchAria')}
                   className="w-full border border-gray-300 rounded-lg bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
                 />
               </div>
 
               {visiblePlayers.length === 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                  No players match “{playerSearch.trim()}”.
+                  {t('stats.noPlayersMatch', { query: playerSearch.trim() })}
                 </div>
               )}
 
               {/* Mobile cards */}
               <div className="sm:hidden space-y-3">
-                {visiblePlayers.length > 0 && <h2 className="text-sm font-semibold text-gray-700">All players</h2>}
+                {visiblePlayers.length > 0 && <h2 className="text-sm font-semibold text-gray-700">{t('nav.allPlayers')}</h2>}
                 {visiblePlayers.map(p => {
                   const isMe = p.userId === user?.userId;
                   const rate = p.totalSignups > 0 ? p.attendanceRate : null;
@@ -1129,7 +1138,7 @@ export default function Statistics() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <Avatar src={p.avatarUrl} name={p.name} size={32} />
                         <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
-                          {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
+                          {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">{t('hub.you')}</span>}
                         </span>
                       </div>
                       <div className="grid grid-cols-4 gap-2 text-center">
@@ -1137,53 +1146,53 @@ export default function Statistics() {
                           <p className="text-sm font-semibold text-gray-900">
                             {p.totalPlayed}<span className="text-gray-400 font-normal text-[11px]">/{overview?.teamGames ?? 0}</span>
                           </p>
-                          <p className="text-[11px] text-gray-400">Games</p>
+                          <p className="text-[11px] text-gray-400">{t('stats.games')}</p>
                         </div>
                         <div>
                           <p className={`text-sm font-semibold ${rate === null ? 'text-gray-300' : rate >= 75 ? 'text-green-600' : rate >= 50 ? 'text-amber-600' : 'text-red-500'}`}>
                             {rate === null ? '—' : `${rate.toFixed(0)}%`}
                           </p>
-                          <p className="text-[11px] text-gray-400">Attendance</p>
+                          <p className="text-[11px] text-gray-400">{t('stats.attendance')}</p>
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-900">{p.totalGoals}</p>
-                          <p className="text-[11px] text-gray-400">Goals</p>
+                          <p className="text-[11px] text-gray-400">{t('stats.goals')}</p>
                         </div>
                         <div>
                           <p className="text-sm font-semibold text-gray-900">{p.totalAssists}</p>
-                          <p className="text-[11px] text-gray-400">Assists</p>
+                          <p className="text-[11px] text-gray-400">{t('stats.assists')}</p>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500 border-t border-gray-50 pt-2">
-                        {isCoach && <span>Signed up: <span className="font-medium text-gray-700">{p.totalSignups}</span></span>}
-                        <span>Clean sheets: <span className="font-medium text-gray-700">{p.totalCleanSheets}</span></span>
+                        {isCoach && <span>{t('stats.signedUpLabel')} <span className="font-medium text-gray-700">{p.totalSignups}</span></span>}
+                        <span>{t('stats.cleanSheetsLabel')} <span className="font-medium text-gray-700">{p.totalCleanSheets}</span></span>
                         {p.totalYellowCards > 0 && <span className="text-amber-600 font-medium inline-flex items-center gap-1"><CardChip color="yellow" /> {p.totalYellowCards}</span>}
                         {p.totalRedCards > 0 && <span className="text-red-600 font-medium inline-flex items-center gap-1"><CardChip color="red" /> {p.totalRedCards}</span>}
                       </div>
                     </div>
                   );
                 })}
-                {visiblePlayers.length > 0 && <p className="text-xs text-gray-400">Tap a player to view their profile</p>}
+                {visiblePlayers.length > 0 && <p className="text-xs text-gray-400">{t('stats.tapPlayer')}</p>}
               </div>
 
               {/* Desktop table */}
               <div className={`${visiblePlayers.length === 0 ? 'hidden' : 'hidden sm:block'} bg-white rounded-xl border border-gray-200 overflow-x-auto`}>
                 <div className="px-5 py-4 border-b border-gray-100">
-                  <h2 className="text-sm font-semibold text-gray-700">All players</h2>
+                  <h2 className="text-sm font-semibold text-gray-700">{t('nav.allPlayers')}</h2>
                 </div>
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
                       {[
-                        { label: 'Player',       cls: '' },
-                        ...(isCoach ? [{ label: 'Signed up', cls: 'hidden sm:table-cell' }] : []),
-                        { label: `Games (of ${overview?.teamGames ?? 0})`, cls: '' },
-                        { label: 'Attendance',   cls: '' },
-                        { label: 'Goals',        cls: '' },
-                        { label: 'Assists',      cls: '' },
-                        { label: 'Clean sheets', cls: 'hidden sm:table-cell' },
-                        { label: 'YC',           cls: 'hidden sm:table-cell' },
-                        { label: 'RC',           cls: 'hidden sm:table-cell' },
+                        { label: t('stats.player'),  cls: '' },
+                        ...(isCoach ? [{ label: t('stats.signedUp'), cls: 'hidden sm:table-cell' }] : []),
+                        { label: t('stats.gamesOf', { total: overview?.teamGames ?? 0 }), cls: '' },
+                        { label: t('stats.attendance'),  cls: '' },
+                        { label: t('stats.goals'),       cls: '' },
+                        { label: t('stats.assists'),     cls: '' },
+                        { label: t('stats.cleanSheets'), cls: 'hidden sm:table-cell' },
+                        { label: t('stats.yc'),          cls: 'hidden sm:table-cell' },
+                        { label: t('stats.rc'),          cls: 'hidden sm:table-cell' },
                       ].map(h => (
                         <th key={h.label} className={`px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${h.cls}`}>{h.label}</th>
                       ))}
@@ -1201,7 +1210,7 @@ export default function Statistics() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <Avatar src={p.avatarUrl} name={p.name} size={28} />
                               <span className={`font-medium ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
-                                {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">you</span>}
+                                {p.name}{isMe && <span className="text-brand-green ml-1 text-[10px]">{t('hub.you')}</span>}
                               </span>
                             </div>
                           </td>
@@ -1231,7 +1240,7 @@ export default function Statistics() {
                     })}
                   </tbody>
                 </table>
-                <p className="text-xs text-gray-400 px-5 py-3">Click a row to view the player's profile</p>
+                <p className="text-xs text-gray-400 px-5 py-3">{t('stats.clickRow')}</p>
               </div>
             </div>
         )}

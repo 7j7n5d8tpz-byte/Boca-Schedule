@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { loginAs } from './helpers/auth';
 
 // The player hub's header packs the crest, the tier caption, the XP bar and the

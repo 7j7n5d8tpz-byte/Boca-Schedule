@@ -75,7 +75,7 @@ router.get('/:opponentId/history', authenticate, async (req, res, next) => {
       .eq('opponent_id', opponentId)
       .single();
     if (oppErr || !opponent) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Opponent not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Modstanderen blev ikke fundet' } });
       return;
     }
 
@@ -158,7 +158,7 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
   try {
     const body = CreateOpponentSchema.safeParse(req.body);
     if (!body.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name is required' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Navn skal udfyldes' } });
       return;
     }
     const resolved = await resolveOpponent(body.data.name, undefined, req.user!.userId);

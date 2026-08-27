@@ -1,8 +1,10 @@
 import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { meetingTime } from '../../utils';
+import { useDateFormat } from '../../i18n/format';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { PitchView, POS_TAG, type SelectionPlayer, type Guest } from '../../components/PitchView';
 import MatchEditForm, { initialMatchFields, matchUpdatePayload, type MatchEditFields } from '../../components/MatchEditForm';
@@ -38,31 +40,32 @@ interface MatchInfo {
   optimizationResult: OptimizationResult | null;
 }
 
-const POSITION_NAMES: Record<string, string> = {
-  GK: 'Goalkeeper', DEF: 'Defender', WIN: 'Winger', MID: 'Midfielder', STR: 'Striker',
-};
-
-function fairnessLabel(alpha: number): string {
-  if (alpha >= 0.66) return 'Weighted toward fair playing time';
-  if (alpha <= 0.34) return 'Weighted toward formation fit';
-  return 'Balanced — fairness & formation';
+function useFairnessLabel() {
+  const { t } = useTranslation();
+  return (alpha: number): string => {
+    if (alpha >= 0.66) return t('coach.fairnessHint');
+    if (alpha <= 0.34) return t('coach.fitHint');
+    return t('coach.fairnessBalanced');
+  };
 }
 
 // ─── "Why this squad" explainer ────────────────────────────────────────────────
 
 function WhySquad({ opt, minPlayers }: { opt: OptimizationResult; minPlayers: number }) {
+  const { t } = useTranslation();
+  const fairnessLabel = useFairnessLabel();
   const formation = opt.formation ?? {};
   const slots = Object.entries(formation);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <span className="font-semibold text-gray-900">Why this squad</span>
+      <span className="font-semibold text-gray-900">{t('coach.whyThisSquad')}</span>
 
       <div className="mt-4 space-y-4">
         {/* Run summary */}
         <div className="flex flex-wrap gap-2">
           <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${opt.deficit === 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-            {opt.deficit === 0 ? `Squad complete · ${opt.selectedCount} selected` : `${opt.deficit} short of the ${minPlayers} minimum`}
+            {opt.deficit === 0 ? t('coach.squadComplete', { count: opt.selectedCount }) : t('coach.squadShort', { deficit: opt.deficit, min: minPlayers })}
           </span>
           <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 text-gray-600">
             {fairnessLabel(opt.fairnessWeight)}
@@ -72,7 +75,7 @@ function WhySquad({ opt, minPlayers }: { opt: OptimizationResult; minPlayers: nu
         {/* Formation coverage */}
         {slots.length > 0 && (
           <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Formation coverage</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">{t('coach.formationCoverage')}</p>
             <div className="flex flex-wrap gap-2">
               {slots.map(([pos, slot]) => (
                 <span
@@ -80,7 +83,7 @@ function WhySquad({ opt, minPlayers }: { opt: OptimizationResult; minPlayers: nu
                   className={`text-xs font-medium px-2 py-1 rounded-lg border ${
                     slot.filled >= slot.required ? 'border-green-200 bg-green-50 text-green-700' : 'border-amber-200 bg-amber-50 text-amber-700'
                   }`}
-                  title={POSITION_NAMES[pos] ?? pos}
+                  title={t(`positionsLong.${pos}`, { defaultValue: pos })}
                 >
                   {pos} {slot.filled}/{slot.required} {slot.filled >= slot.required ? '✓' : '⚠'}
                 </span>
@@ -91,14 +94,14 @@ function WhySquad({ opt, minPlayers }: { opt: OptimizationResult; minPlayers: nu
 
         {/* How it works */}
         <div className="text-sm text-gray-600 space-y-1.5 border-t border-gray-100 pt-3">
-          <p className="font-medium text-gray-700">How the optimizer chooses</p>
+          <p className="font-medium text-gray-700">{t('coach.howOptimizerChooses')}</p>
           <ul className="list-disc list-inside space-y-1 text-sm text-gray-500">
-            <li>Fills your formation (e.g. GK, 2× DEF, 2× WIN…) and reaches at least the minimum squad size.</li>
-            <li><span className="text-gray-700 font-medium">Fairness:</span> players who have played fewer games are favoured. Regular sign-ups are rewarded too, but games actually played weigh most (about 4:1).</li>
-            <li><span className="text-gray-700 font-medium">Priority (<Star className="inline w-3 h-3 -mt-0.5 text-amber-500" />):</span> players you starred are strongly favoured for a spot.</li>
-            <li><span className="text-gray-700 font-medium">Balance:</span> the Fairness↔Positions slider tilts between even playing time and best formation fit. This run was <span className="text-gray-700">{fairnessLabel(opt.fairnessWeight).toLowerCase()}</span>.</li>
+            <li>{t('coach.optFills')}</li>
+            <li><span className="text-gray-700 font-medium">{t('coach.fairnessLabel')}</span> {t('coach.optFairnessBody')}</li>
+            <li><span className="text-gray-700 font-medium">{t('coach.priorityPrefix')}<Star className="inline w-3 h-3 -mt-0.5 text-amber-500" />{t('coach.prioritySuffix')}</span> {t('coach.optPriorityBody')}</li>
+            <li><span className="text-gray-700 font-medium">{t('coach.balanceLabel')}</span> {t('coach.optBalanceBody')} <span className="text-gray-700">{fairnessLabel(opt.fairnessWeight).toLowerCase()}</span>.</li>
           </ul>
-          <p className="text-xs text-gray-400 pt-1">Reflects the last optimizer run — any manual changes may differ.</p>
+          <p className="text-xs text-gray-400 pt-1">{t('coach.optReflects')}</p>
         </div>
       </div>
     </div>
@@ -122,6 +125,8 @@ interface SpotClaim {
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function Selections() {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -196,13 +201,13 @@ export default function Selections() {
       setEditFields(null);
       setShowDiscardConfirm(false);
     },
-    onError: (err: any) => setSaveError(err.response?.data?.error?.message ?? 'Failed to save'),
+    onError: (err: any) => setSaveError(err.response?.data?.error?.message ?? t('coach.saveFailed')),
   });
 
   const publishMutation = useMutation({
     mutationFn: () => api.post(`/matches/${matchId}/publish`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['matches'] }); navigate('/coach'); },
-    onError: (err: any) => setPublishError(err.response?.data?.error?.message ?? 'Failed to publish'),
+    onError: (err: any) => setPublishError(err.response?.data?.error?.message ?? t('coach.publishFailed')),
   });
 
   function togglePlayer(userId: string) {
@@ -234,7 +239,7 @@ export default function Selections() {
   }
 
   if (isLoading) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
-  if (!data) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">Match not found</div>;
+  if (!data) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">{t('coach.matchNotFound')}</div>;
 
   const { match, players } = data;
   const isPublished = match.status === 'published';
@@ -293,17 +298,17 @@ export default function Selections() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref="/coach" backLabel="Matches" />
+      <AppNav backHref="/coach" backLabel={t('coach.matches')} />
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-900">
-              {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {formatDate(date, 'long')}
             </h1>
             <p className="text-gray-500 mt-1">
-              {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)}) · {editMode ? 'Editing squad' : 'Squad'}
+              {t('match.timeAndMeet', { time: match.matchTime.slice(0, 5), meet: meetingTime(match.matchTime) })} · {editMode ? t('coach.editingSquad') : t('coach.squad')}
               {match.opponent && <span className="text-gray-700 font-medium"> · vs {match.opponent}</span>}
             </p>
           </div>
@@ -313,13 +318,13 @@ export default function Selections() {
                 onClick={enterEdit}
                 className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
               >
-                Edit
+                {t('coach.edit')}
               </button>
               <button
                 onClick={() => isPublished ? setShowReoptConfirm(true) : navigate(`/coach/matches/${matchId}#optimize`)}
                 className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
               >
-                Re-optimize
+                {t('coach.reoptimize')}
               </button>
             </div>
           )}
@@ -328,23 +333,20 @@ export default function Selections() {
         {/* Re-optimize confirmation (published squads only) */}
         {showReoptConfirm && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3">
-            <p className="font-semibold text-amber-800">Re-optimize this published squad?</p>
-            <p className="text-sm text-amber-700">
-              Running the optimizer replaces the current squad and returns the match to “optimized”.
-              You'll need to publish again afterwards.
-            </p>
+            <p className="font-semibold text-amber-800">{t('coach.reoptimizeQ')}</p>
+            <p className="text-sm text-amber-700">{t('coach.reoptBody')}</p>
             <div className="flex gap-2">
               <button
                 onClick={() => navigate(`/coach/matches/${matchId}#optimize`)}
                 className="text-sm bg-brand-green hover:bg-brand-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
               >
-                Continue to optimizer
+                {t('coach.continueToOptimizer')}
               </button>
               <button
                 onClick={() => setShowReoptConfirm(false)}
                 className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
               >
-                Keep current squad
+                {t('coach.keepCurrentSquad')}
               </button>
             </div>
           </div>
@@ -355,25 +357,25 @@ export default function Selections() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="font-semibold text-gray-900">
-                {selectedCount} selected
+                {t('coach.selectedCount2', { count: selectedCount })}
                 <span className={`ml-2 text-sm font-normal ${tooFew ? 'text-red-500' : tooMany ? 'text-orange-500' : 'text-gray-500'}`}>
-                  (min {match.minPlayers} · max {match.maxPlayers})
+                  {t('coach.minMax', { min: match.minPlayers, max: match.maxPlayers })}
                 </span>
               </p>
-              {tooFew && <p className="text-sm text-red-500 mt-0.5">Need {match.minPlayers - selectedCount} more</p>}
+              {tooFew && <p className="text-sm text-red-500 mt-0.5">{t('coach.needMoreN', { count: match.minPlayers - selectedCount })}</p>}
             </div>
             {!editMode && !isPublished && (
               <button onClick={() => { setPublishError(''); publishMutation.mutate(); }}
                 disabled={publishMutation.isPending || tooFew}
                 className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-                {publishMutation.isPending ? 'Publishing…' : 'Publish'}
+                {publishMutation.isPending ? t('coach.publishing') : t('coach.publish')}
               </button>
             )}
           </div>
           {publishError && <p className="text-sm text-red-500">{publishError}</p>}
           {isPublished && !editMode && (
             <p className="text-xs text-gray-500">
-              Published — players can see this squad. Use <span className="font-medium">Edit</span> to swap players; anyone added or removed is notified.
+              {t('coach.publishedNote1')} <span className="font-medium">{t('coach.edit')}</span> {t('coach.publishedNote2')}
             </p>
           )}
         </div>
@@ -382,11 +384,11 @@ export default function Selections() {
         {claims.length > 0 && (
           <div className="bg-white rounded-xl border border-brand-green/40 p-5 space-y-3">
             <div>
-              <h2 className="font-semibold text-gray-900">Spot claimants</h2>
+              <h2 className="font-semibold text-gray-900">{t('coach.spotClaimants')}</h2>
               <p className="text-xs text-gray-500 mt-0.5">
                 {claims.length === 1
-                  ? 'A player wants to take an open spot. Confirm to add them to the squad.'
-                  : `${claims.length} players want an open spot. Confirm one to add them; the rest are declined.`}
+                  ? t('coach.claimOne')
+                  : t('coach.claimMany', { count: claims.length })}
               </p>
             </div>
             {claims.map(c => (
@@ -407,14 +409,14 @@ export default function Selections() {
                     disabled={resolveClaimMutation.isPending}
                     className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
                   >
-                    Confirm
+                    {t('coach.confirm')}
                   </button>
                   <button
                     onClick={() => resolveClaimMutation.mutate({ claimId: c.claimId, accept: false })}
                     disabled={resolveClaimMutation.isPending}
                     className="border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
                   >
-                    Decline
+                    {t('coach.decline')}
                   </button>
                 </div>
               </div>
@@ -429,7 +431,7 @@ export default function Selections() {
               onClick={() => setShowWhy(v => !v)}
               className="text-xs font-medium text-brand-green hover:text-brand-green-700"
             >
-              {showWhy ? 'Hide explanation' : 'Why this squad?'}
+              {showWhy ? t('coach.hideExplanation') : t('coach.whyThisSquadQ')}
             </button>
             {showWhy && <WhySquad opt={match.optimizationResult} minPlayers={match.minPlayers} />}
           </div>
@@ -442,33 +444,33 @@ export default function Selections() {
           <>
             {/* Edit match details */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-              <h2 className="font-semibold text-gray-900">Match details</h2>
+              <h2 className="font-semibold text-gray-900">{t('coach.matchDetails')}</h2>
               <MatchEditForm value={editFields} onChange={setEditFields} matchType={match.matchType} />
             </div>
 
             {/* Squad editor */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-              <h2 className="font-semibold text-gray-900">Squad</h2>
+              <h2 className="font-semibold text-gray-900">{t('coach.squad')}</h2>
 
               {/* Signed-up players */}
               <div className="space-y-2 pt-1">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Signed up — {signedUpPlayers.length}</h3>
-                {signedUpPlayers.length === 0 && <p className="text-sm text-gray-400">No players signed up.</p>}
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('coach.signedUpHeading2', { count: signedUpPlayers.length })}</h3>
+                {signedUpPlayers.length === 0 && <p className="text-sm text-gray-400">{t('coach.noSignups')}</p>}
                 {signedUpPlayers.map(p => <PlayerRow key={p.player.userId} p={p} interactive />)}
               </div>
 
               {/* Add players who didn't sign up */}
               <div className="space-y-2 pt-2 border-t border-gray-100">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Add another player</h3>
-                <p className="text-xs text-gray-400 -mt-1">Players who didn't sign up. Adding one signs them up for this match.</p>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('coach.addAnotherPlayer')}</h3>
+                <p className="text-xs text-gray-400 -mt-1">{t('coach.addAnotherPlayerHint')}</p>
                 <input
                   type="text"
-                  placeholder="Search players…"
+                  placeholder={t('coach.searchPlayers')}
                   value={addFilter}
                   onChange={e => setAddFilter(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
                 />
-                {otherPlayers.length === 0 && <p className="text-sm text-gray-400">No matching players.</p>}
+                {otherPlayers.length === 0 && <p className="text-sm text-gray-400">{t('coach.noMatchingPlayers')}</p>}
                 {otherPlayers.map(p => <PlayerRow key={p.player.userId} p={p} interactive />)}
               </div>
             </div>
@@ -476,12 +478,12 @@ export default function Selections() {
             {/* Guest players (external, non-registered) */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-700">Guest players</h2>
+                <h2 className="text-sm font-semibold text-gray-700">{t('coach.guestPlayers')}</h2>
                 <button
                   onClick={() => setShowAddGuest(v => !v)}
                   className="text-xs font-medium text-brand-green hover:text-brand-green-700"
                 >
-                  {showAddGuest ? 'Cancel' : '+ Add guest'}
+                  {showAddGuest ? t('common.cancel') : t('coach.addGuestPlus')}
                 </button>
               </div>
 
@@ -489,7 +491,7 @@ export default function Selections() {
                 <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
                   <input
                     type="text"
-                    placeholder="Guest name"
+                    placeholder={t('coach.guestName')}
                     value={guestName}
                     onChange={e => setGuestName(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -500,7 +502,7 @@ export default function Selections() {
                     onChange={e => setGuestPosition(e.target.value)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
                   >
-                    <option value="">Position (optional)</option>
+                    <option value="">{t('coach.positionOptional')}</option>
                     {(match.matchType === 'futsal'
                       ? ['GK', 'WIN', 'MID', 'STR']
                       : ['GK', 'DEF', 'WIN', 'MID', 'STR']
@@ -511,13 +513,13 @@ export default function Selections() {
                     disabled={!guestName.trim() || addGuestMutation.isPending}
                     className="w-full bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2 rounded-lg transition-colors"
                   >
-                    {addGuestMutation.isPending ? 'Adding…' : 'Add guest'}
+                    {addGuestMutation.isPending ? t('coach.adding') : t('coach.addGuest')}
                   </button>
                 </div>
               )}
 
               {guests.length === 0 && !showAddGuest && (
-                <p className="text-sm text-gray-400">No guest players added.</p>
+                <p className="text-sm text-gray-400">{t('coach.noGuests')}</p>
               )}
 
               {guests.map(g => (
@@ -534,24 +536,24 @@ export default function Selections() {
                     disabled={removeGuestMutation.isPending}
                     className="text-xs text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
                   >
-                    Remove
+                    {t('coach.remove')}
                   </button>
                 </div>
               ))}
-              <p className="text-xs text-gray-400">Guests are added or removed immediately.</p>
+              <p className="text-xs text-gray-400">{t('coach.guestsImmediate')}</p>
             </div>
 
             {/* One save for the whole edit (match details + squad) */}
             <div className="sticky bottom-0 bg-gray-50 -mx-4 px-4 py-3 border-t border-gray-200">
               {saveError && <p className="text-sm text-red-500 mb-2">{saveError}</p>}
-              {isPublished && tooFew && <p className="text-xs text-red-500 mb-2">Squad is below the minimum of {match.minPlayers}.</p>}
-              {isPublished && !tooFew && <p className="text-xs text-gray-500 mb-2">Saving emails and notifies anyone added to or removed from the squad.</p>}
+              {isPublished && tooFew && <p className="text-xs text-red-500 mb-2">{t('coach.belowMinimum', { min: match.minPlayers })}</p>}
+              {isPublished && !tooFew && <p className="text-xs text-gray-500 mb-2">{t('coach.saveNotifies')}</p>}
               {showDiscardConfirm ? (
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm text-amber-700">Discard unsaved changes?</p>
+                  <p className="text-sm text-amber-700">{t('coach.discardQ')}</p>
                   <div className="flex gap-2 shrink-0">
-                    <button onClick={exitEdit} className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors">Discard</button>
-                    <button onClick={() => setShowDiscardConfirm(false)} className="text-sm bg-brand-green hover:bg-brand-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">Keep editing</button>
+                    <button onClick={exitEdit} className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors">{t('coach.discard')}</button>
+                    <button onClick={() => setShowDiscardConfirm(false)} className="text-sm bg-brand-green hover:bg-brand-green-700 text-white font-medium px-4 py-2 rounded-lg transition-colors">{t('coach.keepEditing')}</button>
                   </div>
                 </div>
               ) : (
@@ -560,14 +562,14 @@ export default function Selections() {
                     onClick={() => dirty ? setShowDiscardConfirm(true) : exitEdit()}
                     className="text-sm border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition-colors"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     onClick={() => { setSaveError(''); saveAllMutation.mutate({ fields: editFields, ids: [...ids] }); }}
                     disabled={saveAllMutation.isPending || !dirty || (isPublished && tooFew)}
                     className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
                   >
-                    {saveAllMutation.isPending ? 'Saving…' : isPublished ? 'Save & notify players' : 'Save changes'}
+                    {saveAllMutation.isPending ? t('coach.saving') : isPublished ? t('coach.saveAndNotify') : t('coach.saveChanges')}
                   </button>
                 </div>
               )}
@@ -577,15 +579,15 @@ export default function Selections() {
           <>
             {/* Read-only squad list */}
             <div className="space-y-2">
-              <h2 className="text-sm font-semibold text-gray-700">Signed-up players — {signedUpPlayers.length}</h2>
-              {signedUpPlayers.length === 0 && <p className="text-sm text-gray-400">No players signed up.</p>}
+              <h2 className="text-sm font-semibold text-gray-700">{t('coach.signedUpPlayersHeading', { count: signedUpPlayers.length })}</h2>
+              {signedUpPlayers.length === 0 && <p className="text-sm text-gray-400">{t('coach.noSignups')}</p>}
               {signedUpPlayers.map(p => <PlayerRow key={p.player.userId} p={p} interactive={false} />)}
             </div>
 
             {/* Guests (read-only) */}
             {guests.length > 0 && (
               <div className="space-y-2">
-                <h2 className="text-sm font-semibold text-gray-700">Guest players</h2>
+                <h2 className="text-sm font-semibold text-gray-700">{t('coach.guestPlayers')}</h2>
                 {guests.map(g => (
                   <div key={g.guest_id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center shrink-0">

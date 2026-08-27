@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid,
@@ -28,19 +29,20 @@ interface StatsData {
 }
 
 export default function FinesStats() {
+  const { t } = useTranslation();
   const [year, setYear] = useState<string>('all');
   const { data } = useQuery<StatsData>({
     queryKey: ['fines-stats', year],
     queryFn: () => api.get(`/fines/stats${year === 'all' ? '' : `?year=${year}`}`).then(r => r.data.data),
   });
 
-  if (!data) return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">Loading…</div>;
+  if (!data) return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">{t('common.loading')}</div>;
 
   if (data.fineCount === 0) {
     return (
       <div className="space-y-4">
         <YearFilter year={year} setYear={setYear} years={data.availableYears} />
-        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">No fines yet — nothing to brag about.</div>
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">{t('fines.statsEmpty')}</div>
       </div>
     );
   }
@@ -54,15 +56,15 @@ export default function FinesStats() {
 
       {/* Headline tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Tile icon={<Icon name="banknotes" className="w-5 h-5" />} value={kr(data.pot.totalDkk)} label="The pot" sub={`${kr(data.pot.collectedDkk)} in · ${kr(data.pot.outstandingDkk)} owed`} />
-        <Tile icon={<Icon name="crown" className="w-5 h-5" />} value={king?.name.split(' ')[0] ?? '—'} label="Bødekongen" sub={king ? kr(king.totalDkk) : ''} />
-        <Tile icon={<Icon name="receipt" className="w-5 h-5" />} value={data.favouriteFine?.label ?? '—'} label="Favourite fine" sub={data.favouriteFine ? `${data.favouriteFine.count}×` : ''} small />
-        <Tile icon={<StatIcon name="ball" gray className="w-5 h-5" />} value={kr(data.perGameDkk)} label="Per game" sub="avg / match" />
+        <Tile icon={<Icon name="banknotes" className="w-5 h-5" />} value={kr(data.pot.totalDkk)} label={t('fines.thePot')} sub={t('fines.potSub', { in: kr(data.pot.collectedDkk), owed: kr(data.pot.outstandingDkk) })} />
+        <Tile icon={<Icon name="crown" className="w-5 h-5" />} value={king?.name.split(' ')[0] ?? '—'} label={t('fines.fineKing')} sub={king ? kr(king.totalDkk) : ''} />
+        <Tile icon={<Icon name="receipt" className="w-5 h-5" />} value={data.favouriteFine?.label ?? '—'} label={t('fines.favouriteFine')} sub={data.favouriteFine ? `${data.favouriteFine.count}×` : ''} small />
+        <Tile icon={<StatIcon name="ball" gray className="w-5 h-5" />} value={kr(data.perGameDkk)} label={t('fines.perGame')} sub={t('fines.perGameSub')} />
       </div>
 
       {/* Leaderboards */}
       <div className="grid sm:grid-cols-2 gap-4">
-        <Panel title="Top fined">
+        <Panel title={t('fines.topFined')}>
           <ol className="divide-y divide-gray-50">
             {data.topFined.map((p, i) => (
               <li key={p.playerId} className="flex items-center justify-between px-4 py-2.5 text-sm">
@@ -76,9 +78,9 @@ export default function FinesStats() {
           </ol>
         </Panel>
 
-        <Panel title="Most fined per game">
+        <Panel title={t('fines.mostFinedPerGame')}>
           {data.topPerGame.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-gray-400">No match fines yet.</p>
+            <p className="px-4 py-3 text-sm text-gray-400">{t('fines.noMatchFines')}</p>
           ) : (
             <ol className="divide-y divide-gray-50">
               {data.topPerGame.map((p, i) => (
@@ -87,16 +89,16 @@ export default function FinesStats() {
                     <span className="text-gray-400 w-4 shrink-0">{i + 1}.</span>
                     <span className="font-medium text-gray-800 truncate">{p.name}</span>
                   </span>
-                  <span className="shrink-0 text-gray-500">{kr(p.perGameDkk)}/game <span className="text-gray-300">· {p.games}g</span></span>
+                  <span className="shrink-0 text-gray-500">{t('fines.perGameAmount', { amount: kr(p.perGameDkk) })} <span className="text-gray-300">· {t('fines.gamesShort', { count: p.games })}</span></span>
                 </li>
               ))}
             </ol>
           )}
         </Panel>
 
-        <Panel title={`The saints (${data.saints.length})`}>
+        <Panel title={t('fines.theSaints', { count: data.saints.length })}>
           {data.saints.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-gray-400">Nobody — everyone's been fined</p>
+            <p className="px-4 py-3 text-sm text-gray-400">{t('fines.noSaints')}</p>
           ) : (
             <div className="px-4 py-3 flex flex-wrap gap-1.5">
               {data.saints.map(n => (
@@ -106,7 +108,7 @@ export default function FinesStats() {
           )}
         </Panel>
 
-        <Panel title="Biggest single fine">
+        <Panel title={t('fines.biggestFine')}>
           {data.biggestFine ? (
             <div className="px-4 py-3">
               <p className="text-2xl font-bold font-numeric text-gray-900">{kr(data.biggestFine.amountDkk)}</p>
@@ -116,24 +118,24 @@ export default function FinesStats() {
           ) : <p className="px-4 py-3 text-sm text-gray-400">—</p>}
         </Panel>
 
-        <Panel title="Most expensive match">
+        <Panel title={t('fines.mostExpensiveMatch')}>
           {data.mostExpensiveMatch ? (
             <div className="px-4 py-3">
               <p className="text-2xl font-bold font-numeric text-gray-900">{kr(data.mostExpensiveMatch.totalDkk)}</p>
               <p className="text-sm text-gray-700">{data.mostExpensiveMatch.label}</p>
             </div>
-          ) : <p className="px-4 py-3 text-sm text-gray-400">No match fines yet.</p>}
+          ) : <p className="px-4 py-3 text-sm text-gray-400">{t('fines.noMatchFines')}</p>}
         </Panel>
       </div>
 
       {/* Charts */}
-      <Panel title="What we get fined for">
+      <Panel title={t('fines.whatWeGetFinedFor')}>
         <div className="p-3">
           <ResponsiveContainer width="100%" height={chartTypes.length * 38 + 10}>
             <BarChart data={chartTypes} layout="vertical" margin={{ left: 0, right: 16, top: 0, bottom: 0 }}>
               <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
               <YAxis type="category" dataKey="label" width={130} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={((value: any, _name: any, item: any) => [`${value}× · ${kr(item?.payload?.totalDkk ?? 0)}`, 'Fines']) as any} />
+              <Tooltip formatter={((value: any, _name: any, item: any) => [`${value}× · ${kr(item?.payload?.totalDkk ?? 0)}`, t('fines.finesTooltip')]) as any} />
               <Bar dataKey="count" fill={GREEN} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -141,14 +143,14 @@ export default function FinesStats() {
       </Panel>
 
       {data.overTime.length > 1 && (
-        <Panel title="Fines over time">
+        <Panel title={t('fines.finesOverTime')}>
           <div className="p-3">
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={data.overTime} margin={{ left: -10, right: 16, top: 6, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={((value: any) => [kr(Number(value)), 'Fined']) as any} />
+                <Tooltip formatter={((value: any) => [kr(Number(value)), t('fines.finedTooltip')]) as any} />
                 <Line type="monotone" dataKey="totalDkk" stroke={CRIMSON} strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -160,13 +162,14 @@ export default function FinesStats() {
 }
 
 function YearFilter({ year, setYear, years }: { year: string; setYear: (y: string) => void; years: number[] }) {
+  const { t } = useTranslation();
   return (
     <select
       value={year}
       onChange={e => setYear(e.target.value)}
       className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
     >
-      <option value="all">All years</option>
+      <option value="all">{t('fines.allYears')}</option>
       {years.map(y => <option key={y} value={y}>{y}</option>)}
     </select>
   );

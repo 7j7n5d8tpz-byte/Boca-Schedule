@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Star } from './Icon';
 
 export interface SelectionPlayer {
@@ -92,6 +93,7 @@ export function PitchView({
   matchType: string;
   guests: Guest[];
 }) {
+  const { t } = useTranslation();
   const isFutsal = matchType === 'futsal';
   const PITCH_X      = isFutsal ? PITCH_X_FUTSAL      : PITCH_X_7;
   const FORMATION_MIN = isFutsal ? FORMATION_MIN_FUTSAL : FORMATION_MIN_7;
@@ -128,9 +130,9 @@ export function PitchView({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-700">Formation</h2>
+        <h2 className="text-sm font-semibold text-gray-700">{t('pitch.formation')}</h2>
         <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${allMet ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-          {allMet ? '✓ All positions covered' : '⚠ Formation incomplete'}
+          {allMet ? t('pitch.allCovered') : t('pitch.incomplete')}
         </span>
       </div>
 
@@ -272,7 +274,7 @@ export function PitchView({
               <div className="w-8 h-8 rounded-full border-2 border-dashed border-white/70 flex items-center justify-center">
                 <span className="text-white text-[8px] font-bold">{pos}</span>
               </div>
-              <p className="text-white/50 text-[8px] mt-0.5 text-center">empty</p>
+              <p className="text-white/50 text-[8px] mt-0.5 text-center">{t('pitch.empty')}</p>
             </div>
           ));
         })}
@@ -352,15 +354,15 @@ export function PitchView({
         ))}
         <div className="flex items-center gap-1.5">
           <Star className="w-3 h-3 text-yellow-400" />
-          <span className="text-xs text-gray-400">Priority</span>
+          <span className="text-xs text-gray-400">{t('pitch.priority')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full bg-gray-400" />
-          <span className="text-xs text-gray-400">Guest</span>
+          <span className="text-xs text-gray-400">{t('pitch.guest')}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-gray-400 border border-dashed border-gray-300 rounded px-1">empty</span>
-          <span className="text-xs text-gray-400">Uncovered slot</span>
+          <span className="text-xs text-gray-400 border border-dashed border-gray-300 rounded px-1">{t('pitch.empty')}</span>
+          <span className="text-xs text-gray-400">{t('pitch.uncovered')}</span>
         </div>
       </div>
     </div>

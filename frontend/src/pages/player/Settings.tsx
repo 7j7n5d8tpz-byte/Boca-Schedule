@@ -1,16 +1,19 @@
 import AppNav from '../../components/AppNav';
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { LANGUAGES, type Language } from '../../i18n';
 import AvatarCropper from '../../components/AvatarCropper';
 
 function PasswordStrength({ password }: { password: string }) {
+  const { t } = useTranslation();
   const checks = [
-    { label: '8+ characters', ok: password.length >= 8 },
-    { label: 'Uppercase letter', ok: /[A-Z]/.test(password) },
-    { label: 'Number', ok: /[0-9]/.test(password) },
-    { label: 'Special character', ok: /[!@#$%^&*]/.test(password) },
+    { label: t('password.min8'), ok: password.length >= 8 },
+    { label: t('password.uppercase'), ok: /[A-Z]/.test(password) },
+    { label: t('password.number'), ok: /[0-9]/.test(password) },
+    { label: t('password.special'), ok: /[!@#$%^&*]/.test(password) },
   ];
   const score = checks.filter(c => c.ok).length;
   const colors = ['bg-red-400', 'bg-orange-400', 'bg-yellow-400', 'bg-green-500'];
@@ -47,6 +50,7 @@ const POS_COLOR: Record<string, string> = {
 
 export default function Settings() {
   const { user, updateUser } = useAuth();
+  const { t, i18n } = useTranslation();
   const qc = useQueryClient();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,7 +101,7 @@ export default function Settings() {
       setEditing(false);
     },
     onError: (err: any) => {
-      setSaveError(err.response?.data?.error?.message ?? 'Failed to save');
+      setSaveError(err.response?.data?.error?.message ?? t('settings.saveFailed'));
     },
   });
 
@@ -109,20 +113,28 @@ export default function Settings() {
       setCropSrc(null);
       setAvatarError('');
     },
-    onError: (err: any) => setAvatarError(err.response?.data?.error?.message ?? 'Failed to upload photo'),
+    onError: (err: any) => setAvatarError(err.response?.data?.error?.message ?? t('settings.uploadFailed')),
+  });
+
+  const [languageError, setLanguageError] = useState('');
+  const languageMutation = useMutation({
+    mutationFn: (lang: Language) =>
+      api.put(`/players/${user!.userId}/profile`, { language: lang }).then(() => lang),
+    onSuccess: (lang) => { updateUser({ language: lang }); setLanguageError(''); },
+    onError: (err: any) => setLanguageError(err.response?.data?.error?.message ?? t('settings.language.error')),
   });
 
   const removeAvatarMutation = useMutation({
     mutationFn: () => api.delete(`/players/${user!.userId}/avatar`),
     onSuccess: () => { updateUser({ avatarUrl: null }); setAvatarError(''); },
-    onError: (err: any) => setAvatarError(err.response?.data?.error?.message ?? 'Failed to remove photo'),
+    onError: (err: any) => setAvatarError(err.response?.data?.error?.message ?? t('settings.removeFailed')),
   });
 
   function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file
     if (!file) return;
-    if (!file.type.startsWith('image/')) { setAvatarError('Please choose an image file.'); return; }
+    if (!file.type.startsWith('image/')) { setAvatarError(t('common.chooseImageFile')); return; }
     const reader = new FileReader();
     reader.onload = () => setCropSrc(reader.result as string);
     reader.readAsDataURL(file);
@@ -138,17 +150,17 @@ export default function Settings() {
       setPasswordError('');
     },
     onError: (err: any) => {
-      setPasswordError(err.response?.data?.error?.message ?? 'Failed to update password');
+      setPasswordError(err.response?.data?.error?.message ?? t('settings.updateFailed'));
     },
   });
 
   function submitPasswordChange() {
-    if (!currentPassword) { setPasswordError('Enter your current password.'); return; }
+    if (!currentPassword) { setPasswordError(t('settings.enterCurrentPassword')); return; }
     if (newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[!@#$%^&*]/.test(newPassword)) {
-      setPasswordError('New password must be 8+ characters with an uppercase letter, number, and special character.');
+      setPasswordError(t('settings.passwordRequirements'));
       return;
     }
-    if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return; }
+    if (newPassword !== confirmPassword) { setPasswordError(t('auth.passwordsDoNotMatch')); return; }
     setPasswordError('');
     changePasswordMutation.mutate();
   }
@@ -165,13 +177,13 @@ export default function Settings() {
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-extrabold text-gray-900">Settings</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900">{t('settings.title')}</h1>
           {!editing && (
             <button
               onClick={() => setEditing(true)}
               className="text-sm text-brand-green hover:underline"
             >
-              Edit
+              {t('settings.edit')}
             </button>
           )}
         </div>
@@ -191,7 +203,7 @@ export default function Settings() {
                   onClick={() => fileInputRef.current?.click()}
                   className="text-sm font-medium text-brand-green hover:underline"
                 >
-                  {user?.avatarUrl ? 'Change photo' : 'Add photo'}
+                  {user?.avatarUrl ? t('settings.changePhoto') : t('settings.addPhoto')}
                 </button>
                 {user?.avatarUrl && (
                   <button
@@ -199,11 +211,11 @@ export default function Settings() {
                     disabled={removeAvatarMutation.isPending}
                     className="text-sm text-gray-400 hover:text-red-500 disabled:opacity-50"
                   >
-                    Remove
+                    {t('common.remove')}
                   </button>
                 )}
               </div>
-              <p className="text-xs text-gray-400">JPG, PNG or WebP. You choose the crop.</p>
+              <p className="text-xs text-gray-400">{t('settings.photoHint')}</p>
               {avatarError && <p className="text-xs text-red-500">{avatarError}</p>}
             </div>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={onFilePicked} className="hidden" />
@@ -211,14 +223,14 @@ export default function Settings() {
 
           <div className="h-px bg-gray-100" />
 
-          {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
+          {isLoading && <p className="text-sm text-gray-400">{t('common.loading')}</p>}
 
           {!isLoading && data && (
             <>
               {editing ? (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.name')}</label>
                     <input
                       value={name}
                       onChange={e => setName(e.target.value)}
@@ -226,7 +238,7 @@ export default function Settings() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Positions</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t('settings.preferredPositions')}</label>
                     <div className="flex gap-2 flex-wrap">
                       {ALL_POSITIONS.map(pos => (
                         <button
@@ -250,13 +262,13 @@ export default function Settings() {
                       disabled={saveMutation.isPending}
                       className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
                     >
-                      {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+                      {saveMutation.isPending ? t('settings.saving') : t('settings.saveChanges')}
                     </button>
                     <button
                       onClick={() => setEditing(false)}
                       className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </div>
@@ -271,7 +283,7 @@ export default function Settings() {
                       </span>
                     ))}
                     {(data.player.preferredPositions ?? []).length === 0 && (
-                      <span className="text-sm text-gray-400">No positions set</span>
+                      <span className="text-sm text-gray-400">{t('settings.noPositions')}</span>
                     )}
                   </div>
                 </div>
@@ -286,7 +298,7 @@ export default function Settings() {
             onClick={() => { setChangingPassword(p => !p); setPasswordError(''); setPasswordSuccess(false); }}
             className="w-full flex items-center justify-between text-sm font-medium text-gray-700 hover:text-gray-900"
           >
-            <span>Change password</span>
+            <span>{t('settings.changePassword')}</span>
             <span className="text-gray-400">{changingPassword ? '▲' : '▼'}</span>
           </button>
 
@@ -294,13 +306,13 @@ export default function Settings() {
             <div className="mt-4 space-y-4">
               {passwordSuccess ? (
                 <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 text-sm">
-                  Password updated successfully.
-                  <button onClick={() => { setChangingPassword(false); setPasswordSuccess(false); }} className="ml-2 underline">Close</button>
+                  {t('settings.passwordUpdated')}
+                  <button onClick={() => { setChangingPassword(false); setPasswordSuccess(false); }} className="ml-2 underline">{t('common.close')}</button>
                 </div>
               ) : (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.currentPassword')}</label>
                     <input
                       type="password"
                       autoComplete="current-password"
@@ -311,7 +323,7 @@ export default function Settings() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.newPassword')}</label>
                     <input
                       type="password"
                       autoComplete="new-password"
@@ -323,7 +335,7 @@ export default function Settings() {
                     <PasswordStrength password={newPassword} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.confirmNewPassword')}</label>
                     <input
                       type="password"
                       autoComplete="new-password"
@@ -335,7 +347,7 @@ export default function Settings() {
                       placeholder="••••••••"
                     />
                     {confirmPassword && confirmPassword !== newPassword && (
-                      <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                      <p className="text-xs text-red-500 mt-1">{t('auth.passwordsDoNotMatchShort')}</p>
                     )}
                   </div>
                   {passwordError && <p className="text-sm text-red-500">{passwordError}</p>}
@@ -345,13 +357,13 @@ export default function Settings() {
                       disabled={changePasswordMutation.isPending}
                       className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
                     >
-                      {changePasswordMutation.isPending ? 'Updating…' : 'Update password'}
+                      {changePasswordMutation.isPending ? t('settings.updating') : t('settings.updatePassword')}
                     </button>
                     <button
                       onClick={() => { setChangingPassword(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setPasswordError(''); }}
                       className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </>
@@ -363,9 +375,9 @@ export default function Settings() {
         {/* Calendar subscription */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
           <div>
-            <p className="text-sm font-medium text-gray-900">Subscribe to my matches</p>
+            <p className="text-sm font-medium text-gray-900">{t('settings.calendar.title')}</p>
             <p className="text-xs text-gray-400 mt-0.5">
-              Add this feed to your calendar app to keep your upcoming Boca matches in sync automatically.
+              {t('settings.calendar.help')}
             </p>
           </div>
           {feedUrl && (
@@ -381,17 +393,46 @@ export default function Settings() {
                   onClick={async () => { await navigator.clipboard.writeText(feedUrl); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
                   className="shrink-0 text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors"
                 >
-                  {copied ? 'Copied ✓' : 'Copy'}
+                  {copied ? t('settings.calendar.copied') : t('settings.calendar.copy')}
                 </button>
               </div>
               <a
                 href={feedUrl.replace(/^https?:/, 'webcal:')}
                 className="inline-block text-xs font-medium text-brand-green hover:underline"
               >
-                Add to calendar app →
+                {t('settings.calendar.addToApp')}
               </a>
             </>
           )}
+        </div>
+
+        {/* Language */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900">{t('settings.language.title')}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{t('settings.language.help')}</p>
+          </div>
+          <div className="flex gap-2">
+            {LANGUAGES.map(lang => {
+              const active = i18n.language === lang;
+              return (
+                <button
+                  key={lang}
+                  onClick={() => languageMutation.mutate(lang)}
+                  disabled={active || languageMutation.isPending}
+                  aria-pressed={active}
+                  className={`text-sm font-medium px-4 py-2 rounded-lg border transition-colors ${
+                    active
+                      ? 'bg-brand-green text-white border-brand-green'
+                      : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {t(lang === 'da' ? 'settings.language.danish' : 'settings.language.english')}
+                </button>
+              );
+            })}
+          </div>
+          {languageError && <p className="text-xs text-red-500">{languageError}</p>}
         </div>
 
       </main>

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import { useCatalog, type PlayerAchievements } from '../api/achievements';
@@ -15,6 +16,7 @@ export default function PlayerCrestStrip({ playerId, onOpen, linkToAchievements 
   onOpen?: (code: string) => void;
   linkToAchievements?: boolean;
 }) {
+  const { t } = useTranslation();
   const { data: catalog } = useCatalog();
   const { data } = useQuery<PlayerAchievements>({
     queryKey: ['achievements', playerId],
@@ -31,10 +33,10 @@ export default function PlayerCrestStrip({ playerId, onOpen, linkToAchievements 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
       <div className="flex items-center justify-between gap-3 mb-3">
-        <h2 className="text-sm font-semibold text-gray-700">Crests · {data.seasonYear} (all competitions)</h2>
+        <h2 className="text-sm font-semibold text-gray-700">{t('crests.title', { year: data.seasonYear })}</h2>
         {linkToAchievements && (
           <Link to="/achievements" className="text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors shrink-0">
-            All achievements →
+            {t('crests.allAchievements')}
           </Link>
         )}
       </div>
@@ -52,7 +54,7 @@ export default function PlayerCrestStrip({ playerId, onOpen, linkToAchievements 
           </div>
         ))}
       </div>
-      {onOpen && <p className="mt-3 text-[11px] text-gray-400">Tap a crest to see what it takes.</p>}
+      {onOpen && <p className="mt-3 text-[11px] text-gray-400">{t('crests.tapToSee')}</p>}
     </div>
   );
 }

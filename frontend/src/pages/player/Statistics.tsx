@@ -36,6 +36,22 @@ interface PlayerStat {
   gkAppearances: number;
 }
 
+// A cancelled match scored as a forfeit: 3-0 to us when the opponent called it
+// off, 0-3 when we did. It counts in the record but was never played.
+type Walkover = 'us' | 'opponent' | null;
+
+function WalkoverBadge({ walkover }: { walkover: Walkover }) {
+  if (!walkover) return null;
+  return (
+    <span
+      className="text-xs font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700"
+      title={walkover === 'opponent' ? 'Opponent cancelled — awarded 3–0' : 'We cancelled — forfeited 0–3'}
+    >
+      Walkover
+    </span>
+  );
+}
+
 interface MatchHistory {
   matchId: string;
   matchDate: string;
@@ -43,6 +59,7 @@ interface MatchHistory {
   opponent: string | null;
   goalsFor: number;
   goalsAgainst: number;
+  walkover: Walkover;
 }
 
 interface MatchHighlight {
@@ -55,6 +72,7 @@ interface MatchHighlight {
   goalsFor: number;
   goalsAgainst: number;
   gameAssessment: string | null;
+  walkover: Walkover;
   goals: { scorerId: string | null; scorerName: string | null; assisterId: string | null; assisterName: string | null }[];
   cleanSheets: { playerId: string; name: string }[];
   yellowCards: { playerId: string; name: string }[];
@@ -105,6 +123,7 @@ interface OpponentMatch {
   goalsFor: number;
   goalsAgainst: number;
   gameAssessment: string | null;
+  walkover: Walkover;
 }
 
 interface OpponentHistory {
@@ -484,6 +503,7 @@ export default function Statistics() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <WalkoverBadge walkover={h.walkover} />
                       <span className="text-2xl font-bold font-numeric text-gray-900">{h.goalsFor} – {h.goalsAgainst}</span>
                       <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${resultColor}`}>{result}</span>
                     </div>
@@ -507,7 +527,14 @@ export default function Statistics() {
                       ))}
                     </div>
                   )}
-                  {h.goals.length === 0 && h.goalsFor > 0 && (
+                  {h.walkover && (
+                    <p className="text-sm text-gray-500">
+                      {h.walkover === 'opponent'
+                        ? 'The opponent cancelled — awarded to us as a 3–0 walkover.'
+                        : 'We cancelled — forfeited as a 0–3 walkover.'}
+                    </p>
+                  )}
+                  {!h.walkover && h.goals.length === 0 && h.goalsFor > 0 && (
                     <p className="text-xs text-gray-400 italic">Goal details not recorded.</p>
                   )}
 
@@ -756,6 +783,7 @@ export default function Statistics() {
                             </p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
+                            <WalkoverBadge walkover={m.walkover} />
                             <span className="text-lg font-bold font-numeric text-gray-900">{m.goalsFor}–{m.goalsAgainst}</span>
                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${resultColor}`}>{result}</span>
                           </div>
@@ -789,6 +817,7 @@ export default function Statistics() {
                               <td className="px-4 py-2">
                                 <span className="font-numeric font-semibold text-gray-900 mr-2">{m.goalsFor}–{m.goalsAgainst}</span>
                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${resultColor}`}>{result}</span>
+                                <span className="ml-2"><WalkoverBadge walkover={m.walkover} /></span>
                               </td>
                               <td className={`px-4 py-2 ${assessment ? assessment.color : 'text-gray-300'}`}>{assessment ? assessment.label : '—'}</td>
                             </tr>

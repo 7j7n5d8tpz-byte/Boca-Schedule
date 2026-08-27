@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { sendSelectionNotifications, sendCancellationNotifications, sendReleaseNotification, sendSpotOpenNotification } from '../lib/mailer.js';
+import { walkoverScore, type CancelledBy } from '../lib/walkover.js';
 import { createNotifications } from '../lib/notifications.js';
 import { notifySignupOpen } from '../lib/signupOpen.js';
 import { resolveOpponent } from '../lib/opponents.js';
@@ -320,6 +321,7 @@ const UpdateMatchSchema = z.object({
   matchCategory: z.enum(['serie', 'pokal']).optional(),
   serieLetter: z.string().max(10).nullable().optional(),
   status: z.enum(['draft','signup_open','signup_closed','optimized','published','completed','cancelled']).optional(),
+  cancelledBy: z.enum(['us','opponent']).nullable().optional(),
   minPlayers: z.number().int().positive().optional(),
   maxPlayers: z.number().int().positive().optional(),
   signupOpenDate: z.string().datetime().optional(),
@@ -387,10 +389,45 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
 
     // Fetch the prior row so we can detect a new cancellation or a moved match.
     const { data: existing } = await supabaseAdmin
-      .from('matches').select('status, match_date, match_time, location, opponent').eq('match_id', matchId).single();
+      .from('matches').select('status, match_date, match_time, location, opponent, cancelled_by').eq('match_id', matchId).single();
+
+    // Who called the match off. Only meaningful while the match is cancelled, so
+    // un-cancelling clears it (and the walkover result below with it).
+    const nextStatus = d.status ?? existing?.status;
+    if (d.cancelledBy != null && nextStatus !== 'cancelled') {
+      res.status(422).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'cancelledBy is only valid on a cancelled match' },
+      });
+      return;
+    }
+    if (d.cancelledBy !== undefined) updates.cancelled_by = d.cancelledBy;
+    if (nextStatus !== 'cancelled') updates.cancelled_by = null;
+
+    const prevCancelledBy = (existing?.cancelled_by ?? null) as CancelledBy | null;
+    const cancelledBy = ('cancelled_by' in updates ? updates.cancelled_by : prevCancelledBy) as CancelledBy | null;
 
     const { data, error } = await supabaseAdmin.from('matches').update(updates).eq('match_id', matchId).select().single();
     if (error) throw error;
+
+    // Keep the walkover result in step with who cancelled: 3-0 to us when the
+    // opponent called it off, 0-3 when we did. It's a team result only — nobody
+    // played, so no match_performance rows and no achievement recompute.
+    if (cancelledBy !== prevCancelledBy) {
+      if (cancelledBy) {
+        const { goalsFor, goalsAgainst } = walkoverScore(cancelledBy);
+        await supabaseAdmin.from('match_results').upsert({
+          match_id: matchId,
+          goals_for: goalsFor,
+          goals_against: goalsAgainst,
+          recorded_by: req.user!.userId,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'match_id' });
+      } else {
+        // Only ever removes a walkover — a played match's result is never touched.
+        await supabaseAdmin.from('match_results').delete().eq('match_id', matchId);
+      }
+    }
 
     // Opening a draft by hand announces it, exactly as creating an open match
     // does. notifySignupOpen claims the match atomically, so this can't collide
@@ -414,12 +451,18 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
               matchTime: existing.match_time,
               location: existing.location,
               opponent: existing.opponent ?? null,
-            }).catch(err => console.error('Failed to send cancellation notifications:', err));
+            }, cancelledBy).catch(err => console.error('Failed to send cancellation notifications:', err));
           }
+          const label = matchLabel({ match_date: existing.match_date, match_time: existing.match_time, opponent: existing.opponent });
+          const outcome = cancelledBy === 'opponent'
+            ? ' · Opponent called it off — scored as a 3–0 win'
+            : cancelledBy === 'us'
+              ? ' · We called it off — scored as a 0–3 loss'
+              : '';
           createNotifications(rows.map((u: any) => u.user_id), {
             type: 'match_cancelled',
             title: 'Match cancelled',
-            body: matchLabel({ match_date: existing.match_date, match_time: existing.match_time, opponent: existing.opponent }),
+            body: `${label}${outcome}`,
             link: '/dashboard',
             matchId: String(matchId),
           });
@@ -494,6 +537,7 @@ router.get('/:matchId/signups', authenticate, requireRole('coach', 'admin'), asy
           matchCategory: match.match_category ?? 'serie',
           serieLetter: match.serie_letter ?? null,
           status: match.status,
+          cancelledBy: match.cancelled_by ?? null,
           minPlayers: match.min_players,
           maxPlayers: match.max_players,
           signupOpenDate: match.signup_open_date,

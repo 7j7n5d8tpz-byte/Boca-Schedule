@@ -161,6 +161,7 @@ export async function sendDeselectionNotifications(
 export async function sendCancellationNotifications(
   players: { name: string; email: string }[],
   match: { matchDate: string; matchTime: string; location: string; opponent: string | null },
+  cancelledBy: 'us' | 'opponent' | null = null,
 ): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('en-GB', {
     weekday: 'long', day: 'numeric', month: 'long',
@@ -168,16 +169,24 @@ export async function sendCancellationNotifications(
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
+  // A side that calls the match off forfeits it, so say how it was scored.
+  const outcomeText = cancelledBy === 'opponent'
+    ? 'The opponent called it off, so the match is scored as a 3–0 win to us.'
+    : cancelledBy === 'us'
+      ? 'We called it off, so the match is scored as a 0–3 loss.'
+      : '';
+
   return sendMany(players, 'cancellation notifications', p => ({
     subject: `Match cancelled — ${dateStr}`,
     html: `<p>Hi <strong>${p.name}</strong>,</p>
      <p>Unfortunately the match you were selected for has been cancelled.</p>
+     ${outcomeText ? `<p>${outcomeText}</p>` : ''}
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Date</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Time</td><td style="font-size:14px">${timeStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Location</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
      </table>`,
-    text: `Hi ${p.name},\n\nUnfortunately the match you were selected for has been cancelled.\n\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}`,
+    text: `Hi ${p.name},\n\nUnfortunately the match you were selected for has been cancelled.\n${outcomeText ? `${outcomeText}\n` : ''}\nDate: ${dateStr}\nTime: ${timeStr}\nLocation: ${match.location}${opponent}`,
   }));
 }
 

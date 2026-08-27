@@ -26,6 +26,7 @@ interface MatchData {
   matchCategory: string;
   serieLetter: string | null;
   status: string;
+  cancelledBy: CancelledBy;
   minPlayers: number;
   maxPlayers: number;
   signupOpenDate: string;
@@ -36,6 +37,51 @@ interface SignupsResponse {
   match: MatchData;
   signups: SignupPlayer[];
   summary: { totalSignups: number; prioritySignups: number };
+}
+
+// Whoever calls a match off forfeits it: the opponent cancelling hands us a 3-0,
+// cancelling ourselves hands them one. A match called off by neither side
+// (weather, postponed, mutually agreed) is recorded with no result at all.
+type CancelledBy = 'us' | 'opponent' | null;
+
+const CANCEL_OPTIONS: { value: CancelledBy; label: string; hint: string }[] = [
+  { value: 'opponent', label: 'The opponent cancelled',   hint: 'Scored as a 3–0 win to us' },
+  { value: 'us',       label: 'We cancelled',             hint: 'Scored as a 0–3 loss' },
+  { value: null,       label: 'Neither — called off',     hint: 'Postponed, weather or mutually agreed. No result recorded.' },
+];
+
+function cancelOutcomeText(cancelledBy: CancelledBy) {
+  if (cancelledBy === 'opponent') return 'The opponent cancelled — scored as a 3–0 win to us.';
+  if (cancelledBy === 'us')       return 'We cancelled — scored as a 0–3 loss.';
+  return 'Called off by neither side — no result recorded.';
+}
+
+function CancelledByPicker({ value, onChange, disabled }: { value: CancelledBy; onChange: (v: CancelledBy) => void; disabled?: boolean }) {
+  return (
+    <div className="space-y-2">
+      {CANCEL_OPTIONS.map(o => (
+        <label
+          key={String(o.value)}
+          className={`flex items-start gap-3 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${
+            value === o.value ? 'border-red-300 bg-white' : 'border-gray-200 bg-white/60 hover:bg-white'
+          }`}
+        >
+          <input
+            type="radio"
+            name="cancelled-by"
+            className="mt-1 accent-red-600"
+            checked={value === o.value}
+            disabled={disabled}
+            onChange={() => onChange(o.value)}
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-gray-900">{o.label}</span>
+            <span className="block text-xs text-gray-500">{o.hint}</span>
+          </span>
+        </label>
+      ))}
+    </div>
+  );
 }
 
 const POS_COLOR: Record<string, string> = {
@@ -58,6 +104,8 @@ export default function MatchDetail() {
   const [showEdit, setShowEdit] = useState(false);
   const [editFields, setEditFields] = useState<MatchEditFields | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelledBy, setCancelledBy] = useState<CancelledBy>(null);
+  const [showOutcomeEdit, setShowOutcomeEdit] = useState(false);
 
   const { data, isLoading } = useQuery<SignupsResponse>({
     queryKey: ['match-signups', matchId],
@@ -102,10 +150,21 @@ export default function MatchDetail() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: () => api.put(`/matches/${matchId}`, { status: 'cancelled' }),
+    mutationFn: () => api.put(`/matches/${matchId}`, { status: 'cancelled', cancelledBy }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['matches'] });
       navigate('/coach');
+    },
+  });
+
+  // Fixing the outcome afterwards — the walkover result follows whichever side
+  // is recorded here, and clearing it removes the result again.
+  const outcomeMutation = useMutation({
+    mutationFn: (value: CancelledBy) => api.put(`/matches/${matchId}`, { cancelledBy: value }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['match-signups', matchId] });
+      qc.invalidateQueries({ queryKey: ['matches'] });
+      setShowOutcomeEdit(false);
     },
   });
 
@@ -171,12 +230,14 @@ export default function MatchDetail() {
             >
               Edit
             </button>
-            <button
-              onClick={() => setShowCancelConfirm(true)}
-              className="text-sm border border-red-200 text-red-600 hover:bg-red-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
-            >
-              Cancel match
-            </button>
+            {match.status !== 'cancelled' && (
+              <button
+                onClick={() => setShowCancelConfirm(true)}
+                className="text-sm border border-red-200 text-red-600 hover:bg-red-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Cancel match
+              </button>
+            )}
           </div>
         </div>
 
@@ -250,6 +311,35 @@ export default function MatchDetail() {
             <p className="text-sm text-gray-500">This match is completed.</p>
           </div>
         )}
+        {match.status === 'cancelled' && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-red-800">This match is cancelled.</p>
+                <p className="text-sm text-red-600 mt-0.5">{cancelOutcomeText(match.cancelledBy)}</p>
+              </div>
+              <button
+                onClick={() => { setShowOutcomeEdit(v => !v); setCancelledBy(match.cancelledBy); }}
+                className="shrink-0 text-sm border border-red-200 text-red-600 hover:bg-red-100 font-medium px-3 py-1.5 rounded-lg transition-colors"
+              >
+                {showOutcomeEdit ? 'Close' : 'Change'}
+              </button>
+            </div>
+            {showOutcomeEdit && (
+              <>
+                <CancelledByPicker value={cancelledBy} onChange={setCancelledBy} disabled={outcomeMutation.isPending} />
+                <button
+                  onClick={() => outcomeMutation.mutate(cancelledBy)}
+                  disabled={outcomeMutation.isPending}
+                  className="text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+                >
+                  {outcomeMutation.isPending ? 'Saving…' : 'Save outcome'}
+                </button>
+                {outcomeMutation.isError && <p className="text-sm text-red-500">Failed to save the outcome.</p>}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Edit form */}
         {showEdit && editFields && (
@@ -279,7 +369,9 @@ export default function MatchDetail() {
         {showCancelConfirm && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-3">
             <p className="font-semibold text-red-800">Cancel this match?</p>
-            <p className="text-sm text-red-600">This cannot be undone. The match will be marked as cancelled and removed from the active list.</p>
+            <p className="text-sm text-red-600">The match is removed from the active list and everyone selected is notified.</p>
+            <p className="text-sm font-medium text-red-800">Who cancelled?</p>
+            <CancelledByPicker value={cancelledBy} onChange={setCancelledBy} disabled={cancelMutation.isPending} />
             <div className="flex gap-2">
               <button
                 onClick={() => cancelMutation.mutate()}
@@ -298,7 +390,8 @@ export default function MatchDetail() {
           </div>
         )}
 
-        {/* Optimize card */}
+        {/* Optimize card — a cancelled match has nothing left to select. */}
+        {match.status !== 'cancelled' && (
         <div id="optimize" className="bg-white rounded-xl border border-gray-200 p-5 space-y-4 scroll-mt-4">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -357,6 +450,7 @@ export default function MatchDetail() {
             </div>
           )}
         </div>
+        )}
 
         {/* Sign-ups list */}
         <div className="space-y-3">

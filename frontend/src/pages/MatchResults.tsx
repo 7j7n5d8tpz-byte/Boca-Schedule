@@ -2,9 +2,11 @@ import AppNav from './../components/AppNav';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { toPng } from 'html-to-image';
 import { api } from '../api/client';
 import StatIcon, { CardChip } from '../components/StatIcon';
+import { useDateFormat } from '../i18n/format';
 
 const POS_COLOR: Record<string, string> = {
   GK:  'bg-yellow-100 text-yellow-700',
@@ -14,13 +16,13 @@ const POS_COLOR: Record<string, string> = {
   STR: 'bg-red-100 text-red-700',
 };
 
-const ASSESSMENT_LABEL: Record<string, { label: string; color: string; bg: string }> = {
-  dominated:          { label: 'We dominated',      color: '#15803d', bg: '#f0fdf4' },
-  strong_performance: { label: 'Strong performance', color: '#1d4ed8', bg: '#eff6ff' },
-  even_game:          { label: 'Evenly matched',     color: '#6b7280', bg: '#f9fafb' },
-  unlucky:            { label: 'Unlucky result',     color: '#b45309', bg: '#fffbeb' },
-  tough_game:         { label: 'Tough game',         color: '#9333ea', bg: '#faf5ff' },
-  off_day:            { label: 'Off day',            color: '#dc2626', bg: '#fef2f2' },
+const ASSESSMENT_STYLE: Record<string, { color: string; bg: string }> = {
+  dominated:          { color: '#15803d', bg: '#f0fdf4' },
+  strong_performance: { color: '#1d4ed8', bg: '#eff6ff' },
+  even_game:          { color: '#6b7280', bg: '#f9fafb' },
+  unlucky:            { color: '#b45309', bg: '#fffbeb' },
+  tough_game:         { color: '#9333ea', bg: '#faf5ff' },
+  off_day:            { color: '#dc2626', bg: '#fef2f2' },
 };
 
 interface SelectedPlayer {
@@ -59,10 +61,12 @@ interface HighlightsProps {
 }
 
 function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: React.RefObject<HTMLDivElement | null> }) {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const won  = props.goalsFor > props.goalsAgainst;
   const drew = props.goalsFor === props.goalsAgainst;
-  const assessment = props.gameAssessment ? ASSESSMENT_LABEL[props.gameAssessment] : null;
-  const dateStr = props.date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const assessment = props.gameAssessment ? ASSESSMENT_STYLE[props.gameAssessment] : null;
+  const dateStr = formatDate(props.date, 'longYear');
   const hasGoalDetails   = props.goalDetails.length > 0;
   const hasCleanSheets   = props.cleanSheetNames.length > 0;
   const hasYellowCards   = props.yellowCardNames.length > 0;
@@ -85,7 +89,7 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
         <img src="/boca-logo.png" alt="Boca" style={{ width: 52, height: 52, borderRadius: 26 }} />
         <div>
           <p style={{ color: '#fff', fontWeight: 700, fontSize: 15, margin: 0 }}>Boca Boldisch</p>
-          <p style={{ color: '#6b9e6b', fontSize: 11, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>{props.matchType}</p>
+          <p style={{ color: '#6b9e6b', fontSize: 11, margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>{t(`matchTypes.${props.matchType}`, { defaultValue: props.matchType })}</p>
         </div>
         <div style={{ marginLeft: 'auto' }}>
           <p style={{ color: '#9ca3af', fontSize: 12, margin: 0 }}>{dateStr}</p>
@@ -94,13 +98,13 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
 
       {/* Score */}
       <div style={{ textAlign: 'center', marginBottom: assessment ? 20 : showBottomSection ? 24 : 0 }}>
-        <p style={{ color: '#9ca3af', fontSize: 12, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Final score</p>
+        <p style={{ color: '#9ca3af', fontSize: 12, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>{t('results.card.finalScore')}</p>
         {/* Team labels — separate row so the separator aligns with the numbers only */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 20, marginBottom: 4 }}>
           <p style={{ color: '#d1fae5', fontSize: 12, margin: 0, minWidth: 80, textAlign: 'center' }}>Boca Boldisch</p>
           <div style={{ width: 32 }} />
           <p style={{ color: '#9ca3af', fontSize: 12, margin: 0, minWidth: 80, textAlign: 'center' }}>
-            {props.opponent ?? 'Opponent'}
+            {props.opponent ?? t('results.card.opponent')}
           </p>
         </div>
         {/* Score numbers row */}
@@ -110,7 +114,7 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
           <p style={{ color: '#9ca3af', fontSize: 66, fontWeight: 900, lineHeight: 1, margin: 0, minWidth: 80, textAlign: 'center', letterSpacing: -2, fontFeatureSettings: '"tnum" 1' }}>{props.goalsAgainst}</p>
         </div>
         <p style={{ marginTop: 12, fontSize: 18, fontWeight: 700, color: won ? '#4ade80' : drew ? '#fbbf24' : '#f87171' }}>
-          {won ? 'WIN' : drew ? 'DRAW' : 'LOSS'}
+          {won ? t('results.card.win') : drew ? t('results.card.draw') : t('results.card.loss')}
         </p>
       </div>
 
@@ -118,7 +122,7 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
       {assessment && (
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: props.manOfMatchName || showBottomSection ? 20 : 0 }}>
           <span style={{ background: assessment.bg, color: assessment.color, fontSize: 13, fontWeight: 600, padding: '6px 16px', borderRadius: 20 }}>
-            {assessment.label}
+            {t(`results.assessment.${props.gameAssessment}`)}
           </span>
         </div>
       )}
@@ -128,7 +132,7 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
         <div style={{ textAlign: 'center', marginBottom: showBottomSection ? 24 : 0 }}>
           <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>
             <img src="/icon-star-white.png" alt="" style={{ width: 12, height: 12, display: 'inline-block', verticalAlign: 'middle', marginRight: 5, marginTop: -2 }} />
-            Man of the Match
+            {t('results.card.motm')}
           </p>
           <p style={{ color: '#fde68a', fontSize: 16, fontWeight: 700, margin: 0 }}>{props.manOfMatchName}</p>
         </div>
@@ -142,7 +146,7 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
             <div style={{ flex: 1 }}>
               <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
                 <img src="/icon-ball-white.png" alt="" style={{ width: 12, height: 12, display: 'inline-block', verticalAlign: 'middle', marginRight: 5, marginTop: -2 }} />
-                Goals
+                {t('results.card.goals')}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {props.goalDetails.map((g, i) => (
@@ -150,7 +154,7 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
                     <span style={{ color: '#4b5563', fontSize: 11, minWidth: 16, flexShrink: 0, paddingTop: 1 }}>{i + 1}.</span>
                     <div>
                       <span style={{ color: '#d1fae5', fontSize: 13, fontWeight: 600, display: 'block' }}>
-                        {g.scorerName ?? 'Own goal'}
+                        {g.scorerName ?? t('results.card.ownGoal')}
                       </span>
                       {g.assisterName && (
                         <span style={{ color: '#86efac', fontSize: 11, display: 'block' }}>↳ {g.assisterName}</span>
@@ -167,7 +171,7 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
             <div style={{ flex: 1 }}>
               <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>
                 <img src="/icon-glove-white.png" alt="" style={{ width: 12, height: 12, display: 'inline-block', verticalAlign: 'middle', marginRight: 5, marginTop: -2 }} />
-                Clean sheet
+                {t('results.card.cleanSheet')}
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {props.cleanSheetNames.map((name, i) => (
@@ -180,7 +184,7 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
           {/* Cards */}
           {hasCards && (
             <div style={{ flex: 1 }}>
-              <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Cards</p>
+              <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>{t('results.card.cards')}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {props.yellowCardNames.map((name, i) => (
                   <div key={`y${i}`} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -203,7 +207,7 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
       {/* Long read / match report */}
       {props.longRead && (
         <div style={{ borderTop: '1px solid #1f2f1f', marginTop: 20, paddingTop: 16 }}>
-          <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Match Report</p>
+          <p style={{ color: '#6b9e6b', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{t('results.card.matchReport')}</p>
           <p style={{ color: '#d1d5db', fontSize: 12, lineHeight: 1.6, margin: 0, whiteSpace: 'pre-wrap' }}>{props.longRead}</p>
         </div>
       )}
@@ -237,14 +241,15 @@ function PlayerButton({ player, selected, onClick, disabled }: {
 // ─── Step progress ────────────────────────────────────────────────────────────
 
 function StepProgress({ step, goalIndex, goalsFor }: { step: Step; goalIndex: number; goalsFor: number }) {
+  const { t } = useTranslation();
   const steps = [
-    { key: 'score',       label: 'Score' },
-    ...(goalsFor > 0 ? [{ key: 'goals', label: step === 'goals' ? `Goal ${goalIndex + 1}/${goalsFor}` : 'Goals' }] : []),
-    { key: 'goalkeepers', label: 'Goalkeepers' },
-    { key: 'cards',       label: 'Cards' },
-    { key: 'motm',        label: 'Man of match' },
-    { key: 'fines',       label: 'Fines' },
-    { key: 'assessment',  label: 'Feeling' },
+    { key: 'score',       label: t('results.steps.score') },
+    ...(goalsFor > 0 ? [{ key: 'goals', label: step === 'goals' ? t('results.steps.goalN', { index: goalIndex + 1, total: goalsFor }) : t('results.steps.goals') }] : []),
+    { key: 'goalkeepers', label: t('results.steps.goalkeepers') },
+    { key: 'cards',       label: t('results.steps.cards') },
+    { key: 'motm',        label: t('results.steps.motm') },
+    { key: 'fines',       label: t('results.steps.fines') },
+    { key: 'assessment',  label: t('results.steps.feeling') },
   ];
   const currentIdx = steps.findIndex(s => s.key === step);
   return (
@@ -265,6 +270,8 @@ function StepProgress({ step, goalIndex, goalsFor }: { step: Step; goalIndex: nu
 
 export default function MatchResults() {
   const { matchId } = useParams<{ matchId: string }>();
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -419,7 +426,7 @@ export default function MatchResults() {
       qc.invalidateQueries({ queryKey: ['matches'] });
       setShowHighlights(true);
     },
-    onError: (err: any) => setError(err.response?.data?.error?.message ?? 'Failed to save'),
+    onError: (err: any) => setError(err.response?.data?.error?.message ?? t('results.saveFailed')),
   });
 
   async function downloadHighlights() {
@@ -458,7 +465,7 @@ export default function MatchResults() {
   }
 
   const goalDetails: GoalDetail[] = goalEntries.map(g => ({
-    scorerName:   g.scorerId   ? (selectedPlayers.find(p => p.userId === g.scorerId)?.name  ?? 'Unknown') : null,
+    scorerName:   g.scorerId   ? (selectedPlayers.find(p => p.userId === g.scorerId)?.name  ?? t('results.unknown')) : null,
     assisterName: g.assisterId ? (selectedPlayers.find(p => p.userId === g.assisterId)?.name ?? null)     : null,
   }));
 
@@ -466,13 +473,13 @@ export default function MatchResults() {
     ...(gkFirstHalfId  && gkFirstHalfCleanSheet  ? [gkFirstHalfId]  : []),
     ...(gkSecondHalfId && gkSecondHalfCleanSheet ? [gkSecondHalfId] : []),
   ])];
-  const cleanSheetNames  = cleanSheetIds.map(id => selectedPlayers.find(p => p.userId === id)?.name ?? 'Unknown');
-  const yellowCardNames  = yellowCardIds.map(id => selectedPlayers.find(p => p.userId === id)?.name ?? 'Unknown');
-  const redCardNames     = redCardIds.map(id => selectedPlayers.find(p => p.userId === id)?.name ?? 'Unknown');
+  const cleanSheetNames  = cleanSheetIds.map(id => selectedPlayers.find(p => p.userId === id)?.name ?? t('results.unknown'));
+  const yellowCardNames  = yellowCardIds.map(id => selectedPlayers.find(p => p.userId === id)?.name ?? t('results.unknown'));
+  const redCardNames     = redCardIds.map(id => selectedPlayers.find(p => p.userId === id)?.name ?? t('results.unknown'));
   const manOfMatchName   = motmId ? (selectedPlayers.find(p => p.userId === motmId)?.name ?? null) : null;
 
   if (selectionsLoading || resultsLoading) {
-    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
+    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">{t('common.loading')}</div>;
   }
 
   const match = selectionsData?.match;
@@ -487,10 +494,10 @@ export default function MatchResults() {
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Record match result</h1>
+          <h1 className="text-2xl font-extrabold text-gray-900">{t('results.title')}</h1>
           {date && (
             <p className="text-gray-500 mt-1">
-              {date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })} · {match.matchTime.slice(0, 5)}
+              {formatDate(date, 'long')} · {match.matchTime.slice(0, 5)}
               {match.opponent && <span className="text-gray-700 font-medium"> · vs {match.opponent}</span>}
             </p>
           )}
@@ -502,10 +509,10 @@ export default function MatchResults() {
         {/* ── Score ── */}
         {step === 'score' && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
-            <h2 className="font-semibold text-gray-900">Final score</h2>
+            <h2 className="font-semibold text-gray-900">{t('results.finalScore')}</h2>
             <div className="flex items-center justify-center gap-8">
               <div className="text-center space-y-3">
-                <p className="text-sm font-medium text-gray-500">Boca</p>
+                <p className="text-sm font-medium text-gray-500">{t('results.boca')}</p>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setGoalsFor(g => Math.max(0, g - 1))} className="w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 text-xl font-light flex items-center justify-center">−</button>
                   <span className="w-10 text-4xl font-bold text-gray-900 text-center tabular-nums">{goalsFor}</span>
@@ -514,7 +521,7 @@ export default function MatchResults() {
               </div>
               <span className="text-2xl text-gray-300 font-light pb-1">—</span>
               <div className="text-center space-y-3">
-                <p className="text-sm font-medium text-gray-500">Opponent</p>
+                <p className="text-sm font-medium text-gray-500">{t('results.opponent')}</p>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setGoalsAgainst(g => Math.max(0, g - 1))} className="w-9 h-9 rounded-full border border-gray-300 text-gray-600 hover:bg-gray-50 text-xl font-light flex items-center justify-center">−</button>
                   <span className="w-10 text-4xl font-bold text-gray-900 text-center tabular-nums">{goalsAgainst}</span>
@@ -526,7 +533,7 @@ export default function MatchResults() {
               onClick={handleContinueFromScore}
               className="w-full bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
             >
-              Continue →
+              {t('results.continue')}
             </button>
           </div>
         )}
@@ -536,13 +543,13 @@ export default function MatchResults() {
           <div className="space-y-4">
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900">Goal {goalIndex + 1} of {goalsFor}</h2>
+                <h2 className="font-semibold text-gray-900">{t('results.goalOf', { index: goalIndex + 1, total: goalsFor })}</h2>
                 <span className="text-xs text-gray-400 font-mono">{goalsFor} – {goalsAgainst}</span>
               </div>
 
               {/* Scorer */}
               <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">Who scored?</p>
+                <p className="text-sm font-medium text-gray-700">{t('results.whoScored')}</p>
                 <div className="space-y-1.5 max-h-56 overflow-y-auto">
                   {selectedPlayers.map(p => (
                     <PlayerButton
@@ -560,7 +567,7 @@ export default function MatchResults() {
                         : 'border-gray-200 text-gray-400 hover:border-gray-300'
                     }`}
                   >
-                    Unknown / own goal
+                    {t('results.unknownOwnGoal')}
                   </button>
                 </div>
               </div>
@@ -568,7 +575,7 @@ export default function MatchResults() {
               {/* Assister */}
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700">
-                  Who assisted? <span className="text-gray-400 font-normal">optional</span>
+                  {t('results.whoAssisted')} <span className="text-gray-400 font-normal">{t('results.optional')}</span>
                 </p>
                 <div className="space-y-1.5 max-h-56 overflow-y-auto">
                   <button
@@ -579,7 +586,7 @@ export default function MatchResults() {
                         : 'border-gray-200 text-gray-400 hover:border-gray-300'
                     }`}
                   >
-                    No assist
+                    {t('results.noAssist')}
                   </button>
                   {selectedPlayers.map(p => (
                     <PlayerButton
@@ -596,10 +603,10 @@ export default function MatchResults() {
 
             <div className="flex gap-2">
               <button onClick={goToPrevGoal} className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors">
-                ← Back
+                {t('results.back')}
               </button>
               <button onClick={goToNextGoal} className="flex-[2] bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors">
-                {goalIndex < goalsFor - 1 ? 'Next goal →' : 'Continue →'}
+                {goalIndex < goalsFor - 1 ? t('results.nextGoal') : t('results.continue')}
               </button>
             </div>
           </div>
@@ -610,14 +617,14 @@ export default function MatchResults() {
           <div className="space-y-4">
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
               <div>
-                <h2 className="font-semibold text-gray-900">Goalkeepers</h2>
-                <p className="text-sm text-gray-500 mt-1">Who played in goal each half, and did they keep a clean sheet?</p>
+                <h2 className="font-semibold text-gray-900">{t('results.goalkeepers')}</h2>
+                <p className="text-sm text-gray-500 mt-1">{t('results.goalkeepersSub')}</p>
               </div>
 
               {/* 1st half */}
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <p className="text-sm font-medium text-gray-700">1st half goalkeeper</p>
+                  <p className="text-sm font-medium text-gray-700">{t('results.gkFirstHalf')}</p>
                   <select
                     value={gkFirstHalfId ?? ''}
                     onChange={e => {
@@ -627,7 +634,7 @@ export default function MatchResults() {
                     }}
                     className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-green appearance-none"
                   >
-                    <option value="">Unknown</option>
+                    <option value="">{t('results.unknown')}</option>
                     {selectedPlayers.map(p => (
                       <option key={p.userId} value={p.userId}>{p.name}</option>
                     ))}
@@ -645,7 +652,7 @@ export default function MatchResults() {
                   }`}
                 >
                   <span className={`text-sm font-medium flex items-center gap-1.5 ${gkFirstHalfCleanSheet ? 'text-brand-green-700' : 'text-gray-700'}`}>
-                    <StatIcon name="glove" className="w-4 h-4" /> Clean sheet
+                    <StatIcon name="glove" className="w-4 h-4" /> {t('results.cleanSheet')}
                   </span>
                   <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${gkFirstHalfCleanSheet ? 'bg-brand-green' : 'bg-gray-300'}`}>
                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${gkFirstHalfCleanSheet ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -658,7 +665,7 @@ export default function MatchResults() {
               {/* 2nd half */}
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <p className="text-sm font-medium text-gray-700">2nd half goalkeeper</p>
+                  <p className="text-sm font-medium text-gray-700">{t('results.gkSecondHalf')}</p>
                   <select
                     value={gkSecondHalfId ?? ''}
                     onChange={e => {
@@ -668,7 +675,7 @@ export default function MatchResults() {
                     }}
                     className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-green appearance-none"
                   >
-                    <option value="">Unknown</option>
+                    <option value="">{t('results.unknown')}</option>
                     {selectedPlayers.map(p => (
                       <option key={p.userId} value={p.userId}>{p.name}</option>
                     ))}
@@ -686,7 +693,7 @@ export default function MatchResults() {
                   }`}
                 >
                   <span className={`text-sm font-medium flex items-center gap-1.5 ${gkSecondHalfCleanSheet ? 'text-brand-green-700' : 'text-gray-700'}`}>
-                    <StatIcon name="glove" className="w-4 h-4" /> Clean sheet
+                    <StatIcon name="glove" className="w-4 h-4" /> {t('results.cleanSheet')}
                   </span>
                   <div className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${gkSecondHalfCleanSheet ? 'bg-brand-green' : 'bg-gray-300'}`}>
                     <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${gkSecondHalfCleanSheet ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -700,13 +707,13 @@ export default function MatchResults() {
                 onClick={() => { setGoalIndex(Math.max(0, goalsFor - 1)); setStep(goalsFor > 0 ? 'goals' : 'score'); }}
                 className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                ← Back
+                {t('results.back')}
               </button>
               <button
                 onClick={() => setStep('cards')}
                 className="flex-[2] bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
               >
-                Continue →
+                {t('results.continue')}
               </button>
             </div>
           </div>
@@ -717,12 +724,12 @@ export default function MatchResults() {
           <div className="space-y-4">
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
               <div>
-                <h2 className="font-semibold text-gray-900">Cards</h2>
-                <p className="text-sm text-gray-500 mt-1">Select any players who received cards. Leave empty if none.</p>
+                <h2 className="font-semibold text-gray-900">{t('results.cards')}</h2>
+                <p className="text-sm text-gray-500 mt-1">{t('results.cardsSub')}</p>
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><CardChip color="yellow" /> Yellow cards</p>
+                <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><CardChip color="yellow" /> {t('stats.yellowCards')}</p>
                 <div className="space-y-1.5">
                   {selectedPlayers.map(p => (
                     <PlayerButton
@@ -736,7 +743,7 @@ export default function MatchResults() {
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><CardChip color="red" /> Red cards</p>
+                <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><CardChip color="red" /> {t('stats.redCards')}</p>
                 <div className="space-y-1.5">
                   {selectedPlayers.map(p => (
                     <PlayerButton
@@ -750,7 +757,7 @@ export default function MatchResults() {
               </div>
 
               {yellowCardIds.length === 0 && redCardIds.length === 0 && (
-                <p className="text-xs text-gray-400">Nothing selected — no cards recorded.</p>
+                <p className="text-xs text-gray-400">{t('results.nothingSelected')}</p>
               )}
             </div>
 
@@ -759,13 +766,13 @@ export default function MatchResults() {
                 onClick={() => setStep('goalkeepers')}
                 className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                ← Back
+                {t('results.back')}
               </button>
               <button
                 onClick={() => setStep('motm')}
                 className="flex-[2] bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
               >
-                Continue →
+                {t('results.continue')}
               </button>
             </div>
           </div>
@@ -775,8 +782,8 @@ export default function MatchResults() {
         {step === 'motm' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-              <h2 className="font-semibold text-gray-900">Man of the match</h2>
-              <p className="text-xs text-gray-400">Optional — leave unselected if you prefer.</p>
+              <h2 className="font-semibold text-gray-900">{t('results.motm')}</h2>
+              <p className="text-xs text-gray-400">{t('results.motmOptional')}</p>
               <div className="space-y-1.5">
                 <button
                   onClick={() => setMotmId(null)}
@@ -786,7 +793,7 @@ export default function MatchResults() {
                       : 'border-gray-200 text-gray-400 hover:border-gray-300'
                   }`}
                 >
-                  No man of the match
+                  {t('results.noMotm')}
                 </button>
                 {selectedPlayers.map(p => (
                   <PlayerButton
@@ -804,13 +811,13 @@ export default function MatchResults() {
                 onClick={() => setStep('cards')}
                 className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                ← Back
+                {t('results.back')}
               </button>
               <button
                 onClick={() => setStep('fines')}
                 className="flex-[2] bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
               >
-                Continue →
+                {t('results.continue')}
               </button>
             </div>
           </div>
@@ -820,10 +827,9 @@ export default function MatchResults() {
         {step === 'fines' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-              <h2 className="font-semibold text-gray-900">Fines</h2>
+              <h2 className="font-semibold text-gray-900">{t('results.fines')}</h2>
               <p className="text-xs text-gray-400">
-                Optional — add any fines from this match. A fine admin approves them before they count
-                (unless you are one, in which case they apply right away).
+                {t('results.finesSub')}
               </p>
 
               {/* Added fines */}
@@ -834,7 +840,7 @@ export default function MatchResults() {
                     const type = (fineTypes ?? []).find(t => t.fineTypeId === f.fineTypeId);
                     return (
                       <div key={i} className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2 text-sm">
-                        <span className="truncate text-gray-800">{player?.name ?? 'Player'} · {type?.label ?? 'Fine'}</span>
+                        <span className="truncate text-gray-800">{player?.name ?? t('results.playerFallback')} · {type?.label ?? t('results.fineFallback')}</span>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-gray-500">{type ? `${type.amountDkk} kr` : ''}</span>
                           <button onClick={() => setMatchFines(prev => prev.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500">✕</button>
@@ -852,7 +858,7 @@ export default function MatchResults() {
                   onChange={e => setFineDraftPlayer(e.target.value)}
                   className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
                 >
-                  <option value="">Player…</option>
+                  <option value="">{t('results.playerPlaceholder')}</option>
                   {selectedPlayers.map(p => <option key={p.userId} value={p.userId}>{p.name}</option>)}
                 </select>
                 <select
@@ -860,7 +866,7 @@ export default function MatchResults() {
                   onChange={e => setFineDraftType(e.target.value)}
                   className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
                 >
-                  <option value="">Fine…</option>
+                  <option value="">{t('results.finePlaceholder')}</option>
                   {(fineTypes ?? []).map(t => <option key={t.fineTypeId} value={t.fineTypeId}>{t.label} — {t.amountDkk} kr</option>)}
                 </select>
                 <button
@@ -872,7 +878,7 @@ export default function MatchResults() {
                   disabled={!fineDraftPlayer || !fineDraftType}
                   className="bg-brand-dark text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-40 shrink-0"
                 >
-                  Add
+                  {t('results.add')}
                 </button>
               </div>
             </div>
@@ -882,13 +888,13 @@ export default function MatchResults() {
                 onClick={() => setStep('motm')}
                 className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                ← Back
+                {t('results.back')}
               </button>
               <button
                 onClick={() => setStep('assessment')}
                 className="flex-[2] bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
               >
-                Continue →
+                {t('results.continue')}
               </button>
             </div>
           </div>
@@ -898,18 +904,13 @@ export default function MatchResults() {
         {step === 'assessment' && (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-              <h2 className="font-semibold text-gray-900">How did the game feel?</h2>
-              <p className="text-xs text-gray-400">Optional — skip if you prefer.</p>
+              <h2 className="font-semibold text-gray-900">{t('results.howDidItFeel')}</h2>
+              <p className="text-xs text-gray-400">{t('results.optionalSkip')}</p>
               <div className="grid grid-cols-2 gap-2">
 
-                {([
-                  { key: 'dominated',          label: 'We dominated',      sub: 'Controlled from start to finish' },
-                  { key: 'strong_performance', label: 'Strong performance', sub: 'Played well, result reflected the effort' },
-                  { key: 'even_game',          label: 'Evenly matched',     sub: 'Could have gone either way' },
-                  { key: 'unlucky',            label: 'Unlucky result',     sub: 'Played well but scoreline was harsh' },
-                  { key: 'tough_game',         label: 'Tough game',         sub: 'Opponent was strong, we struggled' },
-                  { key: 'off_day',            label: 'Off day',            sub: 'Below our usual standard' },
-                ] as const).map(opt => (
+                {(['dominated', 'strong_performance', 'even_game', 'unlucky', 'tough_game', 'off_day'] as const).map(key => {
+                  const opt = { key, label: t(`results.assessment.${key}`), sub: t(`results.assessmentSub.${key}`) };
+                  return (
                   <button
                     key={opt.key}
                     onClick={() => setGameAssessment(prev => prev === opt.key ? null : opt.key)}
@@ -920,16 +921,17 @@ export default function MatchResults() {
                     <p className="text-sm font-medium text-gray-900">{opt.label}</p>
                     <p className="text-xs text-gray-400 mt-0.5 leading-tight">{opt.sub}</p>
                   </button>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Long read */}
               <div className="space-y-2 pt-1">
-                <p className="text-sm font-medium text-gray-700">Match report <span className="text-gray-400 font-normal">optional</span></p>
+                <p className="text-sm font-medium text-gray-700">{t('results.matchReport')} <span className="text-gray-400 font-normal">{t('results.optional')}</span></p>
                 <textarea
                   value={longRead}
                   onChange={e => setLongRead(e.target.value)}
-                  placeholder="Write a brief match report…"
+                  placeholder={t('results.reportPlaceholder')}
                   rows={4}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-green resize-none"
                 />
@@ -943,14 +945,14 @@ export default function MatchResults() {
                 onClick={() => setStep('fines')}
                 className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                ← Back
+                {t('results.back')}
               </button>
               <button
                 onClick={() => { setError(''); saveMutation.mutate(); }}
                 disabled={saveMutation.isPending}
                 className="flex-[2] bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
               >
-                {saveMutation.isPending ? 'Saving…' : existingResults?.result ? 'Update result' : 'Save result'}
+                {saveMutation.isPending ? t('results.saving') : existingResults?.result ? t('results.updateResult') : t('results.saveResult')}
               </button>
             </div>
           </div>
@@ -970,10 +972,10 @@ export default function MatchResults() {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
               <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-lg w-full space-y-5 boca-pop">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-bold text-gray-900 text-lg">Result saved!</h2>
+                  <h2 className="font-bold text-gray-900 text-lg">{t('results.resultSaved')}</h2>
                   <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
                 </div>
-                <p className="text-sm text-gray-500">Download the highlights card to share with your team.</p>
+                <p className="text-sm text-gray-500">{t('results.downloadPrompt')}</p>
                 {/* Zoomed preview only — no capture ref */}
                 <div className="overflow-hidden rounded-xl flex justify-center bg-gray-900">
                   <div style={{ zoom: 0.7 }}>
@@ -989,13 +991,13 @@ export default function MatchResults() {
                     disabled={downloading}
                     className="flex-1 bg-brand-dark hover:bg-gray-800 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
                   >
-                    {downloading ? 'Generating…' : '⬇ Download PNG'}
+                    {downloading ? t('results.generating') : t('results.downloadPng')}
                   </button>
                   <button
                     onClick={() => navigate(-1)}
                     className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
                   >
-                    Done →
+                    {t('results.done')}
                   </button>
                 </div>
               </div>

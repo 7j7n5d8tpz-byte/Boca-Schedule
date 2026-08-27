@@ -137,7 +137,7 @@ router.post('/users/:placeholderId/merge', async (req, res, next) => {
     await writeAudit(req.user!.userId, 'placeholder_merged', 'user', placeholderId,
       { name: placeholder?.name }, { mergedInto: targetUserId, targetName: target?.name });
 
-    res.json({ success: true, message: 'Placeholder merged', data: { placeholderId, targetUserId } });
+    res.json({ success: true, message: 'Pladsholderen er flettet', data: { placeholderId, targetUserId } });
   } catch (err) {
     next(err);
   }
@@ -149,7 +149,7 @@ router.delete('/users/:userId', async (req, res, next) => {
     const { userId } = req.params;
 
     if (userId === req.user!.userId) {
-      res.status(400).json({ success: false, error: { code: 'CANNOT_DELETE_SELF', message: 'Cannot delete your own account' } });
+      res.status(400).json({ success: false, error: { code: 'CANNOT_DELETE_SELF', message: 'Du kan ikke slette din egen konto' } });
       return;
     }
 
@@ -160,7 +160,7 @@ router.delete('/users/:userId', async (req, res, next) => {
 
     await writeAudit(req.user!.userId, 'user_deleted', 'user', userId, target ?? null, null);
 
-    res.json({ success: true, message: 'User deleted successfully', data: { deletedUserId: userId } });
+    res.json({ success: true, message: 'Brugeren er slettet', data: { deletedUserId: userId } });
   } catch (err) {
     next(err);
   }
@@ -173,7 +173,7 @@ router.put('/users/:userId/role', async (req, res, next) => {
     const { role } = req.body;
 
     if (userId === req.user!.userId) {
-      res.status(400).json({ success: false, error: { code: 'CANNOT_CHANGE_OWN_ROLE', message: 'Cannot change your own role' } });
+      res.status(400).json({ success: false, error: { code: 'CANNOT_CHANGE_OWN_ROLE', message: 'Du kan ikke ændre din egen rolle' } });
       return;
     }
 
@@ -196,7 +196,7 @@ router.put('/users/:userId/active', async (req, res, next) => {
     const { isActive } = req.body as { isActive: boolean };
 
     if (userId === req.user!.userId) {
-      res.status(400).json({ success: false, error: { code: 'CANNOT_DEACTIVATE_SELF', message: 'Cannot deactivate your own account' } });
+      res.status(400).json({ success: false, error: { code: 'CANNOT_DEACTIVATE_SELF', message: 'Du kan ikke deaktivere din egen konto' } });
       return;
     }
 

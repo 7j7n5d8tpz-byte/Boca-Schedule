@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 
@@ -20,10 +21,12 @@ export function decodeLocation(location: string): { venue: string; court: string
   return { venue: location, court: '' };
 }
 
-export function formatLocation(location: string, matchType: string): string {
+// `t` is passed in so this stays a plain function usable outside components.
+export function formatLocation(location: string, matchType: string, t?: (k: string) => string): string {
   const { venue, court } = decodeLocation(location);
   if (!court) return venue;
-  const prefix = matchType === 'futsal' ? 'Hall' : 'Court';
+  const key = matchType === 'futsal' ? 'pickers.hall' : 'pickers.court';
+  const prefix = t ? t(key) : (matchType === 'futsal' ? 'Hall' : 'Court');
   return `${venue} · ${prefix} ${court}`;
 }
 
@@ -37,8 +40,9 @@ interface Props {
 }
 
 export default function LocationPicker({ venue, court, onVenueChange, onCourtChange, required, matchType }: Props) {
+  const { t } = useTranslation();
   const isFutsal = matchType === 'futsal';
-  const subLabel = isFutsal ? 'Hall' : 'Court';
+  const subLabel = isFutsal ? t('pickers.hall') : t('pickers.court');
   const qc = useQueryClient();
   const [addingNew, setAddingNew] = useState(false);
   const [newVenue, setNewVenue] = useState('');
@@ -60,7 +64,7 @@ export default function LocationPicker({ venue, court, onVenueChange, onCourtCha
       setNewVenue('');
       setAddError('');
     },
-    onError: () => setAddError('Failed to add location'),
+    onError: () => setAddError(t('pickers.addFailedLocation')),
   });
 
   const deleteMutation = useMutation({
@@ -96,17 +100,17 @@ export default function LocationPicker({ venue, court, onVenueChange, onCourtCha
       <div className="flex gap-2">
         <div className="flex-1 min-w-0">
           <select
-            aria-label="Venue"
+            aria-label={t('pickers.venueAria')}
             required={required}
             value={addingNew ? ADD_SENTINEL : venue}
             onChange={e => handleSelectChange(e.target.value)}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
           >
-            <option value="" disabled>Select venue…</option>
+            <option value="" disabled>{t('pickers.selectVenue')}</option>
             {locations.map(loc => (
               <option key={loc} value={loc}>{loc}</option>
             ))}
-            <option value={ADD_SENTINEL}>+ Add location…</option>
+            <option value={ADD_SENTINEL}>{t('pickers.addLocation')}</option>
           </select>
         </div>
         <div className="w-28 shrink-0">
@@ -128,7 +132,7 @@ export default function LocationPicker({ venue, court, onVenueChange, onCourtCha
           <input
             type="text"
             autoFocus
-            placeholder="New venue name"
+            placeholder={t('pickers.newVenueName')}
             value={newVenue}
             onChange={e => setNewVenue(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitNewVenue(); } }}
@@ -140,14 +144,14 @@ export default function LocationPicker({ venue, court, onVenueChange, onCourtCha
             disabled={!newVenue.trim() || addMutation.isPending}
             className="shrink-0 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
           >
-            {addMutation.isPending ? '…' : 'Add'}
+            {addMutation.isPending ? '…' : t('pickers.add')}
           </button>
           <button
             type="button"
             onClick={() => { setAddingNew(false); setAddError(''); }}
             className="shrink-0 text-sm text-gray-500 hover:text-gray-700"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           {addError && <span className="text-xs text-red-500">{addError}</span>}
         </div>
@@ -161,7 +165,7 @@ export default function LocationPicker({ venue, court, onVenueChange, onCourtCha
             onClick={() => { setManaging(v => !v); setConfirmDelete(null); }}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
-            {managing ? 'Done managing' : 'Manage venues…'}
+            {managing ? t('pickers.doneManaging') : t('pickers.manageVenues')}
           </button>
 
           {managing && (
@@ -171,21 +175,21 @@ export default function LocationPicker({ venue, court, onVenueChange, onCourtCha
                   <span className="text-gray-700">{loc}</span>
                   {confirmDelete === loc ? (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-red-600 font-medium">Delete?</span>
+                      <span className="text-xs text-red-600 font-medium">{t('pickers.deleteQ')}</span>
                       <button
                         type="button"
                         onClick={() => deleteMutation.mutate(loc)}
                         disabled={deleteMutation.isPending}
                         className="text-xs bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-medium px-2 py-0.5 rounded transition-colors"
                       >
-                        Yes
+                        {t('pickers.yes')}
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmDelete(null)}
                         className="text-xs text-gray-500 hover:text-gray-700"
                       >
-                        No
+                        {t('pickers.no')}
                       </button>
                     </div>
                   ) : (
@@ -194,7 +198,7 @@ export default function LocationPicker({ venue, court, onVenueChange, onCourtCha
                       onClick={() => setConfirmDelete(loc)}
                       className="text-xs text-red-400 hover:text-red-600 transition-colors"
                     >
-                      Remove
+                      {t('pickers.remove')}
                     </button>
                   )}
                 </div>

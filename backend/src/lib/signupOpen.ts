@@ -18,7 +18,7 @@ export const OPENED_MATCH_COLUMNS =
 // "Sat 12 Sep · 20:00 · Hall 1 vs FC X" — the one-liner used as the in-app
 // notification body (same shape as the match-day reminder's).
 export function openedMatchLabel(m: OpenedMatch): string {
-  const dateStr = new Date(`${m.match_date}T${m.match_time}`).toLocaleDateString('en-GB', {
+  const dateStr = new Date(`${m.match_date}T${m.match_time}`).toLocaleDateString('da-DK', {
     weekday: 'short', day: 'numeric', month: 'short',
   });
   return `${dateStr} · ${m.match_time.slice(0, 5)} · ${m.location}${m.opponent ? ` vs ${m.opponent}` : ''}`;
@@ -67,7 +67,7 @@ export async function notifySignupOpen(matchIds: string[]): Promise<OpenedMatch[
   for (const m of matches) {
     await createNotifications(recipients, {
       type: 'signup_open',
-      title: 'Sign-ups are open',
+      title: 'Tilmeldingen er åben',
       body: openedMatchLabel(m),
       link: '/dashboard',
       matchId: m.match_id,

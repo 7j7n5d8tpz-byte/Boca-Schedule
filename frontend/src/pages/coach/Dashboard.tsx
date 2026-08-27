@@ -2,9 +2,11 @@ import AppNav from '../../components/AppNav';
 import { useState, useLayoutEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { formatLocation } from '../../components/LocationPicker';
 import { meetingTime, mapsUrl } from '../../utils';
+import { useDateFormat } from '../../i18n/format';
 import { CardListSkeleton } from '../../components/Skeleton';
 
 interface Match {
@@ -38,16 +40,9 @@ const STATUS_STYLE: Record<string, string> = {
   completed:     'bg-gray-100 text-gray-400',
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  draft:         'Draft',
-  signup_open:   'Signup open',
-  signup_closed: 'Signup closed',
-  optimized:     'Optimized',
-  published:     'Published',
-  completed:     'Completed',
-};
-
 function MatchRow({ match }: { match: Match }) {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const date = new Date(match.matchDate + 'T' + match.matchTime);
   const signupPct = Math.min(100, (match.currentSignups / match.maxPlayers) * 100);
   const low = match.currentSignups < match.minPlayers;
@@ -58,25 +53,25 @@ function MatchRow({ match }: { match: Match }) {
         {/* Date / location */}
         <div className="min-w-0">
           <p className="font-semibold text-gray-900">
-            {date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+            {formatDate(date, 'weekdayDayMonthYear')}
             {match.opponent && <span className="text-gray-500 font-normal"> · vs {match.opponent}</span>}
           </p>
           <p className="text-sm text-gray-700">
-            {match.matchTime.slice(0, 5)} (meet at {meetingTime(match.matchTime)})
+            {t('match.timeAndMeet', { time: match.matchTime.slice(0, 5), meet: meetingTime(match.matchTime) })}
           </p>
           <p className="text-sm text-gray-500 mt-0.5 truncate">
-            <a href={mapsUrl(match.location)} target="_blank" rel="noopener noreferrer" className="hover:text-brand-green hover:underline" title="Open in Maps">
-              {formatLocation(match.location, match.matchType)}
+            <a href={mapsUrl(match.location)} target="_blank" rel="noopener noreferrer" className="hover:text-brand-green hover:underline" title={t('match.openInMaps')}>
+              {formatLocation(match.location, match.matchType, t)}
             </a>
             <span className={`ml-2 text-xs font-medium px-1.5 py-0.5 rounded ${match.matchType === 'futsal' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-              {match.matchType}
+              {t(`matchTypes.${match.matchType}`, { defaultValue: match.matchType })}
             </span>
           </p>
         </div>
 
         {/* Status badge */}
         <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_STYLE[match.status] ?? 'bg-gray-100 text-gray-500'}`}>
-          {STATUS_LABEL[match.status] ?? match.status}
+          {t(`coach.status.${match.status}`, { defaultValue: match.status })}
         </span>
       </div>
 
@@ -84,10 +79,10 @@ function MatchRow({ match }: { match: Match }) {
       <div className="mt-4 space-y-1">
         <div className="flex justify-between text-xs text-gray-500">
           <span className={low ? 'text-red-500 font-medium' : ''}>
-            {match.currentSignups} / {match.maxPlayers} signed up
-            {low && <span> — need {match.minPlayers - match.currentSignups} more</span>}
+            {t('coach.signedUpOf', { count: match.currentSignups, max: match.maxPlayers })}
+            {low && <span>{t('coach.needMore', { count: match.minPlayers - match.currentSignups })}</span>}
           </span>
-          <span>min {match.minPlayers}</span>
+          <span>{t('coach.minPlayersShort', { count: match.minPlayers })}</span>
         </div>
         <div className="w-full bg-gray-100 rounded-full h-1.5">
           <div
@@ -104,18 +99,18 @@ function MatchRow({ match }: { match: Match }) {
             to={`/coach/matches/${match.matchId}/selections`}
             className="text-sm text-brand-green hover:underline"
           >
-            Manage squad
+            {t('coach.manageSquad')}
           </Link>
         ) : (
           <Link
             to={`/coach/matches/${match.matchId}`}
             className="text-sm text-brand-green hover:underline"
           >
-            View signups
+            {t('coach.viewSignups')}
           </Link>
         )}
         {match.status === 'signup_closed' && (
-          <span className="text-sm text-gray-400">· Ready to optimize</span>
+          <span className="text-sm text-gray-400">{t('coach.readyToOptimizeTag')}</span>
         )}
       </div>
     </div>
@@ -123,6 +118,8 @@ function MatchRow({ match }: { match: Match }) {
 }
 
 export default function CoachDashboard() {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const qc = useQueryClient();
 
   const { data, isLoading } = useQuery({
@@ -159,13 +156,13 @@ export default function CoachDashboard() {
       setAnnounceBody(''); setAnnounceMatchId(''); setAnnounceError('');
       qc.invalidateQueries({ queryKey: ['announcements'] });
     },
-    onError: (err: any) => setAnnounceError(err.response?.data?.error?.message ?? 'Failed to post announcement'),
+    onError: (err: any) => setAnnounceError(err.response?.data?.error?.message ?? t('coach.postFailed')),
   });
 
   const deleteAnnouncement = useMutation({
     mutationFn: (id: string) => api.delete(`/announcements/${id}`),
     onSuccess: () => { setAnnounceError(''); qc.invalidateQueries({ queryKey: ['announcements'] }); },
-    onError: (err: any) => setAnnounceError(err.response?.data?.error?.message ?? 'Failed to remove announcement'),
+    onError: (err: any) => setAnnounceError(err.response?.data?.error?.message ?? t('coach.removeFailed')),
   });
 
   const [editId, setEditId] = useState<string | null>(null);
@@ -195,7 +192,7 @@ export default function CoachDashboard() {
       cancelEdit(); setAnnounceError('');
       qc.invalidateQueries({ queryKey: ['announcements'] });
     },
-    onError: (err: any) => setAnnounceError(err.response?.data?.error?.message ?? 'Failed to save announcement'),
+    onError: (err: any) => setAnnounceError(err.response?.data?.error?.message ?? t('coach.saveAnnouncementFailed')),
   });
 
   const STATUS_ORDER: Record<string, number> = {
@@ -226,14 +223,14 @@ export default function CoachDashboard() {
         {(pendingPerms ?? []).length > 0 && (
           <div className="bg-white rounded-xl border border-amber-200 p-5 space-y-3">
             <h2 className="font-semibold text-gray-900">
-              Result entry requests
+              {t('coach.resultRequests')}
               <span className="ml-2 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{pendingPerms!.length}</span>
             </h2>
             {pendingPerms!.map(req => (
               <div key={req.requestId} className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-gray-900">{req.playerName}</p>
-                  <p className="text-xs text-gray-400">Wants permission to record match results</p>
+                  <p className="text-xs text-gray-400">{t('coach.wantsResultsPermission')}</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button
@@ -241,14 +238,14 @@ export default function CoachDashboard() {
                     disabled={respondPerm.isPending}
                     className="text-xs bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-3 py-1.5 rounded-lg transition-colors"
                   >
-                    Approve
+                    {t('coach.approve')}
                   </button>
                   <button
                     onClick={() => respondPerm.mutate({ requestId: req.requestId, approve: false })}
                     disabled={respondPerm.isPending}
                     className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
                   >
-                    Reject
+                    {t('coach.reject')}
                   </button>
                 </div>
               </div>
@@ -258,13 +255,13 @@ export default function CoachDashboard() {
 
         {/* Announcements */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-          <h2 className="font-semibold text-gray-900">Announcements</h2>
-          <p className="text-xs text-gray-400 -mt-1">Shown to all players on their dashboard. Tie one to a match to auto-hide it once that match has passed.</p>
+          <h2 className="font-semibold text-gray-900">{t('coach.announcements')}</h2>
+          <p className="text-xs text-gray-400 -mt-1">{t('coach.announcementsHint')}</p>
 
           <textarea
             value={announceBody}
             onChange={e => setAnnounceBody(e.target.value)}
-            placeholder="e.g. Bring white shirts on Saturday"
+            placeholder={t('coach.announcementPlaceholder')}
             rows={2}
             maxLength={500}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green resize-none"
@@ -275,10 +272,10 @@ export default function CoachDashboard() {
               onChange={e => setAnnounceMatchId(e.target.value)}
               className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-green"
             >
-              <option value="">No match (stays until removed)</option>
+              <option value="">{t('coach.noMatchStays')}</option>
               {matches.filter(m => m.status !== 'completed').map(m => (
                 <option key={m.matchId} value={m.matchId}>
-                  {new Date(m.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                  {formatDate(m.matchDate, 'dayMonth')}
                   {m.opponent ? ` vs ${m.opponent}` : ''}
                 </option>
               ))}
@@ -288,7 +285,7 @@ export default function CoachDashboard() {
               disabled={!announceBody.trim() || postAnnouncement.isPending}
               className="shrink-0 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              {postAnnouncement.isPending ? 'Posting…' : 'Post'}
+              {postAnnouncement.isPending ? t('coach.posting') : t('coach.post')}
             </button>
           </div>
           {announceError && <p className="text-sm text-red-500">{announceError}</p>}
@@ -312,10 +309,10 @@ export default function CoachDashboard() {
                         onChange={e => setEditMatchId(e.target.value)}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-green"
                       >
-                        <option value="">No match (stays until removed)</option>
+                        <option value="">{t('coach.noMatchStays')}</option>
                         {matches.filter(m => m.status !== 'completed').map(m => (
                           <option key={m.matchId} value={m.matchId}>
-                            {new Date(m.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                            {formatDate(m.matchDate, 'dayMonth')}
                             {m.opponent ? ` vs ${m.opponent}` : ''}
                           </option>
                         ))}
@@ -326,14 +323,14 @@ export default function CoachDashboard() {
                           disabled={editAnnouncement.isPending}
                           className="text-xs border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-50 font-medium px-3 py-1.5 rounded-lg transition-colors"
                         >
-                          Cancel
+                          {t('common.cancel')}
                         </button>
                         <button
                           onClick={() => editAnnouncement.mutate(a.announcementId)}
                           disabled={!editBody.trim() || editAnnouncement.isPending}
                           className="text-xs bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-3 py-1.5 rounded-lg transition-colors"
                         >
-                          {editAnnouncement.isPending ? 'Saving…' : 'Save'}
+                          {editAnnouncement.isPending ? t('coach.saving') : t('coach.save')}
                         </button>
                       </div>
                     </div>
@@ -343,7 +340,7 @@ export default function CoachDashboard() {
                         <p className="text-sm text-gray-800 whitespace-pre-wrap">{a.body}</p>
                         {a.match && (
                           <p className="text-xs text-gray-400 mt-0.5">
-                            for {new Date(a.match.matchDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{a.match.opponent ? ` vs ${a.match.opponent}` : ''}
+                            {t('coach.announcementFor', { date: formatDate(a.match.matchDate, 'dayMonth') })}{a.match.opponent ? ` vs ${a.match.opponent}` : ''}
                           </p>
                         )}
                       </div>
@@ -352,14 +349,14 @@ export default function CoachDashboard() {
                           onClick={() => startEdit(a)}
                           className="text-xs text-brand-green hover:text-brand-green-700 font-medium"
                         >
-                          Edit
+                          {t('coach.edit')}
                         </button>
                         <button
                           onClick={() => deleteAnnouncement.mutate(a.announcementId)}
                           disabled={deleteAnnouncement.isPending}
                           className="text-xs text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
                         >
-                          Remove
+                          {t('coach.remove')}
                         </button>
                       </div>
                     </div>
@@ -373,13 +370,13 @@ export default function CoachDashboard() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Matches</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900">{t('coach.matches')}</h1>
             {!isLoading && (
               <p className="text-sm text-gray-500 mt-1">
-                {matches.length} upcoming · {totalSignups} total sign-ups
+                {t('coach.upcomingLine', { matches: matches.length, signups: totalSignups })}
                 {readyToOptimize > 0 && (
                   <span className="ml-2 text-yellow-600 font-medium">
-                    · {readyToOptimize} ready to optimize
+                    {t('coach.readyToOptimizeLine', { count: readyToOptimize })}
                   </span>
                 )}
               </p>
@@ -391,20 +388,20 @@ export default function CoachDashboard() {
                 to="/coach/optimize"
                 className="border border-brand-green text-brand-green hover:bg-brand-green/5 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
               >
-                Optimize multiple
+                {t('coach.optimizeMultiple')}
               </Link>
             )}
             <Link
               to="/coach/historical"
               className="border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              Record past match
+              {t('coach.recordPastMatch')}
             </Link>
             <Link
               to="/coach/matches/new"
               className="bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
-              + New match
+              {t('coach.newMatchPlus')}
             </Link>
           </div>
         </div>
@@ -412,9 +409,9 @@ export default function CoachDashboard() {
         {/* Result entry shortcuts */}
         {(pendingResults.length > 0 || completedResults.length > 0) && (
           <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-gray-700">Record results</h2>
+            <h2 className="text-sm font-semibold text-gray-700">{t('coach.recordResults')}</h2>
             {pendingResults.length === 0 && (
-              <p className="text-sm text-gray-400">All results recorded.</p>
+              <p className="text-sm text-gray-400">{t('coach.allResultsRecorded')}</p>
             )}
             {pendingResults.map(m => {
               const d = new Date(m.matchDate + 'T' + m.matchTime);
@@ -426,12 +423,12 @@ export default function CoachDashboard() {
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-900">
-                      {d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · {m.matchTime.slice(0, 5)}
+                      {formatDate(d, 'weekdayDayMonth')} · {m.matchTime.slice(0, 5)}
                       {m.opponent && <span className="text-gray-400 font-normal"> vs {m.opponent}</span>}
                     </p>
                     <p className="text-xs text-gray-400">{m.location}</p>
                   </div>
-                  <span className="text-xs text-brand-green font-medium shrink-0">Enter result →</span>
+                  <span className="text-xs text-brand-green font-medium shrink-0">{t('coach.enterResult')}</span>
                 </Link>
               );
             })}
@@ -441,7 +438,7 @@ export default function CoachDashboard() {
                   onClick={() => setShowRecordedResults(v => !v)}
                   className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  {showRecordedResults ? 'Hide recorded matches' : `+ ${completedResults.length} already recorded`}
+                  {showRecordedResults ? t('coach.hideRecorded') : t('coach.alreadyRecorded', { count: completedResults.length })}
                 </button>
                 {showRecordedResults && completedResults.map(m => {
                   const d = new Date(m.matchDate + 'T' + m.matchTime);
@@ -453,12 +450,12 @@ export default function CoachDashboard() {
                     >
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · {m.matchTime.slice(0, 5)}
+                          {formatDate(d, 'weekdayDayMonth')} · {m.matchTime.slice(0, 5)}
                           {m.opponent && <span className="text-gray-400 font-normal"> vs {m.opponent}</span>}
                         </p>
                         <p className="text-xs text-gray-400">{m.location}</p>
                       </div>
-                      <span className="text-xs text-gray-400 font-medium shrink-0">Edit result →</span>
+                      <span className="text-xs text-gray-400 font-medium shrink-0">{t('coach.editResult')}</span>
                     </Link>
                   );
                 })}
@@ -470,7 +467,7 @@ export default function CoachDashboard() {
         {/* Match list */}
         {isLoading && <CardListSkeleton />}
         {!isLoading && matches.length === 0 && (
-          <p className="text-sm text-gray-400">No matches yet. Create one to get started.</p>
+          <p className="text-sm text-gray-400">{t('coach.noMatchesYet')}</p>
         )}
         <div className="space-y-4">
           {matches.filter(m => m.status !== 'completed').map(m => <MatchRow key={m.matchId} match={m} />)}

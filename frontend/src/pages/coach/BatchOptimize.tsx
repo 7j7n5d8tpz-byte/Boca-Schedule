@@ -1,4 +1,6 @@
 import AppNav from '../../components/AppNav';
+import { useTranslation } from 'react-i18next';
+import { useDateFormat } from '../../i18n/format';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -63,6 +65,7 @@ type Step = 'select' | 'configure' | 'optimizing' | 'review';
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BatchOptimize() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   const [step, setStep] = useState<Step>('select');
@@ -142,7 +145,7 @@ export default function BatchOptimize() {
       setStep('review');
     } else if (optimizeMutation.isError) {
       const err = optimizeMutation.error as any;
-      setOptimizeError(err?.response?.data?.error?.message ?? 'Optimization failed');
+      setOptimizeError(err?.response?.data?.error?.message ?? t('coach.optimizeFailed'));
       setStep('configure');
     }
   }, [step, optimizeMutation.isSuccess, optimizeMutation.isError, optimizeMutation.data, optimizeMutation.error]);
@@ -305,21 +308,21 @@ function SelectStep({
   onToggle: (id: string) => void;
   onNext: () => void;
 }) {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-extrabold text-gray-900">Batch optimize</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Select the matches you want to optimize together. The optimizer will balance player fairness across all selected matches jointly.
-        </p>
+        <h1 className="text-2xl font-extrabold text-gray-900">{t('coach.batchTitle')}</h1>
+        <p className="text-sm text-gray-500 mt-1">{t('coach.batchSub')}</p>
       </div>
 
-      {isLoading && <p className="text-sm text-gray-400">Loading matches…</p>}
+      {isLoading && <p className="text-sm text-gray-400">{t('coach.loadingMatches')}</p>}
 
       {!isLoading && matches.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-          <p className="text-sm text-gray-500">No matches ready to optimize right now.</p>
-          <p className="text-xs text-gray-400 mt-1">Close signups on a match first, then come back here.</p>
+          <p className="text-sm text-gray-500">{t('coach.batchNone')}</p>
+          <p className="text-xs text-gray-400 mt-1">{t('coach.batchNoneHint')}</p>
         </div>
       )}
 
@@ -342,7 +345,7 @@ function SelectStep({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-900">
-                  {d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  {formatDate(d, 'long')}
                   {m.opponent && <span className="text-gray-500 font-normal"> · vs {m.opponent}</span>}
                 </p>
                 <p className="text-sm text-gray-500">
@@ -400,20 +403,22 @@ function ConfigureStep({
   onOptimize: () => void;
   optimizeError: string;
 }) {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const [expanded, setExpanded] = useState<string>(selectedMatchIds[0] ?? '');
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">Configure</h1>
-          <p className="text-sm text-gray-500 mt-1">Set fairness balance and priority players for each match.</p>
+          <h1 className="text-2xl font-extrabold text-gray-900">{t('coach.configure')}</h1>
+          <p className="text-sm text-gray-500 mt-1">{t('coach.configureHint')}</p>
         </div>
         <button onClick={onBack} className="inline-flex items-center gap-1 rounded-lg bg-brand-green/10 hover:bg-brand-green/20 text-brand-green text-sm font-medium pl-2 pr-3 py-1.5 transition-colors">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 shrink-0" aria-hidden>
             <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Back
+          {t('coach.back')}
         </button>
       </div>
 
@@ -434,12 +439,12 @@ function ConfigureStep({
               >
                 <div>
                   <p className="font-semibold text-gray-900">
-                    {d ? d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : matchId}
+                    {d ? formatDate(d, 'weekdayDayMonth') : matchId}
                     {match?.opponent && <span className="text-gray-500 font-normal"> · vs {match.opponent}</span>}
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {match ? `${match.matchTime.slice(0, 5)} · ${signupsData?.summary.totalSignups ?? '…'} signed up` : ''}
-                    {' '}· {fw === 50 ? 'Balanced' : fw < 50 ? 'Fairness priority' : 'Positions priority'}
+                    {match ? t('coach.signedUpInline', { time: match.matchTime.slice(0, 5), count: signupsData?.summary.totalSignups ?? '…' }) : ''}
+                    {' '}· {fw === 50 ? t('coach.balanced') : fw < 50 ? t('coach.fairnessPriority') : t('coach.positionsPriority')}
                   </p>
                 </div>
                 <span className="text-gray-400 text-lg">{isExpanded ? '∧' : '∨'}</span>
@@ -450,11 +455,11 @@ function ConfigureStep({
                   {/* Fairness slider */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span className="flex items-center gap-1"><Icon name="scale" className="w-3.5 h-3.5" /> Fairness</span>
+                      <span className="flex items-center gap-1"><Icon name="scale" className="w-3.5 h-3.5" /> {t('coach.fairness')}</span>
                       <span className="font-medium text-gray-600">
-                        {fw === 50 ? 'Balanced' : fw < 50 ? 'Fairness priority' : 'Positions priority'}
+                        {fw === 50 ? t('coach.balanced') : fw < 50 ? t('coach.fairnessPriority') : t('coach.positionsPriority')}
                       </span>
-                      <span className="flex items-center gap-1"><Icon name="puzzle" className="w-3.5 h-3.5" /> Positions</span>
+                      <span className="flex items-center gap-1"><Icon name="puzzle" className="w-3.5 h-3.5" /> {t('coach.positions')}</span>
                     </div>
                     <input
                       type="range" min={0} max={100} step={10}
@@ -466,15 +471,15 @@ function ConfigureStep({
 
                   {/* Signup list with priority toggles */}
                   {!signupsData && (
-                    <p className="text-sm text-gray-400">Loading sign-ups…</p>
+                    <p className="text-sm text-gray-400">{t('coach.loadingSignups')}</p>
                   )}
                   {signupsData && signupsData.signups.length === 0 && (
-                    <p className="text-sm text-gray-400">No sign-ups yet.</p>
+                    <p className="text-sm text-gray-400">{t('coach.noSignupsShort')}</p>
                   )}
                   {signupsData && signupsData.signups.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                        Signed up — {signupsData.summary.totalSignups}
+                        {t('coach.signedUpHeading3', { count: signupsData.summary.totalSignups })}
                       </p>
                       {signupsData.signups.map(({ signupId, player, isPriority: dbPriority }) => {
                         const isPriority = priorityMap[signupId] ?? dbPriority;
@@ -557,6 +562,8 @@ function ReviewStep({
   onPublish: (matchId: string) => void;
   onReoptimize: () => void;
 }) {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   const matchId = orderedMatchIds[reviewIdx];
   const signupsData = signupByMatch[matchId];
   const matchResult = (batchResult.matches ?? []).find(mr => mr.matchId === matchId);
@@ -607,7 +614,7 @@ function ReviewStep({
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
-              {v === 'selections' ? 'Selections' : 'Player balance'}
+              {v === 'selections' ? t('coach.selections') : t('coach.playerBalance')}
             </button>
           ))}
           <div className="sm:pt-4 sm:border-t sm:border-gray-100">
@@ -615,7 +622,7 @@ function ReviewStep({
               onClick={onReoptimize}
               className="w-full text-center sm:text-left px-3 py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
             >
-              ← Re-optimize
+              {t('coach.reoptimizeBack')}
             </button>
           </div>
         </div>
@@ -627,7 +634,7 @@ function ReviewStep({
         {/* Header */}
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">
-            {reviewView === 'selections' ? 'Review selections' : 'Player balance'}
+            {reviewView === 'selections' ? t('coach.reviewSelections') : t('coach.playerBalance')}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             {reviewView === 'selections'
@@ -658,7 +665,7 @@ function ReviewStep({
                           : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    {d ? d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : id}
+                    {d ? formatDate(d, 'weekdayDayMonth') : id}
                     {published && ' ✓'}
                   </button>
                 );
@@ -673,20 +680,20 @@ function ReviewStep({
                   <div className="flex items-center justify-between gap-4">
                     <div>
                       <p className="font-semibold text-gray-900">
-                        {ids.size} selected
+                        {t('coach.selectedCount2', { count: ids.size })}
                         <span className={`ml-2 text-sm font-normal ${tooFew ? 'text-red-500' : 'text-gray-500'}`}>
-                          (min {minPlayers} · max {maxPlayers})
+                          {t('coach.minMax', { min: minPlayers, max: maxPlayers })}
                         </span>
                       </p>
                       {matchResult && matchResult.deficit > 0 && (
                         <p className="text-xs text-amber-600 mt-0.5">
-                          Optimizer deficit: {matchResult.deficit} player{matchResult.deficit > 1 ? 's' : ''} short
+                          {t('coach.deficit', { count: matchResult.deficit })}
                         </p>
                       )}
                     </div>
                     <div className="flex gap-2 shrink-0">
                       {publishState === 'done' ? (
-                        <span className="text-sm text-purple-600 font-medium">Published ✓</span>
+                        <span className="text-sm text-purple-600 font-medium">{t('coach.published')}</span>
                       ) : (
                         <>
                           {(isDirty || saveState === 'idle') && (
@@ -695,7 +702,7 @@ function ReviewStep({
                               disabled={saveState === 'saving'}
                               className="text-sm font-medium px-3 py-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 transition-colors disabled:opacity-50"
                             >
-                              {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved ✓' : 'Save'}
+                              {saveState === 'saving' ? t('coach.saving') : saveState === 'saved' ? t('coach.saved') : t('coach.save')}
                             </button>
                           )}
                           <button
@@ -703,14 +710,14 @@ function ReviewStep({
                             disabled={publishState === 'publishing' || tooFew}
                             className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
                           >
-                            {publishState === 'publishing' ? 'Publishing…' : 'Publish'}
+                            {publishState === 'publishing' ? t('coach.publishing') : t('coach.publish')}
                           </button>
                         </>
                       )}
                     </div>
                   </div>
-                  {saveState === 'error' && <p className="text-sm text-red-500">Failed to save.</p>}
-                  {publishState === 'error' && <p className="text-sm text-red-500">Failed to publish.</p>}
+                  {saveState === 'error' && <p className="text-sm text-red-500">{t('coach.batchSaveFailed')}</p>}
+                  {publishState === 'error' && <p className="text-sm text-red-500">{t('coach.batchPublishFailed')}</p>}
                 </div>
 
                 {/* Pitch */}
@@ -725,7 +732,7 @@ function ReviewStep({
 
                 {/* Player list */}
                 <div className="space-y-2">
-                  <h2 className="text-sm font-semibold text-gray-700">All signed up</h2>
+                  <h2 className="text-sm font-semibold text-gray-700">{t('coach.allSignedUp')}</h2>
                   {selectionPlayers.map(({ player, isPriority, selectedByOptimization }) => {
                     const isSelected = ids.has(player.userId);
                     return (
@@ -851,9 +858,10 @@ function ProjBar({ rate, played, signups, improved, worsened }: {
 
 // A single per-match status dot used in both the mobile cards and the table.
 function Pip({ signedUp, selected }: { signedUp: boolean; selected: boolean }) {
+  const { t } = useTranslation();
   return (
     <div
-      title={!signedUp ? 'Not signed up' : selected ? 'Selected' : 'Signed up, not selected'}
+      title={!signedUp ? t('coach.notSignedUp') : selected ? t('coach.selected') : t('coach.signedUpNotSelected')}
       className={`w-3 h-3 rounded-full transition-colors ${
         !signedUp
           ? 'bg-gray-100'
@@ -876,6 +884,8 @@ function ImpactTable({
   orderedMatchIds: string[];
   signupByMatch: Record<string, SignupsResponse>;
 }) {
+  const { t } = useTranslation();
+  const { formatDate } = useDateFormat();
   // Derive per-player live data from current review selections
   const liveImpact = (impact ?? []).map(p => {
     const batchSelected = orderedMatchIds.filter(mid => reviewSelections[mid]?.has(p.playerId)).length;
@@ -897,7 +907,7 @@ function ImpactTable({
     const d = signupByMatch[id];
     if (!d) return '?';
     const date = new Date(`${d.match.matchDate}T${d.match.matchTime}`);
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    return formatDate(date, 'dayMonth');
   });
 
   return (
@@ -907,15 +917,15 @@ function ImpactTable({
       <div className="flex items-center gap-4 text-xs text-gray-400">
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full bg-brand-green" />
-          <span>Selected</span>
+          <span>{t('coach.selected')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full border-2 border-gray-300" />
-          <span>Signed up, not selected</span>
+          <span>{t('coach.signedUpNotSelected')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full bg-gray-100" />
-          <span>Not in this match</span>
+          <span>{t('coach.notInThisMatch')}</span>
         </div>
       </div>
 
@@ -933,17 +943,17 @@ function ImpactTable({
 
               <div className="flex gap-8">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Season so far</p>
+                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{t('coach.seasonSoFar')}</p>
                   <RateBar played={p.historicalPlayed} signups={p.historicalSignups} />
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">After batch</p>
+                  <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">{t('coach.afterBatch')}</p>
                   <ProjBar rate={p.projRate} played={p.projPlayed} signups={p.projSignups} improved={improved} worsened={worsened} />
                 </div>
               </div>
 
               <div>
-                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">This batch</p>
+                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1.5">{t('coach.thisBatch')}</p>
                 <div className="flex gap-3 flex-wrap">
                   {p.pips.map((pip, i) => (
                     <div key={i} className="flex flex-col items-center gap-1">
@@ -963,8 +973,8 @@ function ImpactTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400">
-              <th className="text-left px-4 py-2.5 font-medium">Player</th>
-              <th className="text-left px-3 py-2.5 font-medium">Season so far</th>
+              <th className="text-left px-4 py-2.5 font-medium">{t('coach.player')}</th>
+              <th className="text-left px-3 py-2.5 font-medium">{t('coach.seasonSoFar')}</th>
               <th className="px-3 py-2.5 font-medium">
                 <div className="flex gap-2 justify-center">
                   {matchLabels.map((label, i) => (
@@ -972,7 +982,7 @@ function ImpactTable({
                   ))}
                 </div>
               </th>
-              <th className="text-left px-3 py-2.5 font-medium">After batch</th>
+              <th className="text-left px-3 py-2.5 font-medium">{t('coach.afterBatch')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">

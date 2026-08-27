@@ -39,7 +39,7 @@ router.get('/players/:playerId/achievements', authenticate, async (req, res, nex
     ]);
 
     if (!profile) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Player not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Spilleren blev ikke fundet' } });
       return;
     }
 

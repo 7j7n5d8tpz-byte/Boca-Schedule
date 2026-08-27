@@ -102,7 +102,7 @@ router.post('/batch', authenticate, requireRole('coach', 'admin'), async (req, r
       batchResult = await optimizeBatch({ total_matches: totalMatches, players, matches: optimizerMatches });
     } catch (optErr) {
       console.error('Batch optimizer error', optErr);
-      res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: 'Optimization service error — please try again.' } });
+      res.status(502).json({ success: false, error: { code: 'OPTIMIZER_ERROR', message: 'Fejl i optimeringen — prøv igen.' } });
       return;
     }
 

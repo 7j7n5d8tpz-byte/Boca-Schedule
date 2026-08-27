@@ -16,8 +16,10 @@ router.get('/', authenticate, async (_req, res, next) => {
       supabaseAdmin.from('opponents').select('opponent_id, name').order('name'),
       supabaseAdmin
         .from('match_results')
+        // Cancelled matches carry a result only when they were walkovers, so
+        // including them adds the forfeited 3-0s and nothing else.
         .select('goals_for, goals_against, matches!inner(opponent_id, status, match_date)')
-        .eq('matches.status', 'completed'),
+        .in('matches.status', ['completed', 'cancelled']),
     ]);
     if (oppErr) throw oppErr;
     if (resErr) throw resErr;
@@ -73,14 +75,14 @@ router.get('/:opponentId/history', authenticate, async (req, res, next) => {
       .eq('opponent_id', opponentId)
       .single();
     if (oppErr || !opponent) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Opponent not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Modstanderen blev ikke fundet' } });
       return;
     }
 
     let q = supabaseAdmin
       .from('match_results')
-      .select('match_id, goals_for, goals_against, game_assessment, matches!inner(match_date, match_time, location, match_type, status, opponent_id)')
-      .eq('matches.status', 'completed')
+      .select('match_id, goals_for, goals_against, game_assessment, matches!inner(match_date, match_time, location, match_type, status, cancelled_by, opponent_id)')
+      .in('matches.status', ['completed', 'cancelled'])
       .eq('matches.opponent_id', opponentId);
     if (matchTypeFilter !== 'all') q = q.eq('matches.match_type', matchTypeFilter);
     const { data: rows, error } = await q;
@@ -96,6 +98,7 @@ router.get('/:opponentId/history', authenticate, async (req, res, next) => {
         goalsFor: r.goals_for,
         goalsAgainst: r.goals_against,
         gameAssessment: r.game_assessment ?? null,
+        walkover: (r.matches.cancelled_by ?? null) as 'us' | 'opponent' | null,
       }))
       // Chronological — drives both the result list and the trend chart.
       .sort((a, b) => (a.matchDate < b.matchDate ? -1 : a.matchDate > b.matchDate ? 1 : 0));
@@ -107,12 +110,14 @@ router.get('/:opponentId/history', authenticate, async (req, res, next) => {
       goalsFor += m.goalsFor;
       goalsAgainst += m.goalsAgainst;
       const diff = m.goalsFor - m.goalsAgainst;
+      // Walkovers count towards the record but never as a best/worst display —
+      // a forfeit isn't a performance.
       if (diff > 0) {
         wins++;
-        if (!biggestWin || diff > biggestWin.goalsFor - biggestWin.goalsAgainst) biggestWin = m;
+        if (!m.walkover && (!biggestWin || diff > biggestWin.goalsFor - biggestWin.goalsAgainst)) biggestWin = m;
       } else if (diff < 0) {
         losses++;
-        if (!biggestLoss || diff < biggestLoss.goalsFor - biggestLoss.goalsAgainst) biggestLoss = m;
+        if (!m.walkover && (!biggestLoss || diff < biggestLoss.goalsFor - biggestLoss.goalsAgainst)) biggestLoss = m;
       } else {
         draws++;
       }
@@ -153,7 +158,7 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
   try {
     const body = CreateOpponentSchema.safeParse(req.body);
     if (!body.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name is required' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Navn skal udfyldes' } });
       return;
     }
     const resolved = await resolveOpponent(body.data.name, undefined, req.user!.userId);

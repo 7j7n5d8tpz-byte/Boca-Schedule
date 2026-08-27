@@ -30,7 +30,7 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
   try {
     const { name } = req.body as { name: string };
     if (!name || typeof name !== 'string' || !name.trim()) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name is required' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Navn skal udfyldes' } });
       return;
     }
 
@@ -66,7 +66,7 @@ router.delete('/', authenticate, requireRole('coach', 'admin'), async (req, res,
   try {
     const { name } = req.body as { name: string };
     if (!name || typeof name !== 'string' || !name.trim()) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'name is required' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Navn skal udfyldes' } });
       return;
     }
 

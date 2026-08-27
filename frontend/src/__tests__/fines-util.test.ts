@@ -25,16 +25,16 @@ describe('fineWhat', () => {
   it('falls back to the reason for custom fines', () => {
     expect(fineWhat({ typeLabel: null, reason: 'Forgot the keys' })).toBe('Forgot the keys');
   });
-  it('falls back to "Fine" when nothing is set', () => {
-    expect(fineWhat({ typeLabel: null, reason: null })).toBe('Fine');
+  it('returns null when nothing is set, leaving the fallback to the caller', () => {
+    expect(fineWhat({ typeLabel: null, reason: null })).toBeNull();
   });
 });
 
 describe('STATUS_META', () => {
-  it('maps lifecycle statuses to user-facing labels', () => {
-    expect(STATUS_META.approved.label).toBe('Outstanding');
-    expect(STATUS_META.payment_claimed.label).toBe('Awaiting confirm');
-    expect(STATUS_META.paid.label).toBe('Paid');
+  it('maps lifecycle statuses to their translation keys', () => {
+    expect(STATUS_META.approved.labelKey).toBe('fines.status.approved');
+    expect(STATUS_META.payment_claimed.labelKey).toBe('fines.status.payment_claimed');
+    expect(STATUS_META.paid.labelKey).toBe('fines.status.paid');
   });
 });
 

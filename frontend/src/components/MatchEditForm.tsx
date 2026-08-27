@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import LocationPicker, { encodeLocation, decodeLocation } from './LocationPicker';
 import OpponentPicker from './OpponentPicker';
 
@@ -84,12 +85,13 @@ export default function MatchEditForm({
   onChange: (next: MatchEditFields) => void;
   matchType: string;
 }) {
+  const { t } = useTranslation();
   const set = (patch: Partial<MatchEditFields>) => onChange({ ...value, ...patch });
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.date')}</label>
         <input
           type="date"
           value={value.matchDate}
@@ -98,7 +100,7 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Time</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.time')}</label>
         <input
           type="time"
           value={value.matchTime}
@@ -107,7 +109,7 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Min players</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.minPlayers')}</label>
         <input
           type="number"
           min={1}
@@ -117,7 +119,7 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Max players</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.maxPlayers')}</label>
         <input
           type="number"
           min={1}
@@ -128,8 +130,8 @@ export default function MatchEditForm({
       </div>
       <div className="sm:col-span-2">
         <label className="block text-xs font-medium text-gray-500 mb-1">
-          Venue <span className="text-gray-400 font-normal">
-            · {matchType === 'futsal' ? 'Hall (optional)' : 'Court (optional)'}
+          {t('matchForm.venue')} <span className="text-gray-400 font-normal">
+            · {matchType === 'futsal' ? t('matchForm.hallOptional') : t('matchForm.courtOptional')}
           </span>
         </label>
         <LocationPicker
@@ -141,26 +143,26 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Opponent <span className="text-gray-400">(optional)</span></label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.opponent')} <span className="text-gray-400">{t('common.optional')}</span></label>
         <OpponentPicker
           opponentId={value.opponentId}
           onChange={(id) => set({ opponentId: id })}
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.category')}</label>
         <select
           value={value.matchCategory}
           onChange={e => set({ matchCategory: e.target.value as 'serie' | 'pokal' })}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
         >
-          <option value="serie">Serie</option>
-          <option value="pokal">Pokal</option>
+          <option value="serie">{t('matchForm.serie')}</option>
+          <option value="pokal">{t('matchForm.pokal')}</option>
         </select>
       </div>
       {value.matchCategory === 'serie' && (
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">Serie letter</label>
+          <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.serieLetter')}</label>
           <select
             value={value.serieLetter}
             onChange={e => set({ serieLetter: e.target.value })}
@@ -173,7 +175,7 @@ export default function MatchEditForm({
         </div>
       )}
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Signup opens</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.signupOpens')}</label>
         <input
           type="date"
           value={value.signupOpenDate}
@@ -182,7 +184,7 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Signup deadline</label>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.signupDeadline')}</label>
         <input
           type="date"
           value={value.signupCloseDate}

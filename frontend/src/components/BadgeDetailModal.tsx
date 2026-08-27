@@ -1,14 +1,17 @@
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Crest, { TIER_META, TIERS, tierRank, type Tier } from './Crest';
 import Avatar from './Avatar';
-import { useCatalog, useTeamWall } from '../api/achievements';
+import { useCatalog, useCatalogText, useTeamWall } from '../api/achievements';
 import { useHubOrigin } from '../hubOrigin';
 
 // "Who else has this?" — opened by clicking any crest. Explains the badge (glyph,
 // description, tier ladder) and lists every player who has earned it, by tier.
 
 export default function BadgeDetailModal({ code, onClose }: { code: string; onClose: () => void }) {
+  const { t } = useTranslation();
+  const text = useCatalogText();
   const { data: catalog } = useCatalog();
   const { data: wall } = useTeamWall();
   // This modal opens from several pages, so hand on wherever the page it sits
@@ -40,7 +43,7 @@ export default function BadgeDetailModal({ code, onClose }: { code: string; onCl
             <Crest glyph={entry.glyph} tier={topTier ?? 'bronze'} locked={!topTier} size={104} showRibbon={false} />
           </div>
           <p className="mt-2 text-base font-bold text-gray-900">{entry.name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{entry.description}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{text.description(entry)}</p>
 
           {/* Tier ladder thresholds */}
           <div className="flex flex-wrap justify-center gap-1.5 mt-3">
@@ -56,13 +59,18 @@ export default function BadgeDetailModal({ code, onClose }: { code: string; onCl
             ))}
           </div>
           <p className="text-[10px] text-gray-400 mt-1">
-            {entry.isStreak ? `${entry.unit} for the best-run crest` : `${entry.unit} needed per tier`} ({TIERS.length} tiers)
+            {entry.isStreak
+              ? t('badge.bestRun', { unit: text.unit(entry) })
+              : t('badge.perTier', { unit: text.unit(entry) })}{' '}
+            {t('badge.tierCount', { count: TIERS.length })}
           </p>
         </div>
 
         <div className="p-4">
           <p className="text-xs font-semibold text-gray-700 mb-2">
-            {isTeam ? 'A whole-squad badge' : holders.length > 0 ? `Earned by ${holders.length} player${holders.length > 1 ? 's' : ''}` : 'Not earned yet'}
+            {isTeam
+              ? t('badge.squadBadge')
+              : holders.length > 0 ? t('badge.earnedBy', { count: holders.length }) : t('badge.notEarned')}
           </p>
           <div className="space-y-1.5">
             {holders.map(h => (
@@ -82,14 +90,14 @@ export default function BadgeDetailModal({ code, onClose }: { code: string; onCl
               </Link>
             ))}
             {!isTeam && holders.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-3">Be the first to earn this one.</p>
+              <p className="text-sm text-gray-400 text-center py-3">{t('badge.beFirst')}</p>
             )}
           </div>
         </div>
 
         <div className="p-4 pt-0">
           <button onClick={onClose} className="w-full bg-gray-100 text-gray-700 rounded-lg py-2.5 text-sm font-semibold hover:bg-gray-200 transition-colors">
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

@@ -115,9 +115,9 @@ describe('mailer transport', () => {
     await sendSignupReminder(players(1), match);
 
     const { html, text } = sendMock.mock.calls[0][0];
-    expect(html).toContain('Sun 9 Aug, 21:00');
-    expect(text).toContain('Signup closes: Sun 9 Aug, 21:00');
-    expect(html).not.toContain('19:00');
+    expect(html).toContain('søn. 9. aug., 21.00');
+    expect(text).toContain('Tilmelding lukker: søn. 9. aug., 21.00');
+    expect(html).not.toContain('19.00');
   });
 
   it('does not let one failed send poison the ones queued behind it', async () => {

@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
+import i18n from '../i18n';
 
 // Node.js 22 declares `localStorage` as a built-in but leaves it undefined
 // unless --localstorage-file is passed. Provide a proper in-memory
@@ -15,3 +16,9 @@ if (typeof globalThis.localStorage === 'undefined') {
     key:        (i: number) => [...store.keys()][i] ?? null,
   });
 }
+
+// The UI defaults to Danish, but the unit tests assert on English labels — and
+// English is also what the E2E suite pins itself to (frontend/e2e/fixtures.ts).
+// Keeping the tests in one language means a copy change in Danish never breaks
+// an assertion that was never about the copy.
+i18n.changeLanguage('en');

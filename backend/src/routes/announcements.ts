@@ -49,7 +49,7 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
   try {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Announcement text is required (max 500 chars)' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Opslaget skal have en tekst (maks. 500 tegn)' } });
       return;
     }
     const { body, matchId } = parsed.data;
@@ -66,7 +66,7 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
       .then(({ data: users }) => {
         createNotifications((users ?? []).map((u: any) => u.user_id), {
           type: 'announcement',
-          title: 'New announcement',
+          title: 'Nyt opslag',
           body: body.length > 120 ? `${body.slice(0, 117)}…` : body,
           link: '/dashboard',
         });
@@ -86,7 +86,7 @@ router.put('/:id', authenticate, requireRole('coach', 'admin'), async (req, res,
   try {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Announcement text is required (max 500 chars)' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Opslaget skal have en tekst (maks. 500 tegn)' } });
       return;
     }
     const { body, matchId } = parsed.data;
@@ -99,7 +99,7 @@ router.put('/:id', authenticate, requireRole('coach', 'admin'), async (req, res,
       .maybeSingle();
     if (error) throw error;
     if (!data) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Announcement not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Opslaget blev ikke fundet' } });
       return;
     }
 

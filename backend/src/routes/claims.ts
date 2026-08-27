@@ -10,7 +10,7 @@ import { createNotifications } from '../lib/notifications.js';
 
 function claimMatchLabel(m: { match_date: string; match_time?: string }): string {
   return new Date(`${m.match_date}T${m.match_time ?? '00:00'}`)
-    .toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    .toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
 // Count current selections for a match and compare against capacity.
@@ -33,11 +33,11 @@ router.post('/matches/:matchId/claims', authenticate, async (req, res, next) => 
       .select('status, match_date, match_time, location, opponent, max_players')
       .eq('match_id', matchId).single();
     if (!match) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Match not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Kampen blev ikke fundet' } });
       return;
     }
     if (match.status !== 'published') {
-      res.status(400).json({ success: false, error: { code: 'NOT_PUBLISHED', message: 'Can only claim spots on published matches' } });
+      res.status(400).json({ success: false, error: { code: 'NOT_PUBLISHED', message: 'Du kan kun overtage pladser i offentliggjorte kampe' } });
       return;
     }
 
@@ -48,12 +48,12 @@ router.post('/matches/:matchId/claims', authenticate, async (req, res, next) => 
       .eq('player_id', claimantId)
       .maybeSingle();
     if (sel) {
-      res.status(400).json({ success: false, error: { code: 'ALREADY_SELECTED', message: 'You are already in the squad for this match' } });
+      res.status(400).json({ success: false, error: { code: 'ALREADY_SELECTED', message: 'Du er allerede i truppen til denne kamp' } });
       return;
     }
 
     if (!(await spotIsOpen(String(matchId), match.max_players))) {
-      res.status(400).json({ success: false, error: { code: 'NO_OPEN_SPOT', message: 'There is no open spot for this match' } });
+      res.status(400).json({ success: false, error: { code: 'NO_OPEN_SPOT', message: 'Der er ingen ledig plads i denne kamp' } });
       return;
     }
 
@@ -84,8 +84,8 @@ router.post('/matches/:matchId/claims', authenticate, async (req, res, next) => 
       }
       createNotifications((coaches ?? []).map((c: any) => c.user_id), {
         type: 'spot_claim',
-        title: 'Spot claimed',
-        body: `${claimant?.name ?? 'A player'} wants the open spot for ${claimMatchLabel(match)}`,
+        title: 'Plads ønsket',
+        body: `${claimant?.name ?? 'En spiller'} vil gerne have den ledige plads til ${claimMatchLabel(match)}`,
         link: `/coach/matches/${matchId}/selections`,
         matchId: String(matchId),
         refId: data.claim_id,
@@ -139,7 +139,7 @@ router.put('/claims/:claimId/resolve', authenticate, requireRole('coach', 'admin
       .eq('status', 'pending')
       .single();
     if (!claim) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Pending claim not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Den afventende ansøgning blev ikke fundet' } });
       return;
     }
 
@@ -203,11 +203,11 @@ router.delete('/claims/:claimId', authenticate, async (req, res, next) => {
       .single();
 
     if (!claim || claim.claimant_id !== userId) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Claim not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Ansøgningen blev ikke fundet' } });
       return;
     }
     if (claim.status !== 'pending') {
-      res.status(400).json({ success: false, error: { code: 'ALREADY_RESOLVED', message: 'Claim is no longer pending' } });
+      res.status(400).json({ success: false, error: { code: 'ALREADY_RESOLVED', message: 'Ansøgningen afventer ikke længere' } });
       return;
     }
 
@@ -244,8 +244,8 @@ function notifyResolution(matchId: string, acceptedId: string | null, rejectedId
       }
       createNotifications([acceptedId], {
         type: 'claim_accepted',
-        title: "You're in the squad",
-        body: `You got the open spot for ${claimMatchLabel(match)}`,
+        title: 'Du er med i truppen',
+        body: `Du fik den ledige plads til ${claimMatchLabel(match)}`,
         link: '/dashboard',
         matchId: String(matchId),
       });
@@ -261,8 +261,8 @@ function notifyResolution(matchId: string, acceptedId: string | null, rejectedId
     if (rejectedIds.length > 0) {
       createNotifications(rejectedIds, {
         type: 'claim_rejected',
-        title: 'Spot went to someone else',
-        body: `The open spot for ${claimMatchLabel(match)} was filled`,
+        title: 'Pladsen gik til en anden',
+        body: `Den ledige plads til ${claimMatchLabel(match)} blev besat`,
         link: '/dashboard',
         matchId: String(matchId),
       });

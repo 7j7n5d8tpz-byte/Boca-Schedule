@@ -79,7 +79,7 @@ describe('Matches', () => {
       rows => rows.length > 0,
     );
     expect(notes.length).toBeGreaterThan(0);
-    expect(notes[0].title).toBe('Sign-ups are open');
+    expect(notes[0].title).toBe('Tilmeldingen er åben');
     expect(notes.some(n => n.user_id === player.userId)).toBe(true);
 
     // In-app is stamped; the email is left for the batching cron.
@@ -262,5 +262,83 @@ describe('Matches', () => {
       .eq('match_id', match.match_id)
       .eq('type', 'match_moved');
     expect((data ?? []).length).toBe(0);
+  });
+
+  // ── Cancellation walkovers ──────────────────────────────────────────────────
+
+  async function cancel(matchId: string, body: Record<string, unknown>) {
+    return request(app)
+      .put(`/api/matches/${matchId}`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send(body);
+  }
+
+  async function resultOf(matchId: string) {
+    const { data } = await supabaseAdmin
+      .from('match_results').select('goals_for, goals_against').eq('match_id', matchId).maybeSingle();
+    return data;
+  }
+
+  it('awards a 3-0 walkover when the opponent cancels', async () => {
+    const match = await createTestMatch({ status: 'published' });
+    createdMatchIds.push(match.match_id);
+
+    const res = await cancel(match.match_id, { status: 'cancelled', cancelledBy: 'opponent' });
+    expect(res.status).toBe(200);
+
+    expect(await resultOf(match.match_id)).toMatchObject({ goals_for: 3, goals_against: 0 });
+  });
+
+  it('forfeits 0-3 when we cancel', async () => {
+    const match = await createTestMatch({ status: 'published' });
+    createdMatchIds.push(match.match_id);
+
+    await cancel(match.match_id, { status: 'cancelled', cancelledBy: 'us' });
+
+    expect(await resultOf(match.match_id)).toMatchObject({ goals_for: 0, goals_against: 3 });
+  });
+
+  it('records no result when neither side cancelled', async () => {
+    const match = await createTestMatch({ status: 'published' });
+    createdMatchIds.push(match.match_id);
+
+    await cancel(match.match_id, { status: 'cancelled', cancelledBy: null });
+
+    expect(await resultOf(match.match_id)).toBeNull();
+  });
+
+  it('rewrites the walkover when the outcome is corrected afterwards', async () => {
+    const match = await createTestMatch({ status: 'published' });
+    createdMatchIds.push(match.match_id);
+
+    await cancel(match.match_id, { status: 'cancelled', cancelledBy: 'us' });
+    await cancel(match.match_id, { cancelledBy: 'opponent' });
+    expect(await resultOf(match.match_id)).toMatchObject({ goals_for: 3, goals_against: 0 });
+
+    // Clearing the outcome removes the walkover result again.
+    await cancel(match.match_id, { cancelledBy: null });
+    expect(await resultOf(match.match_id)).toBeNull();
+  });
+
+  it('rejects cancelledBy on a match that is not cancelled', async () => {
+    const match = await createTestMatch({ status: 'published' });
+    createdMatchIds.push(match.match_id);
+
+    const res = await cancel(match.match_id, { cancelledBy: 'opponent' });
+    expect(res.status).toBe(422);
+    expect(await resultOf(match.match_id)).toBeNull();
+  });
+
+  it('un-cancelling clears the walkover result', async () => {
+    const match = await createTestMatch({ status: 'published' });
+    createdMatchIds.push(match.match_id);
+
+    await cancel(match.match_id, { status: 'cancelled', cancelledBy: 'opponent' });
+    await cancel(match.match_id, { status: 'published' });
+
+    expect(await resultOf(match.match_id)).toBeNull();
+    const { data } = await supabaseAdmin
+      .from('matches').select('cancelled_by').eq('match_id', match.match_id).single();
+    expect(data?.cancelled_by).toBeNull();
   });
 });

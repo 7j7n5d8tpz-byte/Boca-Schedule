@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 
@@ -88,20 +89,23 @@ function TypeIcon({ type }: { type: string }) {
   );
 }
 
-function timeAgo(iso: string): string {
+type Translate = (key: string, opts?: Record<string, unknown>) => string;
+
+function timeAgo(iso: string, t: Translate): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return t('notifications.justNow');
+  if (m < 60) return t('notifications.minutesAgo', { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t('notifications.hoursAgo', { count: h });
   const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  return t('notifications.daysAgo', { count: d });
 }
 
 export default function NotificationBell({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'new' | 'all'>('new');
   const ref = useRef<HTMLDivElement>(null);
@@ -171,7 +175,7 @@ export default function NotificationBell({ onOpenChange }: { onOpenChange?: (ope
     <div className="relative shrink-0" ref={ref}>
       <button
         onClick={() => setOpen(o => !o)}
-        aria-label="Notifications"
+        aria-label={t('notifications.aria')}
         aria-expanded={open}
         className="relative flex items-center justify-center w-9 h-9 rounded-lg hover:bg-white/10 transition-colors"
       >
@@ -199,29 +203,31 @@ export default function NotificationBell({ onOpenChange }: { onOpenChange?: (ope
       {open && (
         <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-100 rounded-xl shadow-2xl overflow-hidden z-50">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-gray-900">Notifications</p>
+            <p className="text-sm font-semibold text-gray-900">{t('notifications.title')}</p>
             {newItems.length > 0 && (
               <button
                 onClick={() => markAll.mutate()}
                 disabled={markAll.isPending}
                 className="text-xs font-medium text-brand-green hover:underline disabled:opacity-50"
               >
-                Mark all read
+                {t('notifications.markAllRead')}
               </button>
             )}
           </div>
 
           {/* New / All tabs */}
           <div className="flex gap-1 px-2 py-2 border-b border-gray-100">
-            {(['new', 'all'] as const).map(t => (
+            {(['new', 'all'] as const).map(tabKey => (
               <button
-                key={t}
-                onClick={() => setTab(t)}
+                key={tabKey}
+                onClick={() => setTab(tabKey)}
                 className={`flex-1 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                  tab === t ? 'bg-brand-green text-white' : 'text-gray-500 hover:bg-gray-100'
+                  tab === tabKey ? 'bg-brand-green text-white' : 'text-gray-500 hover:bg-gray-100'
                 }`}
               >
-                {t === 'new' ? `New${newItems.length ? ` (${newItems.length})` : ''}` : 'All'}
+                {tabKey === 'new'
+                  ? (newItems.length ? t('notifications.tabNewCount', { count: newItems.length }) : t('notifications.tabNew'))
+                  : t('notifications.tabAll')}
               </button>
             ))}
           </div>
@@ -229,7 +235,7 @@ export default function NotificationBell({ onOpenChange }: { onOpenChange?: (ope
           <div className="max-h-96 overflow-y-auto divide-y divide-gray-50">
             {shown.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-8">
-                {tab === 'new' ? "You're all caught up." : 'No notifications yet.'}
+                {tab === 'new' ? t('notifications.caughtUp') : t('notifications.empty')}
               </p>
             )}
             {shown.map(n => (
@@ -246,9 +252,9 @@ export default function NotificationBell({ onOpenChange }: { onOpenChange?: (ope
                   <div className="min-w-0 flex-1">
                     <p className={`text-sm ${isNew(n) ? 'font-semibold text-gray-900' : 'font-medium text-gray-600'}`}>{n.title}</p>
                     {n.body && <p className="text-xs text-gray-500 mt-0.5">{n.body}</p>}
-                    <p className="text-[11px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
+                    <p className="text-[11px] text-gray-400 mt-1">{timeAgo(n.createdAt, t)}</p>
                   </div>
-                  {isNew(n) && <span className="mt-1.5 w-2 h-2 rounded-full bg-brand-green shrink-0" aria-label="New" />}
+                  {isNew(n) && <span className="mt-1.5 w-2 h-2 rounded-full bg-brand-green shrink-0" aria-label={t('notifications.newBadge')} />}
                 </div>
               </button>
             ))}

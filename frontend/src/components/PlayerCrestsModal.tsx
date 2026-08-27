@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Crest, { TIER_META, tierRank } from './Crest';
 import Avatar from './Avatar';
 import RankBar from './RankBar';
@@ -22,6 +23,7 @@ export default function PlayerCrestsModal({ player, onClose, onOpenCrest }: {
   onClose: () => void;
   onOpenCrest?: (code: string) => void;
 }) {
+  const { t } = useTranslation();
   const { data: catalog } = useCatalog();
   const origin = useHubOrigin();
   const lookup = (code: string) => catalog && [...catalog.individual, ...catalog.team].find(c => c.code === code);
@@ -39,7 +41,7 @@ export default function PlayerCrestsModal({ player, onClose, onOpenCrest }: {
             <div className="min-w-0 flex-1">
               <p className="text-base font-bold text-gray-900 truncate">{player.name}</p>
               <p className="text-xs" style={{ color: tier ? TIER_META[tier].ribbon : '#9ca3af' }}>
-                {tier ? `${TIER_META[tier].label} rank` : 'Unranked'} · {player.crests.length} crests
+                {tier ? t('hub.rank', { tier: TIER_META[tier].label }) : t('hub.unranked')} · {t('crests.count', { count: player.crests.length })}
               </p>
             </div>
             <Crest glyph="medal" tier={tier ?? 'bronze'} locked={!tier} size={48} showRibbon={false} />
@@ -49,7 +51,7 @@ export default function PlayerCrestsModal({ player, onClose, onOpenCrest }: {
 
         <div className="p-4">
           {crests.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">No crests earned yet this season.</p>
+            <p className="text-sm text-gray-400 text-center py-6">{t('crests.noneThisSeason')}</p>
           ) : (
             <>
               <div className="grid grid-cols-3 gap-3">
@@ -67,7 +69,7 @@ export default function PlayerCrestsModal({ player, onClose, onOpenCrest }: {
                   </div>
                 ))}
               </div>
-              {onOpenCrest && <p className="mt-3 text-[11px] text-gray-400 text-center">Tap a crest to see what it takes.</p>}
+              {onOpenCrest && <p className="mt-3 text-[11px] text-gray-400 text-center">{t('crests.tapToSee')}</p>}
             </>
           )}
         </div>
@@ -79,10 +81,10 @@ export default function PlayerCrestsModal({ player, onClose, onOpenCrest }: {
             onClick={onClose}
             className="block w-full text-center bg-brand-green text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-brand-green-700 transition-colors"
           >
-            View full profile
+            {t('crests.viewProfile')}
           </Link>
           <button onClick={onClose} className="w-full bg-gray-100 text-gray-700 rounded-lg py-2.5 text-sm font-semibold hover:bg-gray-200 transition-colors">
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

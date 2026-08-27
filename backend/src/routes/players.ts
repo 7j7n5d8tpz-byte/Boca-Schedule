@@ -12,6 +12,7 @@ const router = Router();
 const UpdateProfileSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   preferredPositions: z.array(z.enum(['GK', 'DEF', 'WIN', 'MID', 'STR'])).optional(),
+  language: z.enum(['da', 'en']).optional(),
 });
 
 // GET /api/players — all registered players except self
@@ -71,7 +72,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       totalYellowCards: number; totalRedCards: number; totalManOfMatch: number;
       avgRating: number; attendanceRate: number; gkAppearances: number;
     };
-    type MatchRow = { matchId: string; matchDate: string; location: string; opponent: string | null; goalsFor: number; goalsAgainst: number };
+    type MatchRow = { matchId: string; matchDate: string; location: string; opponent: string | null; goalsFor: number; goalsAgainst: number; walkover: 'us' | 'opponent' | null };
 
     async function getYearData(y: number): Promise<{ players: PlayerRow[]; matchHistory: MatchRow[]; teamGames: number }> {
       const { start, end } = seasonRange(y, matchTypeFilter);
@@ -101,7 +102,7 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
         supabaseAdmin.from('signups').select('player_id').eq('is_active', true).in('match_id', matchIds),
         supabaseAdmin.from('selections').select('player_id, match_id').in('match_id', matchIds),
         supabaseAdmin.from('match_results')
-          .select('match_id, goals_for, goals_against, matches(match_date, location, opponent)')
+          .select('match_id, goals_for, goals_against, matches(match_date, location, opponent, cancelled_by)')
           .in('match_id', matchIds).order('recorded_at', { ascending: true }),
         supabaseAdmin.from('matches').select('match_id').eq('status', 'completed').in('match_id', matchIds),
         supabaseAdmin.from('match_results').select('match_id, gk_first_half, gk_second_half').in('match_id', matchIds),
@@ -202,6 +203,8 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
         opponent: r.matches?.opponent ?? null,
         goalsFor: Number(r.goals_for),
         goalsAgainst: Number(r.goals_against),
+        // A cancelled match only carries a result when it was a walkover.
+        walkover: (r.matches?.cancelled_by ?? null) as 'us' | 'opponent' | null,
       }));
 
       return { players, matchHistory, teamGames: completedIds.size };
@@ -211,8 +214,13 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       const totalGoals        = players.reduce((s, p) => s + p.totalGoals, 0);
       const totalAssists      = players.reduce((s, p) => s + p.totalAssists, 0);
       const totalCleanSheets  = players.reduce((s, p) => s + p.totalCleanSheets, 0);
-      const totalGoalsAgainst = matchHistory.reduce((s, m) => s + m.goalsAgainst, 0);
+      // Walkovers count towards the W/D/L record but stay out of the goal
+      // statistics — nobody played, so their forfeited 3-0 would distort both the
+      // totals and the per-game averages.
+      const playedMatches     = matchHistory.filter(m => !m.walkover);
+      const totalGoalsAgainst = playedMatches.reduce((s, m) => s + m.goalsAgainst, 0);
       const gamesWithResults  = matchHistory.length;
+      const gamesPlayed       = playedMatches.length;
       const wins   = matchHistory.filter(m => m.goalsFor > m.goalsAgainst).length;
       const draws  = matchHistory.filter(m => m.goalsFor === m.goalsAgainst).length;
       const losses = matchHistory.filter(m => m.goalsFor < m.goalsAgainst).length;
@@ -227,8 +235,8 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       return {
         totalPlayers: active.length, totalGoals, totalGoalsAgainst, totalAssists, totalCleanSheets,
         avgAttendanceRate: avgAttendance, gamesWithResults, teamGames, wins, draws, losses,
-        avgGoalsFor:     gamesWithResults ? +(totalGoals / gamesWithResults).toFixed(2) : 0,
-        avgGoalsAgainst: gamesWithResults ? +(totalGoalsAgainst / gamesWithResults).toFixed(2) : 0,
+        avgGoalsFor:     gamesPlayed ? +(totalGoals / gamesPlayed).toFixed(2) : 0,
+        avgGoalsAgainst: gamesPlayed ? +(totalGoalsAgainst / gamesPlayed).toFixed(2) : 0,
         topScorer:   topScorer?.totalGoals        ? { userId: topScorer.userId,   name: topScorer.name,   value: topScorer.totalGoals }     : null,
         topAssister: topAssister?.totalAssists    ? { userId: topAssister.userId, name: topAssister.name, value: topAssister.totalAssists } : null,
         topGk:       topGk?.gkAppearances         ? { userId: topGk.userId, name: topGk.name, halves: topGk.gkAppearances, cleanSheets: topGk.totalCleanSheets } : null,
@@ -266,8 +274,10 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
 
     let q = supabaseAdmin
       .from('match_results')
-      .select('match_id, goals_for, goals_against, game_assessment, goal_events, long_read, gk_first_half, gk_second_half, matches!inner(match_date, match_time, location, opponent, match_type, status)')
-      .eq('matches.status', 'completed')
+      .select('match_id, goals_for, goals_against, game_assessment, goal_events, long_read, gk_first_half, gk_second_half, matches!inner(match_date, match_time, location, opponent, match_type, status, cancelled_by)')
+      // Cancelled matches carry a result only when they were walkovers, so they
+      // join the season's match list as a forfeited 3-0 with no player detail.
+      .in('matches.status', ['completed', 'cancelled'])
       .gte('matches.match_date', start)
       .lte('matches.match_date', end);
     if (matchTypeFilter !== 'all') q = q.eq('matches.match_type', matchTypeFilter);
@@ -375,6 +385,7 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
       goalsFor:       Number(r.goals_for),
       goalsAgainst:   Number(r.goals_against),
       gameAssessment: r.game_assessment ?? null,
+      walkover:       (r.matches.cancelled_by ?? null) as 'us' | 'opponent' | null,
       goals: (r.goal_events ?? []).map((g: any) => ({
         scorerId:     g.scorerId ?? null,
         scorerName:   g.scorerId   ? (nameMap.get(g.scorerId)   ?? 'Unknown') : null,
@@ -419,7 +430,7 @@ router.get('/:playerId/statistics', authenticate, async (req, res, next) => {
     ]);
 
     if (!profile) {
-      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Player not found' } });
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Spilleren blev ikke fundet' } });
       return;
     }
 
@@ -543,24 +554,25 @@ router.put('/:playerId/profile', authenticate, async (req, res, next) => {
     const { playerId } = req.params;
 
     if (playerId !== req.user!.userId && req.user!.role !== 'admin') {
-      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Cannot edit another user\'s profile' } });
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du kan ikke redigere en anden brugers profil' } });
       return;
     }
 
     const body = UpdateProfileSchema.safeParse(req.body);
     if (!body.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid input' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Ugyldige oplysninger' } });
       return;
     }
 
     const updates: Record<string, unknown> = {};
     if (body.data.name) updates.name = body.data.name;
     if (body.data.preferredPositions) updates.preferred_positions = body.data.preferredPositions;
+    if (body.data.language) updates.language = body.data.language;
 
     const { data, error } = await supabaseAdmin.from('users').update(updates).eq('user_id', playerId).select().single();
     if (error) throw error;
 
-    res.json({ success: true, data: { userId: data.user_id, name: data.name, preferredPositions: data.preferred_positions, updatedAt: data.updated_at } });
+    res.json({ success: true, data: { userId: data.user_id, name: data.name, preferredPositions: data.preferred_positions, language: data.language, updatedAt: data.updated_at } });
   } catch (err) {
     next(err);
   }
@@ -577,13 +589,13 @@ router.put('/:playerId/avatar', authenticate, async (req, res, next) => {
   try {
     const { playerId } = req.params;
     if (playerId !== req.user!.userId && req.user!.role !== 'admin') {
-      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Cannot edit another user\'s photo' } });
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du kan ikke redigere en anden brugers billede' } });
       return;
     }
 
     const body = AvatarSchema.safeParse(req.body);
     if (!body.success) {
-      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid image' } });
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Ugyldigt billede' } });
       return;
     }
 
@@ -592,7 +604,7 @@ router.put('/:playerId/avatar', authenticate, async (req, res, next) => {
       avatarUrl = await storeAvatar(playerId as string, body.data.image);
     } catch (err) {
       if (err instanceof AvatarTooLargeError) {
-        res.status(413).json({ success: false, error: { code: 'TOO_LARGE', message: 'Image too large' } });
+        res.status(413).json({ success: false, error: { code: 'TOO_LARGE', message: 'Billedet er for stort' } });
         return;
       }
       throw err;
@@ -612,7 +624,7 @@ router.delete('/:playerId/avatar', authenticate, async (req, res, next) => {
   try {
     const { playerId } = req.params;
     if (playerId !== req.user!.userId && req.user!.role !== 'admin') {
-      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Cannot edit another user\'s photo' } });
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du kan ikke redigere en anden brugers billede' } });
       return;
     }
 

@@ -14,17 +14,25 @@ export interface FineLike {
 
 export const formatKr = (n: number) => `${n.toLocaleString('da-DK')} kr`;
 
-export const STATUS_META: Record<FineStatus, { label: string; cls: string }> = {
-  pending_approval: { label: 'Pending approval', cls: 'bg-gray-100 text-gray-600' },
-  approved:         { label: 'Outstanding',      cls: 'bg-amber-100 text-amber-700' },
-  payment_claimed:  { label: 'Awaiting confirm', cls: 'bg-blue-100 text-blue-700' },
-  paid:             { label: 'Paid',             cls: 'bg-green-100 text-green-700' },
-  rejected:         { label: 'Rejected',         cls: 'bg-red-100 text-red-600' },
-  voided:           { label: 'Voided',           cls: 'bg-gray-100 text-gray-400' },
+// This module stays framework-free, so it carries the i18n *key* for each
+// status rather than the words — the badge component resolves it.
+export const STATUS_META: Record<FineStatus, { labelKey: string; cls: string }> = {
+  pending_approval: { labelKey: 'fines.status.pending_approval', cls: 'bg-gray-100 text-gray-600' },
+  approved:         { labelKey: 'fines.status.approved',         cls: 'bg-amber-100 text-amber-700' },
+  payment_claimed:  { labelKey: 'fines.status.payment_claimed',  cls: 'bg-blue-100 text-blue-700' },
+  paid:             { labelKey: 'fines.status.paid',             cls: 'bg-green-100 text-green-700' },
+  rejected:         { labelKey: 'fines.status.rejected',         cls: 'bg-red-100 text-red-600' },
+  voided:           { labelKey: 'fines.status.voided',           cls: 'bg-gray-100 text-gray-400' },
 };
 
-export function fineWhat(f: { typeLabel?: string | null; reason?: string | null }): string {
-  return f.typeLabel ?? f.reason ?? 'Fine';
+/**
+ * What a fine was for: the catalogue label, else the free-text reason.
+ *
+ * Returns null when neither is set — both are user-supplied, so there is no
+ * translatable fallback to give from here; callers supply `fines.fineFallback`.
+ */
+export function fineWhat(f: { typeLabel?: string | null; reason?: string | null }): string | null {
+  return f.typeLabel ?? f.reason ?? null;
 }
 
 export interface Totals { outstanding: number; awaiting: number; paid: number }

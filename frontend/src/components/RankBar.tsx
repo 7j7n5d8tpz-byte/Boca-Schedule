@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { overallRank } from '../api/achievements';
 import { TIER_META } from './Crest';
 
@@ -8,10 +9,13 @@ import { TIER_META } from './Crest';
 // just means "progress" — the tier itself is shown by the crest / caption, not
 // encoded in the colour.
 export default function RankBar({ points, compact = false }: { points: number; compact?: boolean }) {
+  const { t } = useTranslation();
   const { next, floor } = overallRank(points);
   const span = next ? next.points - floor : 1;
   const pct = next ? Math.min(100, Math.round(((points - floor) / span) * 100)) : 100;
-  const caption = next ? `${next.points - points} XP to ${TIER_META[next.tier].label}` : 'Max rank';
+  const caption = next
+    ? t('crests.xpToNext', { xp: next.points - points, tier: TIER_META[next.tier].label })
+    : t('crests.maxRank');
 
   if (compact) {
     return (

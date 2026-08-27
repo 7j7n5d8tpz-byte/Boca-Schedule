@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
 
@@ -22,6 +23,7 @@ interface Props {
  * opponentId so callers store the FK rather than free text.
  */
 export default function OpponentPicker({ opponentId, onChange }: Props) {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [addingNew, setAddingNew] = useState(false);
   const [newName, setNewName] = useState('');
@@ -41,7 +43,7 @@ export default function OpponentPicker({ opponentId, onChange }: Props) {
       setNewName('');
       setAddError('');
     },
-    onError: () => setAddError('Failed to add opponent'),
+    onError: () => setAddError(t('pickers.addFailedOpponent')),
   });
 
   function handleSelectChange(val: string) {
@@ -64,16 +66,16 @@ export default function OpponentPicker({ opponentId, onChange }: Props) {
   return (
     <div className="space-y-2">
       <select
-        aria-label="Opponent"
+        aria-label={t('pickers.opponentAria')}
         value={addingNew ? ADD_SENTINEL : (opponentId ?? '')}
         onChange={e => handleSelectChange(e.target.value)}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
       >
-        <option value="">No opponent</option>
+        <option value="">{t('pickers.noOpponent')}</option>
         {opponents.map(o => (
           <option key={o.opponentId} value={o.opponentId}>{o.name}</option>
         ))}
-        <option value={ADD_SENTINEL}>+ Add opponent…</option>
+        <option value={ADD_SENTINEL}>{t('pickers.addOpponent')}</option>
       </select>
 
       {addingNew && (
@@ -81,7 +83,7 @@ export default function OpponentPicker({ opponentId, onChange }: Props) {
           <input
             type="text"
             autoFocus
-            placeholder="New opponent name"
+            placeholder={t('pickers.newOpponentName')}
             value={newName}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submitNew(); } }}
@@ -93,14 +95,14 @@ export default function OpponentPicker({ opponentId, onChange }: Props) {
             disabled={!newName.trim() || addMutation.isPending}
             className="shrink-0 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
           >
-            {addMutation.isPending ? '…' : 'Add'}
+            {addMutation.isPending ? '…' : t('pickers.add')}
           </button>
           <button
             type="button"
             onClick={() => { setAddingNew(false); setAddError(''); }}
             className="shrink-0 text-sm text-gray-500 hover:text-gray-700"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           {addError && <span className="text-xs text-red-500">{addError}</span>}
         </div>

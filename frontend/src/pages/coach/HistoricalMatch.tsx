@@ -2,6 +2,7 @@ import AppNav from '../../components/AppNav';
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import OpponentPicker from '../../components/OpponentPicker';
 
@@ -12,6 +13,7 @@ interface RosterPlayer {
 }
 
 export default function HistoricalMatch() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [matchDate, setMatchDate] = useState('');
@@ -43,7 +45,7 @@ export default function HistoricalMatch() {
       // Continue into the normal result wizard for this freshly-created match.
       navigate(`/matches/${res.data.data.matchId}/results`);
     },
-    onError: (err: any) => setError(err.response?.data?.error?.message ?? 'Failed to create historical match'),
+    onError: (err: any) => setError(err.response?.data?.error?.message ?? t('coach.historicalFailed')),
   });
 
   function toggle(userId: string) {
@@ -57,7 +59,7 @@ export default function HistoricalMatch() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (!matchDate) { setError('Match date is required'); return; }
+    if (!matchDate) { setError(t('coach.dateRequired')); return; }
     mutation.mutate();
   }
 
@@ -65,18 +67,18 @@ export default function HistoricalMatch() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav backHref="/coach" backLabel="Matches" />
+      <AppNav backHref="/coach" backLabel={t('coach.matches')} />
 
       <main className="max-w-lg mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Record past match</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">{t('coach.historicalTitle')}</h1>
         <p className="text-sm text-gray-500 mb-6">
-          Backfill an already-played match. Next you'll enter the score, scorers, assists and man of the match.
+          {t('coach.historicalSub')}
         </p>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Match date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchDate')}</label>
               <input
                 type="date"
                 required
@@ -86,7 +88,7 @@ export default function HistoricalMatch() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Kick-off time</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.kickOff')}</label>
               <input
                 type="time"
                 value={matchTime}
@@ -97,39 +99,39 @@ export default function HistoricalMatch() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Opponent <span className="text-gray-400 font-normal">(optional)</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.opponent')} <span className="text-gray-400 font-normal">{t('common.optional')}</span></label>
             <OpponentPicker opponentId={opponentId} onChange={(id) => setOpponentId(id)} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Match type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchType')}</label>
               <select
                 value={matchType}
                 onChange={e => setMatchType(e.target.value as 'futsal' | '7-player' | '11-player')}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               >
-                <option value="7-player">7-player</option>
-                <option value="futsal">Futsal</option>
-                <option value="11-player">11-player</option>
+                <option value="7-player">{t('matchTypes.7-player')}</option>
+                <option value="futsal">{t('matchTypes.futsal')}</option>
+                <option value="11-player">{t('matchTypes.11-player')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.category')}</label>
               <select
                 value={matchCategory}
                 onChange={e => setMatchCategory(e.target.value as 'serie' | 'pokal')}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               >
-                <option value="serie">Serie</option>
-                <option value="pokal">Pokal</option>
+                <option value="serie">{t('matchForm.serie')}</option>
+                <option value="pokal">{t('matchForm.pokal')}</option>
               </select>
             </div>
           </div>
 
           {matchCategory === 'serie' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Serie letter</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.serieLetter')}</label>
               <select
                 value={serieLetter}
                 onChange={e => setSerieLetter(e.target.value)}
@@ -143,20 +145,20 @@ export default function HistoricalMatch() {
           {/* Participants */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Who played? <span className="text-gray-400 font-normal">({participants.size} selected)</span>
+              {t('coach.whoPlayed')} <span className="text-gray-400 font-normal">{t('coach.selectedCount', { count: participants.size })}</span>
             </label>
             <p className="text-xs text-gray-400 mb-2">
-              Pick the players you know took part — at least the scorers, assisters and man of the match. Only these players will be creditable in the next step.
+              {t('coach.whoPlayedHint')}
             </p>
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search players…"
+              placeholder={t('coach.searchPlayers')}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green mb-2"
             />
             <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-50">
-              {filtered.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No players found</p>}
+              {filtered.length === 0 && <p className="text-sm text-gray-400 text-center py-4">{t('coach.noPlayersFound')}</p>}
               {filtered.map(p => {
                 const on = participants.has(p.userId);
                 return (
@@ -185,13 +187,13 @@ export default function HistoricalMatch() {
               disabled={mutation.isPending}
               className="flex-1 bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
             >
-              {mutation.isPending ? 'Creating…' : 'Continue to result →'}
+              {mutation.isPending ? t('coach.creating') : t('coach.continueToResult')}
             </button>
             <Link
               to="/coach"
               className="flex-1 text-center border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              Cancel
+              {t('common.cancel')}
             </Link>
           </div>
         </form>

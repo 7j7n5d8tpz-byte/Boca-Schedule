@@ -4,14 +4,16 @@ import { useLocation } from 'react-router-dom';
 // as router state so the hub names the list the user actually came from.
 export interface HubOrigin {
   from: string;
+  /** i18n key, not display text — origins travel as router state, which outlives
+   *  a language switch, so the label is resolved at render time. */
   fromLabel: string;
 }
 
 // The player roster — the hub's home list, and the default when nothing else
 // says otherwise. ?view= reopens the Players tab on the statistics page.
-export const PLAYERS_HUB_ORIGIN: HubOrigin = { from: '/statistics?view=players', fromLabel: 'All players' };
-export const ACHIEVEMENTS_ORIGIN: HubOrigin = { from: '/achievements', fromLabel: 'Achievements' };
-export const DASHBOARD_ORIGIN: HubOrigin = { from: '/dashboard', fromLabel: 'Dashboard' };
+export const PLAYERS_HUB_ORIGIN: HubOrigin = { from: '/statistics?view=players', fromLabel: 'nav.allPlayers' };
+export const ACHIEVEMENTS_ORIGIN: HubOrigin = { from: '/achievements', fromLabel: 'nav.achievements' };
+export const DASHBOARD_ORIGIN: HubOrigin = { from: '/dashboard', fromLabel: 'nav.dashboard' };
 
 /**
  * The origin the current page should hand on when it links somewhere new.

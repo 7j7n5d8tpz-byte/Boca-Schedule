@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
   ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend,
@@ -67,6 +68,7 @@ type MatchTypeFilter = 'all' | '7-player' | 'futsal';
 export default function PlayerHub() {
   const { playerId = '' } = useParams();
   const { user } = useAuth();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [modalCode, setModalCode] = useState<string | null>(null);
@@ -140,25 +142,27 @@ export default function PlayerHub() {
   // Radar profile — all axes normalized to 0-100.
   const radarData = stats ? [
     {
-      metric: 'Attendance',
+      metric: t('hub.radar.attendance'),
       value: Math.round(stats.attendance_rate),
       display: `${Math.round(stats.attendance_rate)}%`,
     },
     {
-      metric: 'Goals/game',
+      metric: t('hub.radar.goalsPerGame'),
       value: played > 0 ? Math.min(100, Math.round(stats.total_goals / played * 50)) : 0,
-      display: played > 0 ? `${(stats.total_goals / played).toFixed(2)} per game` : '0 per game',
+      display: t('hub.radar.perGame', { value: played > 0 ? (stats.total_goals / played).toFixed(2) : '0' }),
     },
     {
-      metric: 'Assists/game',
+      metric: t('hub.radar.assistsPerGame'),
       value: played > 0 ? Math.min(100, Math.round(stats.total_assists / played * 50)) : 0,
-      display: played > 0 ? `${(stats.total_assists / played).toFixed(2)} per game` : '0 per game',
+      display: t('hub.radar.perGame', { value: played > 0 ? (stats.total_assists / played).toFixed(2) : '0' }),
     },
     {
       // Share of the player's on-pitch half-slots spent in goal (2 halves per game).
-      metric: 'Time in goal',
+      metric: t('hub.radar.timeInGoal'),
       value: played > 0 ? Math.min(100, Math.round(stats.gk_appearances / (played * 2) * 100)) : 0,
-      display: played > 0 ? `${Math.min(100, Math.round(stats.gk_appearances / (played * 2) * 100))}% (${stats.gk_appearances} halves)` : '0%',
+      display: played > 0
+        ? t('hub.radar.halves', { pct: Math.min(100, Math.round(stats.gk_appearances / (played * 2) * 100)), count: stats.gk_appearances })
+        : '0%',
     },
   ] : [];
 
@@ -166,8 +170,10 @@ export default function PlayerHub() {
   const playerMatchData = (data?.recentMatches ?? [])
     .filter(m => m.attended)
     .reverse()
+    // Keys stay English — they're recharts data keys, not labels. The visible
+    // series names come from the `name` props on each <Line> below.
     .map(m => ({
-      name: fmtDate(m.matchDate),
+      name: fmtDate(m.matchDate, i18n.language),
       Goals: m.goals ?? 0,
       Assists: m.assists ?? 0,
       'Clean sheets': m.cleanSheet ? 1 : 0,
@@ -193,12 +199,12 @@ export default function PlayerHub() {
         {/* Back to the list this profile was opened from — same plain green
             control as "All opponents" on the statistics page. */}
         <Link to={backHref} className="inline-block text-sm font-medium text-brand-green hover:text-brand-green-700 transition-colors">
-          ← {backLabel}
+          ← {t(backLabel)}
         </Link>
 
         {notFound && (
           <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
-            <p className="text-gray-500 text-sm">Player not found.</p>
+            <p className="text-gray-500 text-sm">{t('hub.notFound')}</p>
           </div>
         )}
 
@@ -226,14 +232,14 @@ export default function PlayerHub() {
                 <div className="min-w-0 flex-1">
                   <h1 className="text-xl font-bold text-gray-900">
                     {player.name}
-                    {isOwn && <span className="text-brand-green ml-2 text-sm font-medium">you</span>}
+                    {isOwn && <span className="text-brand-green ml-2 text-sm font-medium">{t('hub.you')}</span>}
                   </h1>
                   <div className="flex gap-1.5 flex-wrap mt-2">
                     {(player.preferredPositions ?? []).length > 0
                       ? (player.preferredPositions ?? []).map(pos => (
                           <span key={pos} className={`text-xs font-medium px-2 py-0.5 rounded-full ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
                         ))
-                      : <span className="text-sm text-gray-400">No positions set</span>}
+                      : <span className="text-sm text-gray-400">{t('settings.noPositions')}</span>}
                   </div>
                 </div>
                 {isOwn && (
@@ -241,7 +247,7 @@ export default function PlayerHub() {
                     to="/settings"
                     className="shrink-0 text-xs font-semibold text-brand-green border border-brand-green/40 hover:bg-brand-green/10 rounded-lg px-3 py-1.5 transition-colors"
                   >
-                    Edit profile
+                    {t('hub.editProfile')}
                   </Link>
                 )}
               </div>
@@ -252,7 +258,7 @@ export default function PlayerHub() {
                       <Crest glyph="medal" tier={overallTier ?? 'bronze'} locked={!overallTier} size={44} showRibbon={false} />
                       <div className="min-w-0 flex-1">
                         <p className="text-xs truncate" style={{ color: overallTier ? TIER_META[overallTier].ribbon : '#9ca3af' }}>
-                          {overallTier ? `${TIER_META[overallTier].label} rank` : 'Unranked'} · {earned.length} crest tiers
+                          {overallTier ? t('hub.rank', { tier: TIER_META[overallTier].label }) : t('hub.unranked')} · {t('hub.crestTiers', { count: earned.length })}
                         </p>
                         <div className="mt-1.5"><RankBar points={points} /></div>
                       </div>
@@ -261,7 +267,7 @@ export default function PlayerHub() {
                   {careerRating > 0 && (
                     <div className={`shrink-0 ${earned ? 'text-right' : 'flex-1 text-left'}`}>
                       <p className="text-2xl font-bold font-numeric text-gray-900 leading-none">{careerRating.toFixed(1)}</p>
-                      <p className="text-[10px] text-gray-500 mt-1">career rating</p>
+                      <p className="text-[10px] text-gray-500 mt-1">{t('hub.careerRating')}</p>
                     </div>
                   )}
                 </div>
@@ -272,7 +278,7 @@ export default function PlayerHub() {
             <div className="flex items-center gap-2 flex-wrap">
               {data.availableSeasons.length > 0 && (
                 <select
-                  aria-label="Season"
+                  aria-label={t('hub.season')}
                   value={year ?? stats.season_year}
                   onChange={e => setFilters({ year: Number(e.target.value) })}
                   className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
@@ -293,7 +299,7 @@ export default function PlayerHub() {
                         : 'bg-white text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    {type === 'all' ? 'All' : type === '7-player' ? '7-player' : 'Futsal'}
+                    {type === 'all' ? t('hub.filterAll') : t(`matchTypes.${type}`)}
                   </button>
                 ))}
               </div>
@@ -301,14 +307,14 @@ export default function PlayerHub() {
 
             {/* Season stat cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {stats.total_signups !== null && <StatCard label="Signed up" value={stats.total_signups} />}
-              <StatCard label="Games"        value={played} sub={stats.total_team_games > 0 ? `of ${stats.total_team_games} · ${Math.round(stats.attendance_rate)}%` : undefined} />
-              <StatCard label="Goals"        value={stats.total_goals}        sub={played > 0 ? `${(stats.total_goals        / played).toFixed(2)}/game` : undefined} />
-              <StatCard label="Assists"      value={stats.total_assists}      sub={played > 0 ? `${(stats.total_assists      / played).toFixed(2)}/game` : undefined} />
-              <StatCard label="Clean sheets" value={stats.total_clean_sheets} sub={played > 0 ? `${(stats.total_clean_sheets / played).toFixed(2)}/game` : undefined} />
-              {stats.total_man_of_match > 0 && <StatCard label="Man of match" value={stats.total_man_of_match} color="text-amber-500" />}
-              {stats.total_yellow_cards > 0 && <StatCard label="Yellow cards" value={stats.total_yellow_cards} color="text-amber-500" />}
-              {stats.total_red_cards > 0 && <StatCard label="Red cards" value={stats.total_red_cards} color="text-red-600" />}
+              {stats.total_signups !== null && <StatCard label={t('hub.stats.signedUp')} value={stats.total_signups} />}
+              <StatCard label={t('hub.stats.games')}       value={played} sub={stats.total_team_games > 0 ? t('hub.stats.gamesSub', { total: stats.total_team_games, pct: Math.round(stats.attendance_rate) }) : undefined} />
+              <StatCard label={t('hub.stats.goals')}       value={stats.total_goals}        sub={played > 0 ? t('hub.stats.perGame', { value: (stats.total_goals        / played).toFixed(2) }) : undefined} />
+              <StatCard label={t('hub.stats.assists')}     value={stats.total_assists}      sub={played > 0 ? t('hub.stats.perGame', { value: (stats.total_assists      / played).toFixed(2) }) : undefined} />
+              <StatCard label={t('hub.stats.cleanSheets')} value={stats.total_clean_sheets} sub={played > 0 ? t('hub.stats.perGame', { value: (stats.total_clean_sheets / played).toFixed(2) }) : undefined} />
+              {stats.total_man_of_match > 0 && <StatCard label={t('hub.stats.motm')} value={stats.total_man_of_match} color="text-amber-500" />}
+              {stats.total_yellow_cards > 0 && <StatCard label={t('hub.stats.yellowCards')} value={stats.total_yellow_cards} color="text-amber-500" />}
+              {stats.total_red_cards > 0 && <StatCard label={t('hub.stats.redCards')} value={stats.total_red_cards} color="text-red-600" />}
             </div>
 
             {/* Crests — tap any to see the full description + tier ladder. */}
@@ -317,7 +323,7 @@ export default function PlayerHub() {
             {/* Streaks */}
             {streakEntries.length > 0 && (
               <section>
-                <h2 className="text-sm font-semibold text-gray-700 mb-2">Streaks</h2>
+                <h2 className="text-sm font-semibold text-gray-700 mb-2">{t('hub.streaks')}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {streakEntries.map(({ entry, streak }) => (
                     <StreakCard
@@ -335,7 +341,7 @@ export default function PlayerHub() {
             {/* Radar chart */}
             {radarData.length > 0 && (
               <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h2 className="text-sm font-semibold text-gray-700 mb-2">Play style</h2>
+                <h2 className="text-sm font-semibold text-gray-700 mb-2">{t('hub.playStyle')}</h2>
                 <ResponsiveContainer width="100%" height={260}>
                   <RadarChart data={radarData}>
                     <PolarGrid stroke="#e5e7eb" />
@@ -351,7 +357,7 @@ export default function PlayerHub() {
             {/* Per-match performance */}
             {playerMatchData.length > 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h2 className="text-sm font-semibold text-gray-700 mb-4">Goals · Assists · Clean sheets per match</h2>
+                <h2 className="text-sm font-semibold text-gray-700 mb-4">{t('hub.perMatchTitle')}</h2>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={playerMatchData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
@@ -359,15 +365,15 @@ export default function PlayerHub() {
                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                     <Tooltip content={<ResultTooltip />} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="Goals"   stroke={CHART_COLORS.goals}   strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="Assists" stroke={CHART_COLORS.assists} strokeWidth={2} dot={{ r: 3 }} />
-                    <Line type="monotone" dataKey="Clean sheets" stroke={CHART_COLORS.cleanSheets} strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="Goals"   name={t('hub.stats.goals')}   stroke={CHART_COLORS.goals}   strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="Assists" name={t('hub.stats.assists')} stroke={CHART_COLORS.assists} strokeWidth={2} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="Clean sheets" name={t('hub.stats.cleanSheets')} stroke={CHART_COLORS.cleanSheets} strokeWidth={2} dot={{ r: 3 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
-                No per-match performance data recorded yet.
+                {t('hub.noPerMatch')}
               </div>
             )}
           </>

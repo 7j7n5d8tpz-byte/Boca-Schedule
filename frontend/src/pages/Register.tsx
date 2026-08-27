@@ -211,8 +211,9 @@ export default function Register() {
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.fullName')}</label>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">{t('auth.fullName')}</label>
             <input
+              id="name"
               type="text"
               required
               autoComplete="name"
@@ -225,8 +226,9 @@ export default function Register() {
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.emailAddress')}</label>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">{t('auth.emailAddress')}</label>
             <input
+              id="email"
               type="email"
               required
               autoComplete="email"
@@ -239,8 +241,9 @@ export default function Register() {
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.password')}</label>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">{t('auth.password')}</label>
             <input
+              id="password"
               type="password"
               required
               autoComplete="new-password"
@@ -254,8 +257,9 @@ export default function Register() {
 
           {/* Confirm password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.confirmPassword')}</label>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">{t('auth.confirmPassword')}</label>
             <input
+              id="confirmPassword"
               type="password"
               required
               autoComplete="new-password"
@@ -275,10 +279,10 @@ export default function Register() {
 
           {/* Preferred positions */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <span id="positions-label" className="block text-sm font-medium text-gray-700 mb-2">
               {t('auth.preferredPositions')} <span className="text-gray-400 font-normal">{t('common.optional')}</span>
-            </label>
-            <div className="flex gap-2 flex-wrap">
+            </span>
+            <div role="group" aria-labelledby="positions-label" className="flex gap-2 flex-wrap">
               {POSITIONS.map((pos) => {
                 const selected = form.preferredPositions.includes(pos);
                 return (

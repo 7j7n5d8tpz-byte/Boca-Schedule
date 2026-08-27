@@ -86,8 +86,9 @@ export default function ResetPassword() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.newPassword')}</label>
+                  <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">{t('auth.newPassword')}</label>
                   <input
+                    id="newPassword"
                     type="password"
                     required
                     value={password}
@@ -98,8 +99,9 @@ export default function ResetPassword() {
                   <p className="text-xs text-gray-400 mt-1">{t('auth.passwordRule')}</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.confirmPassword')}</label>
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">{t('auth.confirmPassword')}</label>
                   <input
+                    id="confirmPassword"
                     type="password"
                     required
                     value={confirm}

@@ -62,8 +62,9 @@ export default function ForgotPassword() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">{t('auth.email')}</label>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">{t('auth.email')}</label>
                   <input
+                    id="email"
                     type="email"
                     required
                     value={email}

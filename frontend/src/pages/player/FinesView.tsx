@@ -531,8 +531,8 @@ function PaymentInfoEditor({ current, onDone }: { current: string; onDone: () =>
     <Section title={t('fines.mobilePayBox')}>
       <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col sm:flex-row sm:items-end gap-3">
         <div className="flex-1 min-w-0">
-          <label className="text-xs text-gray-500">{t('fines.paymentInfoLabel')}</label>
-          <input value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green" />
+          <label htmlFor="paymentInfo" className="text-xs text-gray-500">{t('fines.paymentInfoLabel')}</label>
+          <input id="paymentInfo" value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green" />
         </div>
         <button onClick={() => save.mutate()} disabled={save.isPending || value === current} className="bg-brand-dark text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50 shrink-0">
           {save.isPending ? t('fines.saving') : t('fines.save')}

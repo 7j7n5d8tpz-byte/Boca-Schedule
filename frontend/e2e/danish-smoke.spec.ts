@@ -26,7 +26,7 @@ test.describe('Danish by default', () => {
   test('the register screen renders in Danish too', async ({ page }) => {
     await page.goto('/register');
     await expect(page.getByRole('button', { name: 'Opret konto' })).toBeVisible();
-    await expect(page.getByText('Fulde navn')).toBeVisible();
+    await expect(page.getByLabel('Fulde navn')).toBeVisible();
     await expect(page.getByText('Foretrukne positioner')).toBeVisible();
     await expect(page.locator('body')).not.toContainText('auth.');
   });

@@ -99,11 +99,11 @@ export default function NewMatch() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <span className="block text-sm font-medium text-gray-700 mb-1">
               {t('matchForm.venue')} <span className="text-gray-400 font-normal text-xs">
                 · {matchType === 'futsal' ? t('matchForm.hallOptional') : t('matchForm.courtNumberOptional')}
               </span>
-            </label>
+            </span>
             <LocationPicker
               venue={venue}
               court={court}
@@ -115,14 +115,15 @@ export default function NewMatch() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.opponentTeam')} <span className="text-gray-400 font-normal">{t('common.optional')}</span></label>
+            <span className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.opponentTeam')} <span className="text-gray-400 font-normal">{t('common.optional')}</span></span>
             <OpponentPicker opponentId={opponentId} onChange={(id) => setOpponentId(id)} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchType')}</label>
+              <label htmlFor="matchType" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchType')}</label>
               <select
+                id="matchType"
                 value={matchType}
                 onChange={e => {
                   const t = e.target.value as 'futsal' | '7-player' | '11-player';
@@ -139,8 +140,9 @@ export default function NewMatch() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.category')}</label>
+              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.category')}</label>
               <select
+                id="category"
                 value={matchCategory}
                 onChange={e => setMatchCategory(e.target.value as 'serie' | 'pokal')}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -153,8 +155,9 @@ export default function NewMatch() {
 
           {matchCategory === 'serie' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.serieLetter')}</label>
+              <label htmlFor="serieLetter" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.serieLetter')}</label>
               <select
+                id="serieLetter"
                 value={serieLetter}
                 onChange={e => setSerieLetter(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -168,8 +171,9 @@ export default function NewMatch() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.signupOpens')}</label>
+              <label htmlFor="signupOpens" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.signupOpens')}</label>
               <input
+                id="signupOpens"
                 type="date"
                 required
                 value={signupOpenDate}
@@ -193,8 +197,9 @@ export default function NewMatch() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.minPlayers')}</label>
+              <label htmlFor="minPlayers" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.minPlayers')}</label>
               <input
+                id="minPlayers"
                 type="number"
                 min={1}
                 max={25}
@@ -204,8 +209,9 @@ export default function NewMatch() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.maxPlayers')}</label>
+              <label htmlFor="maxPlayers" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.maxPlayers')}</label>
               <input
+                id="maxPlayers"
                 type="number"
                 min={1}
                 max={25}

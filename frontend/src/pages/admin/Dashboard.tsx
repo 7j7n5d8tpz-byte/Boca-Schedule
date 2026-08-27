@@ -334,7 +334,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                     onClick={() => setConfirmDelete(u.userId)}
                     className="shrink-0 text-xs text-red-400 hover:text-red-600 transition-colors"
                   >
-                    Delete
+                    {t('admin.delete')}
                   </button>
                 )}
               </div>

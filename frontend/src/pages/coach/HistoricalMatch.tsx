@@ -78,8 +78,9 @@ export default function HistoricalMatch() {
         <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchDate')}</label>
+              <label htmlFor="matchDate" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchDate')}</label>
               <input
+                id="matchDate"
                 type="date"
                 required
                 value={matchDate}
@@ -88,8 +89,9 @@ export default function HistoricalMatch() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.kickOff')}</label>
+              <label htmlFor="matchTime" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.kickOff')}</label>
               <input
+                id="matchTime"
                 type="time"
                 value={matchTime}
                 onChange={e => setMatchTime(e.target.value)}
@@ -99,14 +101,15 @@ export default function HistoricalMatch() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.opponent')} <span className="text-gray-400 font-normal">{t('common.optional')}</span></label>
+            <span className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.opponent')} <span className="text-gray-400 font-normal">{t('common.optional')}</span></span>
             <OpponentPicker opponentId={opponentId} onChange={(id) => setOpponentId(id)} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchType')}</label>
+              <label htmlFor="matchType" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.matchType')}</label>
               <select
+                id="matchType"
                 value={matchType}
                 onChange={e => setMatchType(e.target.value as 'futsal' | '7-player' | '11-player')}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -117,8 +120,9 @@ export default function HistoricalMatch() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.category')}</label>
+              <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.category')}</label>
               <select
+                id="category"
                 value={matchCategory}
                 onChange={e => setMatchCategory(e.target.value as 'serie' | 'pokal')}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -131,8 +135,9 @@ export default function HistoricalMatch() {
 
           {matchCategory === 'serie' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.serieLetter')}</label>
+              <label htmlFor="serieLetter" className="block text-sm font-medium text-gray-700 mb-1">{t('matchForm.serieLetter')}</label>
               <select
+                id="serieLetter"
                 value={serieLetter}
                 onChange={e => setSerieLetter(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -143,10 +148,10 @@ export default function HistoricalMatch() {
           )}
 
           {/* Participants */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div role="group" aria-labelledby="who-played-label">
+            <span id="who-played-label" className="block text-sm font-medium text-gray-700 mb-1">
               {t('coach.whoPlayed')} <span className="text-gray-400 font-normal">{t('coach.selectedCount', { count: participants.size })}</span>
-            </label>
+            </span>
             <p className="text-xs text-gray-400 mb-2">
               {t('coach.whoPlayedHint')}
             </p>
@@ -155,6 +160,7 @@ export default function HistoricalMatch() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder={t('coach.searchPlayers')}
+              aria-label={t('coach.searchPlayers')}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green mb-2"
             />
             <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-50">

@@ -230,16 +230,17 @@ export default function Settings() {
               {editing ? (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.name')}</label>
+                    <label htmlFor="profileName" className="block text-sm font-medium text-gray-700 mb-1">{t('settings.name')}</label>
                     <input
+                      id="profileName"
                       value={name}
                       onChange={e => setName(e.target.value)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">{t('settings.preferredPositions')}</label>
-                    <div className="flex gap-2 flex-wrap">
+                    <span id="positions-label" className="block text-sm font-medium text-gray-700 mb-2">{t('settings.preferredPositions')}</span>
+                    <div role="group" aria-labelledby="positions-label" className="flex gap-2 flex-wrap">
                       {ALL_POSITIONS.map(pos => (
                         <button
                           key={pos}
@@ -312,8 +313,9 @@ export default function Settings() {
               ) : (
                 <>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.currentPassword')}</label>
+                    <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">{t('settings.currentPassword')}</label>
                     <input
+                      id="currentPassword"
                       type="password"
                       autoComplete="current-password"
                       value={currentPassword}
@@ -323,8 +325,9 @@ export default function Settings() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.newPassword')}</label>
+                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">{t('settings.newPassword')}</label>
                     <input
+                      id="newPassword"
                       type="password"
                       autoComplete="new-password"
                       value={newPassword}
@@ -335,8 +338,9 @@ export default function Settings() {
                     <PasswordStrength password={newPassword} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings.confirmNewPassword')}</label>
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">{t('settings.confirmNewPassword')}</label>
                     <input
+                      id="confirmPassword"
                       type="password"
                       autoComplete="new-password"
                       value={confirmPassword}

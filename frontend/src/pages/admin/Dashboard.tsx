@@ -224,8 +224,9 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
           <h3 className="font-semibold text-gray-900">{t('admin.createNewUser')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.fullName')}</label>
+              <label htmlFor="newUserName" className="block text-xs font-medium text-gray-500 mb-1">{t('admin.fullName')}</label>
               <input
+                id="newUserName"
                 type="text"
                 value={createForm.name}
                 onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
@@ -233,8 +234,9 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.email')}</label>
+              <label htmlFor="newUserEmail" className="block text-xs font-medium text-gray-500 mb-1">{t('admin.email')}</label>
               <input
+                id="newUserEmail"
                 type="email"
                 value={createForm.email}
                 onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
@@ -242,8 +244,9 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.tempPassword')}</label>
+              <label htmlFor="newUserPassword" className="block text-xs font-medium text-gray-500 mb-1">{t('admin.tempPassword')}</label>
               <input
+                id="newUserPassword"
                 type="text"
                 value={createForm.password}
                 onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
@@ -251,8 +254,9 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.role')}</label>
+              <label htmlFor="newUserRole" className="block text-xs font-medium text-gray-500 mb-1">{t('admin.role')}</label>
               <select
+                id="newUserRole"
                 value={createForm.role}
                 onChange={e => setCreateForm(f => ({ ...f, role: e.target.value }))}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -334,14 +338,15 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                     onClick={() => setConfirmDelete(u.userId)}
                     className="shrink-0 text-xs text-red-400 hover:text-red-600 transition-colors"
                   >
-                    Delete
+                    {t('admin.delete')}
                   </button>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">{t('admin.role')}</label>
+                  <label htmlFor={`role-${u.userId}`} className="block text-xs text-gray-400 mb-1">{t('admin.role')}</label>
                   <select
+                    id={`role-${u.userId}`}
                     value={u.role}
                     onChange={e => roleMutation.mutate({ userId: u.userId, role: e.target.value })}
                     className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-green ${ROLE_COLORS[u.role]}`}
@@ -352,8 +357,10 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">{t('admin.status')}</label>
+                  <span className="block text-xs text-gray-400 mb-1">{t('admin.status')}</span>
                   <button
+                    aria-label={`${t('admin.status')}: ${u.isActive ? t('admin.active') : t('admin.inactive')}`}
+                    aria-pressed={u.isActive}
                     onClick={() => activeMutation.mutate({ userId: u.userId, isActive: !u.isActive })}
                     className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg transition-colors ${
                       u.isActive
@@ -365,11 +372,13 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                   </button>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">{t('admin.results')}</label>
+                  <span className="block text-xs text-gray-400 mb-1">{t('admin.results')}</span>
                   {u.role === 'coach' || u.role === 'admin' ? (
                     <p className="text-xs text-gray-300 py-1.5">{t('admin.always')}</p>
                   ) : (
                     <button
+                      aria-label={`${t('admin.results')}: ${u.canEnterResults ? t('admin.enabled') : t('admin.disabled')}`}
+                      aria-pressed={u.canEnterResults}
                       onClick={() => resultsMutation.mutate({ userId: u.userId, canEnterResults: !u.canEnterResults })}
                       disabled={resultsMutation.isPending}
                       className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
@@ -383,11 +392,13 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">{t('admin.fineAdmin')}</label>
+                  <span className="block text-xs text-gray-400 mb-1">{t('admin.fineAdmin')}</span>
                   {u.role === 'admin' ? (
                     <p className="text-xs text-gray-300 py-1.5">{t('admin.always')}</p>
                   ) : (
                     <button
+                      aria-label={`${t('admin.fineAdmin')}: ${u.isFineAdmin ? t('admin.enabled') : t('admin.disabled')}`}
+                      aria-pressed={u.isFineAdmin}
                       onClick={() => fineAdminMutation.mutate({ userId: u.userId, isFineAdmin: !u.isFineAdmin })}
                       disabled={fineAdminMutation.isPending}
                       className={`w-full text-xs font-medium px-2 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
@@ -401,7 +412,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">{t('admin.joined')}</label>
+                  <span className="block text-xs text-gray-400 mb-1">{t('admin.joined')}</span>
                   <p className="text-xs text-gray-500 py-1.5">{fmtDate(u.createdAt)}</p>
                 </div>
               </div>
@@ -555,8 +566,9 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
               {t('admin.mergeBody1')} <span className="font-medium text-gray-900">{mergeFor.name}</span>{t('admin.mergeBody2')}
             </p>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{t('admin.mergeInto')}</label>
+              <label htmlFor="mergeTarget" className="block text-xs font-medium text-gray-500 mb-1">{t('admin.mergeInto')}</label>
               <select
+                id="mergeTarget"
                 value={mergeTarget}
                 onChange={e => setMergeTarget(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"

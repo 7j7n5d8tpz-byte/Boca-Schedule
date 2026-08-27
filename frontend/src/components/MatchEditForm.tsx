@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import LocationPicker, { encodeLocation, decodeLocation } from './LocationPicker';
 import OpponentPicker from './OpponentPicker';
@@ -86,13 +87,17 @@ export default function MatchEditForm({
   matchType: string;
 }) {
   const { t } = useTranslation();
+  // A reusable component can appear more than once on a page, so ids are scoped
+  // per instance rather than hard-coded.
+  const uid = useId();
   const set = (patch: Partial<MatchEditFields>) => onChange({ ...value, ...patch });
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.date')}</label>
+        <label htmlFor={`${uid}-date`} className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.date')}</label>
         <input
+          id={`${uid}-date`}
           type="date"
           value={value.matchDate}
           onChange={e => set({ matchDate: e.target.value })}
@@ -100,8 +105,9 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.time')}</label>
+        <label htmlFor={`${uid}-time`} className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.time')}</label>
         <input
+          id={`${uid}-time`}
           type="time"
           value={value.matchTime}
           onChange={e => set({ matchTime: e.target.value })}
@@ -109,8 +115,9 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.minPlayers')}</label>
+        <label htmlFor={`${uid}-minPlayers`} className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.minPlayers')}</label>
         <input
+          id={`${uid}-minPlayers`}
           type="number"
           min={1}
           value={value.minPlayers}
@@ -119,8 +126,9 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.maxPlayers')}</label>
+        <label htmlFor={`${uid}-maxPlayers`} className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.maxPlayers')}</label>
         <input
+          id={`${uid}-maxPlayers`}
           type="number"
           min={1}
           value={value.maxPlayers}
@@ -129,11 +137,11 @@ export default function MatchEditForm({
         />
       </div>
       <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-gray-500 mb-1">
+        <span className="block text-xs font-medium text-gray-500 mb-1">
           {t('matchForm.venue')} <span className="text-gray-400 font-normal">
             · {matchType === 'futsal' ? t('matchForm.hallOptional') : t('matchForm.courtOptional')}
           </span>
-        </label>
+        </span>
         <LocationPicker
           venue={value.venue}
           court={value.court}
@@ -143,15 +151,16 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.opponent')} <span className="text-gray-400">{t('common.optional')}</span></label>
+        <span className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.opponent')} <span className="text-gray-400">{t('common.optional')}</span></span>
         <OpponentPicker
           opponentId={value.opponentId}
           onChange={(id) => set({ opponentId: id })}
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.category')}</label>
+        <label htmlFor={`${uid}-category`} className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.category')}</label>
         <select
+          id={`${uid}-category`}
           value={value.matchCategory}
           onChange={e => set({ matchCategory: e.target.value as 'serie' | 'pokal' })}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -162,8 +171,9 @@ export default function MatchEditForm({
       </div>
       {value.matchCategory === 'serie' && (
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.serieLetter')}</label>
+          <label htmlFor={`${uid}-serieLetter`} className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.serieLetter')}</label>
           <select
+            id={`${uid}-serieLetter`}
             value={value.serieLetter}
             onChange={e => set({ serieLetter: e.target.value })}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
@@ -175,8 +185,9 @@ export default function MatchEditForm({
         </div>
       )}
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.signupOpens')}</label>
+        <label htmlFor={`${uid}-signupOpens`} className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.signupOpens')}</label>
         <input
+          id={`${uid}-signupOpens`}
           type="date"
           value={value.signupOpenDate}
           onChange={e => set({ signupOpenDate: e.target.value })}
@@ -184,8 +195,9 @@ export default function MatchEditForm({
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.signupDeadline')}</label>
+        <label htmlFor={`${uid}-signupClose`} className="block text-xs font-medium text-gray-500 mb-1">{t('matchForm.signupDeadline')}</label>
         <input
+          id={`${uid}-signupClose`}
           type="date"
           value={value.signupCloseDate}
           onChange={e => set({ signupCloseDate: e.target.value })}

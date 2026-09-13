@@ -756,6 +756,7 @@
     "dateAndDeadlineRequired": "Kampdato og tilmeldingsfrist skal udfyldes",
     "selectVenue": "Vælg et spillested",
     "minExceedsMax": "Min. spillere kan ikke være højere end maks.",
+    "deadlineAfterKickoff": "Tilmeldingsfristen skal ligge før kampstart",
     "historicalTitle": "Registrér tidligere kamp",
     "historicalFailed": "Den tidligere kamp kunne ikke oprettes",
     "dateRequired": "Kampdato skal udfyldes",

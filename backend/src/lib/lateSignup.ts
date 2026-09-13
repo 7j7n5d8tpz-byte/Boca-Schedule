@@ -1,3 +1,5 @@
+import { kickoffInstant } from './clubTime.js';
+
 // Late sign-ups: the deadline is a nudge, not a wall.
 //
 // Before the deadline there is no cap — everyone signs up, the coach picks the
@@ -35,5 +37,5 @@ export function lateSignupOpen(
   if (!REOPENABLE_STATUSES.includes(m.status)) return false;
   if (activeSignups >= m.max_players) return false;
   // Kick-off closes the window for good, whatever the state of the squad.
-  return new Date(`${m.match_date}T${m.match_time}`) > now;
+  return kickoffInstant(m.match_date, m.match_time) > now;
 }

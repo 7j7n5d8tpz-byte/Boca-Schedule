@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { lateSignupOpen, LATE_SIGNUP_COLUMNS, REOPENABLE_STATUSES } from '../lib/lateSignup.js';
+import { kickoffInstant } from '../lib/clubTime.js';
 
 const router = Router();
 
@@ -20,6 +21,17 @@ router.post('/', authenticate, async (req, res, next) => {
       .eq('match_id', matchId).single();
     if (!match) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Kampen blev ikke fundet' } });
+      return;
+    }
+
+    // Kick-off ends sign-ups, full stop. The deadline is coach-set and can be
+    // put anywhere — including after the match — but you can never sign up for
+    // a match that has already started.
+    if (kickoffInstant(match.match_date, match.match_time) <= new Date()) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'MATCH_STARTED', message: 'Kampen er allerede spillet — tilmelding er lukket' },
+      });
       return;
     }
 

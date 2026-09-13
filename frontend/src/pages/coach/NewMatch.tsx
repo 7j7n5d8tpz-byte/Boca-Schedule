@@ -60,6 +60,13 @@ export default function NewMatch() {
     e.preventDefault();
     setError('');
     if (!matchDate || !signupCloseDate) { setError(t('coach.dateAndDeadlineRequired')); return; }
+    // The deadline (20:00 on the picked day) has to land at or before kick-off —
+    // otherwise players could sign up for a match already played, and the match
+    // never completes, so its result can never be recorded.
+    if (new Date(signupCloseDate + 'T20:00:00') > new Date(matchDate + 'T' + matchTime)) {
+      setError(t('coach.deadlineAfterKickoff'));
+      return;
+    }
     if (!venue) { setError(t('coach.selectVenue')); return; }
     if (minPlayers > maxPlayers) { setError(t('coach.minExceedsMax')); return; }
     mutation.mutate();
@@ -188,6 +195,7 @@ export default function NewMatch() {
                 type="date"
                 required
                 value={signupCloseDate}
+                max={matchDate || undefined}
                 onChange={e => setSignupCloseDate(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               />

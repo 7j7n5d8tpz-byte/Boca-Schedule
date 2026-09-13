@@ -7,7 +7,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { PitchView, POS_TAG, type SelectionPlayer, type Guest } from '../../components/PitchView';
-import MatchEditForm, { initialMatchFields, matchUpdatePayload, type MatchEditFields } from '../../components/MatchEditForm';
+import MatchEditForm, { initialMatchFields, matchUpdatePayload, matchFieldsError, type MatchEditFields } from '../../components/MatchEditForm';
 import { Star } from '../../components/Icon';
 
 interface FormationSlot { covered: boolean; required: number; filled: number }
@@ -566,7 +566,7 @@ export default function Selections() {
                   </button>
                   <button
                     onClick={() => { setSaveError(''); saveAllMutation.mutate({ fields: editFields, ids: [...ids] }); }}
-                    disabled={saveAllMutation.isPending || !dirty || (isPublished && tooFew)}
+                    disabled={saveAllMutation.isPending || !dirty || (isPublished && tooFew) || matchFieldsError(editFields) !== null}
                     className="bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
                   >
                     {saveAllMutation.isPending ? t('coach.saving') : isPublished ? t('coach.saveAndNotify') : t('coach.saveChanges')}

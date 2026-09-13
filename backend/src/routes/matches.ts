@@ -9,6 +9,7 @@ import { createNotifications } from '../lib/notifications.js';
 import { notifySignupOpen } from '../lib/signupOpen.js';
 import { resolveOpponent } from '../lib/opponents.js';
 import { lateSignupOpen } from '../lib/lateSignup.js';
+import { kickoffInstant, clubDateString, clubTimeString } from '../lib/clubTime.js';
 
 // Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
 function matchLabel(m: { match_date: string; match_time?: string; opponent?: string | null }): string {
@@ -16,6 +17,19 @@ function matchLabel(m: { match_date: string; match_time?: string; opponent?: str
   const date = d.toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' });
   return m.opponent ? `${date} vs ${m.opponent}` : date;
 }
+
+// A sign-up deadline after kick-off is nonsense: players could sign up for a
+// match that has already been played, and the match never leaves `signup_open`,
+// so it never auto-completes and the result can't be entered. Reject it at the
+// door — on create and on every edit that moves either end of the window.
+function deadlineAfterKickoff(matchDate: string, matchTime: string, signupCloseDate: string): boolean {
+  return new Date(signupCloseDate) > kickoffInstant(matchDate, matchTime);
+}
+
+const DEADLINE_AFTER_KICKOFF = {
+  code: 'DEADLINE_AFTER_KICKOFF',
+  message: 'Tilmeldingsfristen skal ligge før kampstart',
+} as const;
 
 const router = Router();
 
@@ -58,16 +72,24 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     // past matches under "Upcoming".
     const isCoachView = (role === 'coach' || role === 'admin') && statusParam === 'all';
 
-    // Auto-complete any published match whose date+time has passed.
-    // Runs only on the coach/admin 'all' view to avoid affecting player queries.
+    // Auto-complete any live match whose kick-off has passed.
+    //
+    // Not just `published`: a match the coach never got round to closing or
+    // publishing was still played, and while it sits in `signup_open` it never
+    // reaches the "Record results" list — the coach can't enter the result at
+    // all. Drafts stay put (never announced, never played), as do cancelled
+    // matches. Runs only on the coach/admin 'all' view to avoid affecting
+    // player queries.
     if (isCoachView) {
       const now = new Date();
-      const todayStr = now.toISOString().slice(0, 10);          // YYYY-MM-DD
-      const nowTimeStr = now.toTimeString().slice(0, 8);        // HH:MM:SS
+      // Club wall-clock, because match_date/match_time are naive club time —
+      // comparing them against a UTC clock completes matches hours late.
+      const todayStr = clubDateString(now);                     // YYYY-MM-DD
+      const nowTimeStr = clubTimeString(now);                   // HH:MM:SS
       await supabaseAdmin
         .from('matches')
         .update({ status: 'completed', completed_at: now.toISOString() })
-        .eq('status', 'published')
+        .in('status', ['signup_open', 'signup_closed', 'optimized', 'published'])
         .or(`match_date.lt.${todayStr},and(match_date.eq.${todayStr},match_time.lte.${nowTimeStr})`);
     }
 
@@ -128,7 +150,10 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
       // An open spot = a published match whose squad is below capacity.
       const openSpot = m.status === 'published' && (m.selections ?? []).length < m.max_players;
       // Past the deadline, sign-ups reopen while the match is short of players.
-      const deadlinePassed = new Date(m.signup_close_date) < new Date();
+      // Kick-off counts as the deadline whatever the coach set, so a match that
+      // has already been played never shows a sign-up button.
+      const deadlinePassed = new Date(m.signup_close_date) < new Date()
+        || kickoffInstant(m.match_date, m.match_time) <= new Date();
       const lateOpen = deadlinePassed && lateSignupOpen(m, signups.length);
       return {
         matchId: m.match_id,
@@ -181,6 +206,11 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
     }
 
     const d = body.data;
+    if (deadlineAfterKickoff(d.matchDate, d.matchTime, d.signupCloseDate)) {
+      res.status(422).json({ success: false, error: DEADLINE_AFTER_KICKOFF });
+      return;
+    }
+
     const opp = await resolveOpponent(d.opponent, d.opponentId, req.user!.userId);
     const { data, error } = await supabaseAdmin.from('matches').insert({
       match_date: d.matchDate,
@@ -340,22 +370,36 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
 
     const d = body.data;
 
+    // The prior row: needed to validate the edit against the fields it leaves
+    // alone, and further down to detect a new cancellation or a moved match.
+    const { data: existing } = await supabaseAdmin
+      .from('matches')
+      .select('status, match_date, match_time, location, opponent, cancelled_by, signup_close_date')
+      .eq('match_id', matchId)
+      .single();
+
     // Reject premature manual completion — the match must have already been played.
-    if (d.status === 'completed') {
-      const { data: existing } = await supabaseAdmin
-        .from('matches')
-        .select('match_date, match_time')
-        .eq('match_id', matchId)
-        .single();
-      if (existing) {
-        const matchDateTime = new Date(`${existing.match_date}T${existing.match_time}`);
-        if (matchDateTime > new Date()) {
-          res.status(422).json({
-            success: false,
-            error: { code: 'PREMATURE_COMPLETION', message: 'Kampen kan ikke markeres som afsluttet, før den er spillet' },
-          });
-          return;
-        }
+    if (d.status === 'completed' && existing) {
+      if (kickoffInstant(existing.match_date, existing.match_time) > new Date()) {
+        res.status(422).json({
+          success: false,
+          error: { code: 'PREMATURE_COMPLETION', message: 'Kampen kan ikke markeres som afsluttet, før den er spillet' },
+        });
+        return;
+      }
+    }
+
+    // Moving either end of the window has to keep the deadline at or before
+    // kick-off — including when only the match is moved and the deadline stays
+    // put. Edits that touch neither are left alone, so a match that already has
+    // a bad window can still have its venue or squad size fixed.
+    if (existing && (d.matchDate !== undefined || d.matchTime !== undefined || d.signupCloseDate !== undefined)) {
+      const nextDate = d.matchDate ?? existing.match_date;
+      const nextTime = d.matchTime ?? existing.match_time;
+      const nextClose = d.signupCloseDate ?? existing.signup_close_date;
+      if (deadlineAfterKickoff(nextDate, nextTime, nextClose)) {
+        res.status(422).json({ success: false, error: DEADLINE_AFTER_KICKOFF });
+        return;
       }
     }
 
@@ -386,10 +430,6 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
     if (d.maxPlayers !== undefined) updates.max_players = d.maxPlayers;
     if (d.signupOpenDate !== undefined) updates.signup_open_date = d.signupOpenDate;
     if (d.signupCloseDate !== undefined) updates.signup_close_date = d.signupCloseDate;
-
-    // Fetch the prior row so we can detect a new cancellation or a moved match.
-    const { data: existing } = await supabaseAdmin
-      .from('matches').select('status, match_date, match_time, location, opponent, cancelled_by').eq('match_id', matchId).single();
 
     // Who called the match off. Only meaningful while the match is cancelled, so
     // un-cancelling clears it (and the walkover result below with it).

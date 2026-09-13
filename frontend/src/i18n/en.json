@@ -756,6 +756,7 @@
     "dateAndDeadlineRequired": "Match date and signup deadline are required",
     "selectVenue": "Please select a venue",
     "minExceedsMax": "Min players cannot exceed max players",
+    "deadlineAfterKickoff": "The signup deadline must be before kick-off",
     "historicalTitle": "Record past match",
     "historicalFailed": "Failed to create historical match",
     "dateRequired": "Match date is required",

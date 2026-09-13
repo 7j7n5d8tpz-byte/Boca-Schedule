@@ -73,6 +73,26 @@ export function matchUpdatePayload(f: MatchEditFields) {
   };
 }
 
+// The two ends of the sign-up window as real instants, built exactly the way
+// `matchUpdatePayload` sends them (deadline at 20:00 local on the picked day).
+export function signupCloseInstant(f: MatchEditFields): Date {
+  return new Date(f.signupCloseDate + 'T20:00:00');
+}
+
+export function kickoffInstant(f: MatchEditFields): Date {
+  return new Date(f.matchDate + 'T' + f.matchTime);
+}
+
+// A deadline after kick-off would let players sign up for a match that has
+// already been played, and leaves the match stuck in `signup_open` so its
+// result can never be recorded. Returns an i18n key, or null when the window is
+// sound. Mirrors the backend's own check — the server is still the authority.
+export function matchFieldsError(f: MatchEditFields): string | null {
+  if (!f.matchDate || !f.matchTime || !f.signupCloseDate) return null;
+  if (signupCloseInstant(f) > kickoffInstant(f)) return 'coach.deadlineAfterKickoff';
+  return null;
+}
+
 // Shared "edit match details" fields — date/time, squad size, venue, opponent,
 // category/serie and the signup window. Controlled and button-less so the host
 // page owns the Save/Cancel buttons and persistence (MatchDetail saves the match
@@ -91,6 +111,7 @@ export default function MatchEditForm({
   // per instance rather than hard-coded.
   const uid = useId();
   const set = (patch: Partial<MatchEditFields>) => onChange({ ...value, ...patch });
+  const windowError = matchFieldsError(value);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -200,9 +221,11 @@ export default function MatchEditForm({
           id={`${uid}-signupClose`}
           type="date"
           value={value.signupCloseDate}
+          max={value.matchDate || undefined}
           onChange={e => set({ signupCloseDate: e.target.value })}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
         />
+        {windowError && <p className="text-xs text-red-500 mt-1">{t(windowError)}</p>}
       </div>
     </div>
   );

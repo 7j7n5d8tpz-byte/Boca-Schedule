@@ -5,7 +5,7 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../api/client';
 import { formatLocation } from '../../components/LocationPicker';
-import MatchEditForm, { initialMatchFields, matchUpdatePayload, type MatchEditFields } from '../../components/MatchEditForm';
+import MatchEditForm, { initialMatchFields, matchUpdatePayload, matchFieldsError, type MatchEditFields } from '../../components/MatchEditForm';
 import { meetingTime, mapsUrl } from '../../utils';
 import { useDateFormat } from '../../i18n/format';
 import Icon, { Star } from '../../components/Icon';
@@ -364,13 +364,17 @@ export default function MatchDetail() {
               </button>
               <button
                 onClick={() => editMutation.mutate()}
-                disabled={editMutation.isPending}
+                disabled={editMutation.isPending || matchFieldsError(editFields) !== null}
                 className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
               >
                 {editMutation.isPending ? t('coach.saving') : t('coach.saveChanges')}
               </button>
             </div>
-            {editMutation.isError && <p className="text-sm text-red-500">{t('coach.saveChangesFailed')}</p>}
+            {editMutation.isError && (
+              <p className="text-sm text-red-500">
+                {(editMutation.error as any)?.response?.data?.error?.message ?? t('coach.saveChangesFailed')}
+              </p>
+            )}
           </div>
         )}
 

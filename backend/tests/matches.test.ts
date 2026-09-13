@@ -341,4 +341,96 @@ describe('Matches', () => {
       .from('matches').select('cancelled_by').eq('match_id', match.match_id).single();
     expect(data?.cancelled_by).toBeNull();
   });
+
+  // ── Sign-up window vs kick-off ──────────────────────────────────────────────
+  //
+  // A deadline after kick-off used to be accepted, which let players sign up for
+  // a match that had already been played and left the match stuck in
+  // `signup_open`, so its result could never be entered.
+
+  it('rejects a new match whose signup deadline is after kick-off', async () => {
+    const res = await request(app)
+      .post('/api/matches')
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({
+        matchDate:       '2030-06-15',
+        matchTime:       '18:00',
+        location:        'Late Deadline Pitch',
+        matchType:       '7-player',
+        minPlayers:      5,
+        maxPlayers:      7,
+        signupOpenDate:  new Date(Date.now() - 86_400_000).toISOString(),
+        signupCloseDate: new Date('2030-06-16T18:00:00.000Z').toISOString(),
+      });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('DEADLINE_AFTER_KICKOFF');
+    if (res.body.data?.matchId) createdMatchIds.push(res.body.data.matchId);
+  });
+
+  it('rejects moving the deadline past kick-off on an existing match', async () => {
+    const match = await createTestMatch({ match_date: '2030-06-15', match_time: '18:00' });
+    createdMatchIds.push(match.match_id);
+
+    const res = await request(app)
+      .put(`/api/matches/${match.match_id}`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ signupCloseDate: new Date('2030-06-16T18:00:00.000Z').toISOString() });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('DEADLINE_AFTER_KICKOFF');
+
+    const { data } = await supabaseAdmin
+      .from('matches').select('signup_close_date').eq('match_id', match.match_id).single();
+    expect(new Date(data!.signup_close_date).getTime())
+      .toBeLessThan(new Date('2030-06-15T16:00:00.000Z').getTime());
+  });
+
+  it('rejects moving the match to before its existing deadline', async () => {
+    const match = await createTestMatch({
+      match_date: '2030-06-15',
+      match_time: '18:00',
+      signup_close_date: new Date('2030-06-14T18:00:00.000Z').toISOString(),
+    });
+    createdMatchIds.push(match.match_id);
+
+    const res = await request(app)
+      .put(`/api/matches/${match.match_id}`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ matchDate: '2030-06-13' });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('DEADLINE_AFTER_KICKOFF');
+  });
+
+  it('allows an edit that touches neither end of the window', async () => {
+    const match = await createTestMatch({ match_date: '2030-06-15', match_time: '18:00' });
+    createdMatchIds.push(match.match_id);
+
+    const res = await request(app)
+      .put(`/api/matches/${match.match_id}`)
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ location: 'Window Untouched Pitch' });
+    expect(res.status).toBe(200);
+  });
+
+  it('auto-completes a played match the coach never published, so the result can be entered', async () => {
+    // Deadline in the future but kick-off in the past — the state the old
+    // validation allowed. It must still reach the coach's "record results" list.
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const match = await createTestMatch({
+      status: 'signup_open',
+      match_date: yesterday,
+      match_time: '18:00',
+      signup_close_date: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+    });
+    createdMatchIds.push(match.match_id);
+
+    const res = await request(app)
+      .get('/api/matches/upcoming?status=all')
+      .set('Authorization', `Bearer ${coach.token}`);
+    expect(res.status).toBe(200);
+
+    const { data } = await supabaseAdmin
+      .from('matches').select('status, completed_at').eq('match_id', match.match_id).single();
+    expect(data!.status).toBe('completed');
+    expect(data!.completed_at).toBeTruthy();
+  });
 });

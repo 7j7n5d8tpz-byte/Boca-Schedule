@@ -58,7 +58,9 @@ describe('Role enforcement', () => {
         minPlayers:      5,
         maxPlayers:      7,
         signupOpenDate:  new Date(Date.now() - 86_400_000).toISOString(),
-        signupCloseDate: new Date('2030-01-01T18:00:00.000Z').toISOString(),
+        // 18:00 on match day in UTC is 19:00 in Copenhagen — an hour AFTER the
+        // 18:00 kick-off, which the API now rejects. Close the day before.
+        signupCloseDate: new Date('2029-12-31T18:00:00.000Z').toISOString(),
       });
     expect(res.status).toBe(201);
     // cleanup

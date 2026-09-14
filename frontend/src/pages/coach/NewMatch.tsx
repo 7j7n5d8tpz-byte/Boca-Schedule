@@ -28,6 +28,14 @@ export default function NewMatch() {
   const [maxPlayers, setMaxPlayers] = useState(10);
   const [error, setError] = useState('');
 
+  // The club's convention is 20:00 on the picked day, capped at kick-off so a
+  // deadline can never land after the match.
+  const deadlineInstant = () => {
+    const eightPm = new Date(signupCloseDate + 'T20:00:00');
+    const kickoff = new Date(matchDate + 'T' + matchTime);
+    return eightPm > kickoff ? kickoff : eightPm;
+  };
+
   const mutation = useMutation({
     mutationFn: () => api.post('/matches', {
       matchDate,
@@ -42,7 +50,9 @@ export default function NewMatch() {
       // "…T20:00:00Z" treated the deadline as UTC, putting it an hour or two
       // off for CET/CEST users.
       signupOpenDate: new Date(signupOpenDate + 'T00:00:00').toISOString(),
-      signupCloseDate: new Date(signupCloseDate + 'T20:00:00').toISOString(),
+      // 20:00 on the picked day, but never past kick-off — picking the match
+      // day means "open right up to kick-off".
+      signupCloseDate: deadlineInstant().toISOString(),
       minPlayers,
       maxPlayers,
       priorityEnabled: true,
@@ -60,13 +70,10 @@ export default function NewMatch() {
     e.preventDefault();
     setError('');
     if (!matchDate || !signupCloseDate) { setError(t('coach.dateAndDeadlineRequired')); return; }
-    // The deadline (20:00 on the picked day) has to land at or before kick-off —
-    // otherwise players could sign up for a match already played, and the match
-    // never completes, so its result can never be recorded.
-    if (new Date(signupCloseDate + 'T20:00:00') > new Date(matchDate + 'T' + matchTime)) {
-      setError(t('coach.deadlineAfterKickoff'));
-      return;
-    }
+    // A deadline on a day after the match would let players sign up for a match
+    // already played, and leaves the match stuck in signup_open so its result
+    // can never be recorded. (Match day itself is fine — clamped to kick-off.)
+    if (signupCloseDate > matchDate) { setError(t('coach.deadlineAfterKickoff')); return; }
     if (!venue) { setError(t('coach.selectVenue')); return; }
     if (minPlayers > maxPlayers) { setError(t('coach.minExceedsMax')); return; }
     mutation.mutate();

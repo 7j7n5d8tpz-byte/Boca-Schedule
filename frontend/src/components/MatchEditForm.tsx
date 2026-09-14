@@ -67,29 +67,35 @@ export function matchUpdatePayload(f: MatchEditFields) {
     // matching NewMatch. A bare "…Z" treated these as UTC, an hour or two off
     // for CET/CEST users.
     signupOpenDate: new Date(f.signupOpenDate + 'T00:00:00').toISOString(),
-    signupCloseDate: new Date(f.signupCloseDate + 'T20:00:00').toISOString(),
+    signupCloseDate: deadlineInstant(f).toISOString(),
     minPlayers: f.minPlayers,
     maxPlayers: f.maxPlayers,
   };
-}
-
-// The two ends of the sign-up window as real instants, built exactly the way
-// `matchUpdatePayload` sends them (deadline at 20:00 local on the picked day).
-export function signupCloseInstant(f: MatchEditFields): Date {
-  return new Date(f.signupCloseDate + 'T20:00:00');
 }
 
 export function kickoffInstant(f: MatchEditFields): Date {
   return new Date(f.matchDate + 'T' + f.matchTime);
 }
 
-// A deadline after kick-off would let players sign up for a match that has
-// already been played, and leaves the match stuck in `signup_open` so its
-// result can never be recorded. Returns an i18n key, or null when the window is
-// sound. Mirrors the backend's own check — the server is still the authority.
+// The deadline the picked day means: 20:00 local, the club's convention — but
+// never later than kick-off. Picking the match day itself therefore means "open
+// right up to kick-off", which is what a coach reaching for the latest possible
+// deadline is after, and what the repair migration left on the matches whose
+// deadline used to sit after the match.
+export function deadlineInstant(f: MatchEditFields): Date {
+  const eightPm = new Date(f.signupCloseDate + 'T20:00:00');
+  const kickoff = kickoffInstant(f);
+  return eightPm > kickoff ? kickoff : eightPm;
+}
+
+// A deadline on a day after the match would let players sign up for a match
+// that has already been played, and leaves the match stuck in `signup_open` so
+// its result can never be recorded. Returns an i18n key, or null when the
+// window is sound. Only the match day and earlier are offerable — a deadline on
+// match day is clamped to kick-off above rather than rejected.
 export function matchFieldsError(f: MatchEditFields): string | null {
   if (!f.matchDate || !f.matchTime || !f.signupCloseDate) return null;
-  if (signupCloseInstant(f) > kickoffInstant(f)) return 'coach.deadlineAfterKickoff';
+  if (f.signupCloseDate > f.matchDate) return 'coach.deadlineAfterKickoff';
   return null;
 }
 

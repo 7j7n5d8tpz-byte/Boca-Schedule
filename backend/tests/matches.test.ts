@@ -400,6 +400,28 @@ describe('Matches', () => {
     expect(res.body.error.code).toBe('DEADLINE_AFTER_KICKOFF');
   });
 
+  // The repair migration parks legacy deadlines exactly on kick-off, and the
+  // coach form sends that same instant back when the match day is picked, so
+  // the boundary has to be accepted rather than rejected.
+  it('accepts a deadline landing exactly on kick-off', async () => {
+    const res = await request(app)
+      .post('/api/matches')
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({
+        matchDate:       '2030-06-15',
+        matchTime:       '18:00',
+        location:        'Kickoff Deadline Pitch',
+        matchType:       '7-player',
+        minPlayers:      5,
+        maxPlayers:      7,
+        signupOpenDate:  new Date(Date.now() - 86_400_000).toISOString(),
+        // 18:00 on 15 June in Copenhagen (CEST) is 16:00 UTC.
+        signupCloseDate: new Date('2030-06-15T16:00:00.000Z').toISOString(),
+      });
+    expect(res.status).toBe(201);
+    createdMatchIds.push(res.body.data.matchId);
+  });
+
   it('allows an edit that touches neither end of the window', async () => {
     const match = await createTestMatch({ match_date: '2030-06-15', match_time: '18:00' });
     createdMatchIds.push(match.match_id);

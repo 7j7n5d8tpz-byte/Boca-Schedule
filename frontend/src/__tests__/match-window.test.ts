@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchFieldsError, matchUpdatePayload, type MatchEditFields } from '../components/MatchEditForm';
+import { matchFieldsError, matchUpdatePayload, deadlineInstant, type MatchEditFields } from '../components/MatchEditForm';
 
 const fields = (over: Partial<MatchEditFields> = {}): MatchEditFields => ({
   matchDate: '2030-06-15',
@@ -24,16 +24,13 @@ describe('matchFieldsError', () => {
     expect(matchFieldsError(fields())).toBeNull();
   });
 
-  it('accepts a deadline on match day when kick-off is later (20:00 close)', () => {
+  it('accepts the match day itself — that means "open until kick-off"', () => {
     expect(matchFieldsError(fields({ signupCloseDate: '2030-06-15', matchTime: '21:00' }))).toBeNull();
+    expect(matchFieldsError(fields({ signupCloseDate: '2030-06-15', matchTime: '18:00' }))).toBeNull();
   });
 
   it('rejects a deadline on a day after the match', () => {
     expect(matchFieldsError(fields({ signupCloseDate: '2030-06-16' }))).toBe('coach.deadlineAfterKickoff');
-  });
-
-  it('rejects a deadline on match day when kick-off is before 20:00', () => {
-    expect(matchFieldsError(fields({ signupCloseDate: '2030-06-15', matchTime: '18:00' }))).toBe('coach.deadlineAfterKickoff');
   });
 
   it('stays quiet while the form is still half-filled', () => {
@@ -45,5 +42,36 @@ describe('matchFieldsError', () => {
     const f = fields({ signupCloseDate: '2030-06-14' });
     expect(matchUpdatePayload(f).signupCloseDate)
       .toBe(new Date('2030-06-14T20:00:00').toISOString());
+  });
+});
+
+// The repair migration leaves those matches with a deadline at kick-off, which
+// the date picker shows as the match day. Re-saving such a match must not push
+// the deadline back past kick-off to the club's default 20:00.
+describe('deadlineInstant', () => {
+  it('uses 20:00 local on an ordinary earlier day', () => {
+    expect(deadlineInstant(fields()).toISOString())
+      .toBe(new Date('2030-06-14T20:00:00').toISOString());
+  });
+
+  it('clamps to kick-off when the deadline is the match day', () => {
+    const f = fields({ signupCloseDate: '2030-06-15', matchTime: '17:30' });
+    expect(deadlineInstant(f).toISOString())
+      .toBe(new Date('2030-06-15T17:30:00').toISOString());
+  });
+
+  it('leaves a late kick-off on 20:00', () => {
+    const f = fields({ signupCloseDate: '2030-06-15', matchTime: '21:00' });
+    expect(deadlineInstant(f).toISOString())
+      .toBe(new Date('2030-06-15T20:00:00').toISOString());
+  });
+
+  it('round-trips a repaired match unchanged', () => {
+    // Deadline already at kick-off → picker shows the match day → saving sends
+    // the same instant back, so the API accepts it.
+    const f = fields({ signupCloseDate: '2030-06-15', matchTime: '17:30' });
+    expect(matchFieldsError(f)).toBeNull();
+    expect(matchUpdatePayload(f).signupCloseDate).toBe(deadlineInstant(f).toISOString());
+    expect(deadlineInstant(f) <= new Date(f.matchDate + 'T' + f.matchTime)).toBe(true);
   });
 });

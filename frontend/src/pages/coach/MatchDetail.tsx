@@ -294,14 +294,27 @@ export default function MatchDetail() {
           </div>
         )}
         {match.status === 'optimized' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <p className="text-sm text-blue-700">{t('coach.optimizerSelected')}</p>
-            <Link
-              to={`/coach/matches/${matchId}/selections`}
-              className="shrink-0 bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              {t('coach.reviewPublish')}
-            </Link>
+            {/* Running the optimizer closes sign-ups as a side effect, so this
+                state needs the same way back as signup_closed — otherwise a
+                mis-click is a dead end. The squad stays put; it isn't visible to
+                players until it's published, and re-optimizing replaces it. */}
+            <div className="shrink-0 flex gap-2">
+              <button
+                onClick={() => statusMutation.mutate('signup_open')}
+                disabled={statusMutation.isPending}
+                className="border border-gray-300 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                {t('coach.reopenSignups')}
+              </button>
+              <Link
+                to={`/coach/matches/${matchId}/selections`}
+                className="bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                {t('coach.reviewPublish')}
+              </Link>
+            </div>
           </div>
         )}
         {match.status === 'published' && (

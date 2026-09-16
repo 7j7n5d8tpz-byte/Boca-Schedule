@@ -47,6 +47,22 @@ function MatchRow({ match }: { match: Match }) {
   const signupPct = Math.min(100, (match.currentSignups / match.maxPlayers) * 100);
   const low = match.currentSignups < match.minPlayers;
 
+  // The one action that moves this match along. A draft isn't announced yet, and
+  // a completed match is done, so neither gets one.
+  const nextStep = (() => {
+    switch (match.status) {
+      case 'signup_open':
+      case 'signup_closed':
+        return { to: `/coach/matches/${match.matchId}#optimize`, label: t('coach.pickSquad') };
+      case 'optimized':
+        return { to: `/coach/matches/${match.matchId}/selections`, label: t('coach.reviewPublish') };
+      case 'published':
+        return { to: `/coach/matches/${match.matchId}/selections`, label: t('coach.manageSquad') };
+      default:
+        return null;
+    }
+  })();
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
       <div className="flex items-start justify-between gap-4">
@@ -92,25 +108,27 @@ function MatchRow({ match }: { match: Match }) {
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="mt-4 flex gap-2">
-        {match.status === 'published' ? (
+      {/* Actions — every card carries one filled button naming the next step in
+          the pick-then-publish flow, so the coach never has to guess which link
+          continues it. "View signups" stays as the quiet secondary. The
+          optimizer card is further down the match page, hence the #optimize
+          deep-link (MatchDetail scrolls it into view). */}
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {nextStep && (
           <Link
-            to={`/coach/matches/${match.matchId}/selections`}
-            className="text-sm text-brand-green hover:underline"
+            to={nextStep.to}
+            className="bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
-            {t('coach.manageSquad')}
+            {nextStep.label}
           </Link>
-        ) : (
+        )}
+        {match.status !== 'published' && (
           <Link
             to={`/coach/matches/${match.matchId}`}
             className="text-sm text-brand-green hover:underline"
           >
             {t('coach.viewSignups')}
           </Link>
-        )}
-        {match.status === 'signup_closed' && (
-          <span className="text-sm text-gray-400">{t('coach.readyToOptimizeTag')}</span>
         )}
       </div>
     </div>
@@ -367,8 +385,9 @@ export default function CoachDashboard() {
           )}
         </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header — wraps on phones, where three always-present buttons don't
+            fit beside the heading. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-extrabold text-gray-900">{t('coach.matches')}</h1>
             {!isLoading && (
@@ -382,15 +401,17 @@ export default function CoachDashboard() {
               </p>
             )}
           </div>
-          <div className="flex gap-2">
-            {readyToOptimize >= 2 && (
-              <Link
-                to="/coach/optimize"
-                className="border border-brand-green text-brand-green hover:bg-brand-green/5 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              >
-                {t('coach.optimizeMultiple')}
-              </Link>
-            )}
+          <div className="flex flex-wrap gap-2">
+            {/* Always offered. It used to appear only once two matches had
+                closed sign-ups, which made the feature look like it had been
+                removed on every other visit — and batch optimize takes open
+                matches too, so there was nothing to gate on. */}
+            <Link
+              to="/coach/optimize"
+              className="border border-brand-green text-brand-green hover:bg-brand-green/5 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              {t('coach.optimizeMultiple')}
+            </Link>
             <Link
               to="/coach/historical"
               className="border border-gray-300 text-gray-600 hover:bg-gray-50 text-sm font-medium px-4 py-2 rounded-lg transition-colors"

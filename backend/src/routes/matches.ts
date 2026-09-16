@@ -10,6 +10,9 @@ import { notifySignupOpen } from '../lib/signupOpen.js';
 import { resolveOpponent } from '../lib/opponents.js';
 import { lateSignupOpen } from '../lib/lateSignup.js';
 import { kickoffInstant, clubDateString, clubTimeString } from '../lib/clubTime.js';
+import { seasonStartYear, seasonRange, seasonLabel } from '../lib/season.js';
+import { buildPlayedKeys } from '../lib/participation.js';
+import { cellState, selectionPct, type CellState } from '../lib/seasonOverview.js';
 
 // Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
 function matchLabel(m: { match_date: string; match_time?: string; opponent?: string | null }): string {
@@ -30,6 +33,20 @@ const DEADLINE_AFTER_KICKOFF = {
   code: 'DEADLINE_AFTER_KICKOFF',
   message: 'Tilmeldingsfristen skal ligge før kampstart',
 } as const;
+
+// Mark every live match whose kick-off has passed as completed. Uses the club
+// wall-clock, because match_date/match_time are naive club time — comparing
+// them against a UTC clock completes matches hours late.
+async function autoCompletePastMatches(): Promise<void> {
+  const now = new Date();
+  const todayStr = clubDateString(now);                     // YYYY-MM-DD
+  const nowTimeStr = clubTimeString(now);                   // HH:MM:SS
+  await supabaseAdmin
+    .from('matches')
+    .update({ status: 'completed', completed_at: now.toISOString() })
+    .in('status', ['signup_open', 'signup_closed', 'optimized', 'published'])
+    .or(`match_date.lt.${todayStr},and(match_date.eq.${todayStr},match_time.lte.${nowTimeStr})`);
+}
 
 const router = Router();
 
@@ -80,18 +97,7 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     // all. Drafts stay put (never announced, never played), as do cancelled
     // matches. Runs only on the coach/admin 'all' view to avoid affecting
     // player queries.
-    if (isCoachView) {
-      const now = new Date();
-      // Club wall-clock, because match_date/match_time are naive club time —
-      // comparing them against a UTC clock completes matches hours late.
-      const todayStr = clubDateString(now);                     // YYYY-MM-DD
-      const nowTimeStr = clubTimeString(now);                   // HH:MM:SS
-      await supabaseAdmin
-        .from('matches')
-        .update({ status: 'completed', completed_at: now.toISOString() })
-        .in('status', ['signup_open', 'signup_closed', 'optimized', 'published'])
-        .or(`match_date.lt.${todayStr},and(match_date.eq.${todayStr},match_time.lte.${nowTimeStr})`);
-    }
+    if (isCoachView) await autoCompletePastMatches();
 
     // Fetch matches (left join signups so matches with 0 sign-ups still appear)
     let matchQuery = supabaseAdmin
@@ -191,6 +197,119 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
     });
 
     res.json({ success: true, data: { matches: enriched, pagination: { total: count ?? 0, limit, offset } } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/matches/season-overview — coach/admin
+// Player × match grid for one season: who signed up, was selected, played or
+// withdrew, plus matches played and selection % per player. Drafts (never
+// announced) and cancelled matches are left out.
+router.get('/season-overview', authenticate, requireRole('coach', 'admin'), async (req, res, next) => {
+  try {
+    const matchTypeFilter = (req.query.matchType as string | undefined) ?? 'all';
+    await autoCompletePastMatches();
+
+    const [{ data: users, error: usersError }, { data: allMatchDates, error: datesError }] = await Promise.all([
+      supabaseAdmin.from('users')
+        .select('user_id, name, is_active, is_placeholder')
+        .in('role', ['player', 'coach', 'admin']).is('merged_into', null).order('name'),
+      supabaseAdmin.from('matches').select('match_date, match_type')
+        .not('status', 'in', '(draft,cancelled)'),
+    ]);
+    if (usersError) throw usersError;
+    if (datesError) throw datesError;
+
+    const availableYears = [...new Set(
+      (allMatchDates ?? [])
+        .filter((m: any) => matchTypeFilter === 'all' || m.match_type === matchTypeFilter)
+        .map((m: any) => seasonStartYear(m.match_date, matchTypeFilter)),
+    )].sort((a, b) => b - a);
+    // Default to the season we're in, when it has matches; otherwise the latest.
+    const currentYear = seasonStartYear(clubDateString(new Date()), matchTypeFilter);
+    const defaultYear = availableYears.includes(currentYear) ? currentYear : (availableYears[0] ?? currentYear);
+    const year = req.query.year ? parseInt(req.query.year as string) : defaultYear;
+
+    const { start, end } = seasonRange(year, matchTypeFilter);
+    let matchQuery = supabaseAdmin.from('matches')
+      .select('match_id, match_date, match_time, match_type, match_category, opponent, status, min_players, max_players')
+      .gte('match_date', start).lte('match_date', end)
+      .not('status', 'in', '(draft,cancelled)')
+      .order('match_date', { ascending: true }).order('match_time', { ascending: true });
+    if (matchTypeFilter !== 'all') matchQuery = matchQuery.eq('match_type', matchTypeFilter);
+    const { data: matchRows, error: matchError } = await matchQuery;
+    if (matchError) throw matchError;
+
+    const matchIds = (matchRows ?? []).map((m: any) => m.match_id);
+    const [{ data: signupData }, { data: selectionData }, { data: perfData }] = matchIds.length > 0
+      ? await Promise.all([
+          supabaseAdmin.from('signups').select('match_id, player_id, is_active').in('match_id', matchIds),
+          supabaseAdmin.from('selections').select('match_id, player_id').in('match_id', matchIds),
+          supabaseAdmin.from('match_performance').select('match_id, player_id, attended').in('match_id', matchIds),
+        ])
+      : [{ data: [] }, { data: [] }, { data: [] }];
+
+    const signupByKey = new Map<string, 'active' | 'withdrawn'>();
+    (signupData ?? []).forEach((s: any) => signupByKey.set(`${s.match_id}|${s.player_id}`, s.is_active ? 'active' : 'withdrawn'));
+    const selectedKeys = new Set((selectionData ?? []).map((s: any) => `${s.match_id}|${s.player_id}`));
+    const completedIds = new Set((matchRows ?? []).filter((m: any) => m.status === 'completed').map((m: any) => m.match_id));
+    const playedKeys = buildPlayedKeys(selectionData ?? [], perfData ?? [], completedIds);
+
+    const matches = (matchRows ?? []).map((m: any) => ({
+      matchId: m.match_id,
+      matchDate: m.match_date,
+      matchTime: m.match_time,
+      matchType: m.match_type,
+      matchCategory: m.match_category ?? 'serie',
+      opponent: m.opponent ?? null,
+      status: m.status,
+      minPlayers: m.min_players,
+      maxPlayers: m.max_players,
+      signupCount: (signupData ?? []).filter((s: any) => s.match_id === m.match_id && s.is_active).length,
+      selectedCount: (selectionData ?? []).filter((s: any) => s.match_id === m.match_id).length,
+    }));
+
+    const players = (users ?? []).flatMap((u: any) => {
+      const inputs = (matchRows ?? []).map((m: any) => {
+        const key = `${m.match_id}|${u.user_id}`;
+        return {
+          matchId: m.match_id as string,
+          status: m.status as string,
+          signup: signupByKey.get(key) ?? null,
+          selected: selectedKeys.has(key),
+          played: playedKeys.has(key),
+        };
+      });
+      const hasData = inputs.some(c => c.signup || c.selected || c.played);
+      // Current squad members always show; placeholders and inactive players
+      // only when they actually took part in this season.
+      if (!(u.is_active && !u.is_placeholder) && !hasData) return [];
+
+      const cells: Record<string, CellState> = {};
+      for (const c of inputs) cells[c.matchId] = cellState(c);
+      const pct = selectionPct(inputs);
+      return [{
+        userId: u.user_id,
+        name: u.name,
+        played: inputs.filter(c => c.played).length,
+        selected: pct.selected,
+        considered: pct.considered,
+        selectionPct: pct.pct,
+        cells,
+      }];
+    });
+
+    res.json({
+      success: true,
+      data: {
+        year,
+        seasonLabel: seasonLabel(year, matchTypeFilter),
+        availableSeasons: (availableYears.length > 0 ? availableYears : [year]).map(y => ({ year: y, label: seasonLabel(y, matchTypeFilter) })),
+        matches,
+        players,
+      },
+    });
   } catch (err) {
     next(err);
   }

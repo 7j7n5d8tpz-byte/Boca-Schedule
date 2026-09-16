@@ -955,7 +955,8 @@
     "batchClosesSignups_one": "1 af de valgte kampe har stadig åben tilmelding.",
     "batchClosesSignupsHint": "Når du optimerer, lukkes tilmeldingen på dem. Du kan åbne den igen på kampsiden.",
     "batchConfigure_other": "Indstil {{count}} kampe →",
-    "batchClosesSignups_other": "{{count}} af de valgte kampe har stadig åben tilmelding."
+    "batchClosesSignups_other": "{{count}} af de valgte kampe har stadig åben tilmelding.",
+    "seasonOverview": "Sæsonoverblik"
   },
   "admin": {
     "title": "Adminpanel",
@@ -1035,5 +1036,49 @@
     "key": "Nøgle",
     "entriesCount": "{{count}} poster",
     "noAuditEntries": "Ingen poster i logbogen endnu"
+  },
+  "seasonOverview": {
+    "title": "Sæsonoverblik",
+    "subtitle": "Tilmeldinger, udtagelser og spillede kampe for hele sæsonen.",
+    "player": "Spiller",
+    "played": "Spillet",
+    "playedLong": "Kampe spillet",
+    "selectionPct": "Udt. %",
+    "selectionPctLong": "Udtagelsesprocent: udtaget ÷ tilmeldt, kun kampe hvor holdet er offentliggjort eller spillet",
+    "allMatches": "Alle kampe",
+    "openOnly": "Kun åbne",
+    "sortBy": "Sortér",
+    "sortName": "Navn",
+    "sortPlayed": "Flest spillet",
+    "sortPct": "Højest udt. %",
+    "openMatches": "Åbne kampe",
+    "awaitingReply": "Mangler svar",
+    "awaitingReplyHint": "Spillere der hverken har tilmeldt sig eller meldt afbud til mindst én åben kamp",
+    "noMatches": "Ingen kampe i denne sæson.",
+    "noOpenMatches": "Ingen kampe er åbne for tilmelding lige nu.",
+    "loadFailed": "Overblikket kunne ikke hentes.",
+    "countOpen": "{{count}} tilmeldt",
+    "countDecided": "{{count}} udtaget",
+    "legend": "Forklaring",
+    "state": {
+      "played": "Spillet",
+      "no_show": "Udeblev",
+      "selected": "Udtaget",
+      "signed_up": "Tilmeldt",
+      "withdrawn": "Afbud",
+      "missing": "Mangler svar",
+      "none": "Ikke tilmeldt"
+    },
+    "letter": {
+      "played": "S",
+      "no_show": "X",
+      "selected": "U",
+      "signed_up": "T",
+      "withdrawn": "A",
+      "missing": "?",
+      "none": "–"
+    },
+    "pctDetail": "Udtaget {{selected}} af {{considered}}",
+    "pctNone": "Ingen afgjorte kampe"
   }
 }

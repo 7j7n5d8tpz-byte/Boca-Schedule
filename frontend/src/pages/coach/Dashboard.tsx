@@ -407,6 +407,12 @@ export default function CoachDashboard() {
                 removed on every other visit — and batch optimize takes open
                 matches too, so there was nothing to gate on. */}
             <Link
+              to="/coach/season"
+              className="border border-brand-green text-brand-green hover:bg-brand-green/5 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              {t('coach.seasonOverview')}
+            </Link>
+            <Link
               to="/coach/optimize"
               className="border border-brand-green text-brand-green hover:bg-brand-green/5 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >

@@ -20,6 +20,7 @@ import ManageFinesPage from './pages/player/ManageFines';
 import MatchResults from './pages/MatchResults';
 import AdminDashboard from './pages/admin/Dashboard';
 import BatchOptimize from './pages/coach/BatchOptimize';
+import SeasonOverview from './pages/coach/SeasonOverview';
 import HistoricalMatch from './pages/coach/HistoricalMatch';
 
 const queryClient = new QueryClient({
@@ -60,6 +61,7 @@ export default function App() {
             <Route path="/coach/historical" element={<ProtectedRoute roles={['coach', 'admin']}><HistoricalMatch /></ProtectedRoute>} />
             <Route path="/coach/matches/:matchId" element={<ProtectedRoute roles={['coach', 'admin']}><MatchDetail /></ProtectedRoute>} />
             <Route path="/coach/matches/:matchId/selections" element={<ProtectedRoute roles={['coach', 'admin']}><Selections /></ProtectedRoute>} />
+            <Route path="/coach/season" element={<ProtectedRoute roles={['coach', 'admin']}><SeasonOverview /></ProtectedRoute>} />
             <Route path="/coach/optimize" element={<ProtectedRoute roles={['coach', 'admin']}><BatchOptimize /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute roles={['admin']}><AdminDashboard /></ProtectedRoute>} />
             <Route path="/" element={<RoleRouter />} />

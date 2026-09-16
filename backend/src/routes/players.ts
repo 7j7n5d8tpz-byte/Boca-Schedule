@@ -4,7 +4,7 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { storeAvatar, AvatarTooLargeError, AVATAR_DATA_URL_RE } from '../lib/avatar.js';
 import { seasonStartYear, seasonRange, seasonLabel } from '../lib/season.js';
-import { playedMatch } from '../lib/participation.js';
+import { playedMatch, buildPlayedKeys } from '../lib/participation.js';
 import { computeMatchRating, averageRating, matchResult, type MatchResult } from '../lib/rating.js';
 
 const router = Router();
@@ -134,22 +134,9 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
 
       // "Played" uses the shared definition (lib/participation.ts): explicit
       // attendance from the recorded result wins, selection is the fallback.
-      // Union selections and attended performances per (match, player) so a
-      // walk-on with a perf row still counts once.
-      const attendedByKey = new Map<string, boolean>();
-      (perfData ?? []).forEach((p: any) => attendedByKey.set(`${p.match_id}|${p.player_id}`, !!p.attended));
-
       const selectedMap = new Map<string, number>();
-      const playedKeys = new Set<string>();
-      (selectionData ?? []).forEach((s: any) => {
-        selectedMap.set(s.player_id, (selectedMap.get(s.player_id) ?? 0) + 1);
-        if (completedIds.has(s.match_id) && playedMatch(true, attendedByKey.get(`${s.match_id}|${s.player_id}`))) {
-          playedKeys.add(`${s.match_id}|${s.player_id}`);
-        }
-      });
-      (perfData ?? []).forEach((p: any) => {
-        if (completedIds.has(p.match_id) && p.attended) playedKeys.add(`${p.match_id}|${p.player_id}`);
-      });
+      (selectionData ?? []).forEach((s: any) => selectedMap.set(s.player_id, (selectedMap.get(s.player_id) ?? 0) + 1));
+      const playedKeys = buildPlayedKeys(selectionData ?? [], perfData ?? [], completedIds);
       const playedMap = new Map<string, number>();
       for (const key of playedKeys) {
         const playerId = key.slice(key.indexOf('|') + 1);

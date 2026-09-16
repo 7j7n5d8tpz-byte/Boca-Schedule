@@ -955,7 +955,8 @@
     "batchClosesSignups_one": "1 of the selected matches still has signups open.",
     "batchClosesSignupsHint": "Optimizing will close their signups. You can reopen them from the match page.",
     "batchConfigure_other": "Configure {{count}} matches →",
-    "batchClosesSignups_other": "{{count}} of the selected matches still have signups open."
+    "batchClosesSignups_other": "{{count}} of the selected matches still have signups open.",
+    "seasonOverview": "Season overview"
   },
   "admin": {
     "title": "Admin panel",
@@ -1035,5 +1036,49 @@
     "key": "Key",
     "entriesCount": "{{count}} entries",
     "noAuditEntries": "No audit log entries yet"
+  },
+  "seasonOverview": {
+    "title": "Season overview",
+    "subtitle": "Sign-ups, selections and matches played across the season.",
+    "player": "Player",
+    "played": "Played",
+    "playedLong": "Matches played",
+    "selectionPct": "Sel. %",
+    "selectionPctLong": "Selection rate: selected ÷ signed up, counting only matches whose squad is published or played",
+    "allMatches": "All matches",
+    "openOnly": "Open only",
+    "sortBy": "Sort",
+    "sortName": "Name",
+    "sortPlayed": "Most played",
+    "sortPct": "Highest sel. %",
+    "openMatches": "Open matches",
+    "awaitingReply": "No reply yet",
+    "awaitingReplyHint": "Players who have neither signed up nor withdrawn for at least one open match",
+    "noMatches": "No matches this season.",
+    "noOpenMatches": "No matches are open for sign-up right now.",
+    "loadFailed": "Couldn't load the overview.",
+    "countOpen": "{{count}} signed up",
+    "countDecided": "{{count}} selected",
+    "legend": "Legend",
+    "state": {
+      "played": "Played",
+      "no_show": "No-show",
+      "selected": "Selected",
+      "signed_up": "Signed up",
+      "withdrawn": "Withdrew",
+      "missing": "No reply",
+      "none": "Not signed up"
+    },
+    "letter": {
+      "played": "P",
+      "no_show": "X",
+      "selected": "S",
+      "signed_up": "+",
+      "withdrawn": "W",
+      "missing": "?",
+      "none": "–"
+    },
+    "pctDetail": "Selected {{selected}} of {{considered}}",
+    "pctNone": "No decided matches"
   }
 }

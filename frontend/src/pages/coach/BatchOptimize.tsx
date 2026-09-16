@@ -24,6 +24,14 @@ interface Match {
   maxPlayers: number;
 }
 
+// Mirrors the badge colours on the coach dashboard so a match reads the same in
+// both places.
+const STATUS_STYLE: Record<string, string> = {
+  signup_open:   'bg-green-100 text-green-700',
+  signup_closed: 'bg-yellow-100 text-yellow-700',
+  optimized:     'bg-blue-100 text-blue-700',
+};
+
 interface SignupPlayer {
   signupId: string;
   player: { userId: string; name: string; preferredPositions: string[] };
@@ -79,12 +87,22 @@ export default function BatchOptimize() {
   const [publishStates, setPublishStates] = useState<Record<string, 'idle' | 'publishing' | 'done' | 'error'>>({});
   const [optimizeError, setOptimizeError] = useState('');
 
-  // ── Step 1: fetch signup_closed and optimized matches
+  // ── Step 1: fetch every upcoming match the coach can still pick a squad for.
+  // Open matches are included on purpose — the coach shouldn't have to close
+  // sign-ups first just to see what the optimizer would do. Optimizing one does
+  // close its sign-ups (it moves the match to `optimized`), which the step-1 list
+  // warns about; MatchDetail can reopen them again.
   const { data: matchesData, isLoading: matchesLoading } = useQuery({
     queryKey: ['matches', 'batch-eligible'],
-    queryFn: () => api.get('/matches/upcoming?status=signup_closed,optimized').then(r => r.data.data),
+    queryFn: () => api.get('/matches/upcoming?status=signup_open,signup_closed,optimized').then(r => r.data.data),
   });
-  const eligibleMatches: Match[] = matchesData?.matches ?? [];
+  // An explicit status filter skips the backend's auto-complete sweep (that runs
+  // only on the coach's `all` view), so a match that kicked off while nobody
+  // loaded the dashboard can still come back as `signup_open`. Drop anything
+  // already played — there is no squad left to pick for it.
+  const eligibleMatches: Match[] = (matchesData?.matches ?? []).filter(
+    (m: Match) => new Date(`${m.matchDate}T${m.matchTime}`) > new Date(),
+  );
 
   // ── Step 2: fetch signups for each selected match (parallel)
   const orderedSelected = [...selectedMatchIds];
@@ -310,6 +328,9 @@ function SelectStep({
 }) {
   const { t } = useTranslation();
   const { formatDate } = useDateFormat();
+  const openSelectedCount = matches.filter(
+    m => m.status === 'signup_open' && selectedMatchIds.has(m.matchId),
+  ).length;
   return (
     <div className="space-y-4">
       <div>
@@ -354,11 +375,11 @@ function SelectStep({
                     {m.matchType}
                   </span>
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {m.currentSignups} signed up · {m.minPlayers}–{m.maxPlayers} needed
-                  {m.status === 'optimized' && (
-                    <span className="ml-2 text-blue-600 font-medium">· already optimized</span>
-                  )}
+                <p className="text-xs text-gray-400 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>{t('coach.batchSignupLine', { count: m.currentSignups, min: m.minPlayers, max: m.maxPlayers })}</span>
+                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${STATUS_STYLE[m.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {t(`coach.status.${m.status}`, { defaultValue: m.status })}
+                  </span>
                 </p>
               </div>
             </div>
@@ -366,12 +387,24 @@ function SelectStep({
         })}
       </div>
 
+      {/* Optimizing moves a match to `optimized`, which shuts its sign-up window.
+          Say so before the coach commits, since picking an open match is now the
+          normal case rather than something the list used to prevent. */}
+      {openSelectedCount > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3">
+          <p className="text-sm text-yellow-800">
+            {t('coach.batchClosesSignups', { count: openSelectedCount })}
+          </p>
+          <p className="text-xs text-yellow-700 mt-0.5">{t('coach.batchClosesSignupsHint')}</p>
+        </div>
+      )}
+
       {selectedMatchIds.size > 0 && (
         <button
           onClick={onNext}
           className="w-full bg-brand-green hover:bg-brand-green-700 text-white font-medium py-2.5 rounded-lg transition-colors"
         >
-          Configure {selectedMatchIds.size} match{selectedMatchIds.size > 1 ? 'es' : ''} →
+          {t('coach.batchConfigure', { count: selectedMatchIds.size })}
         </button>
       )}
     </div>

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../src/app.js';
 import { createTestUser, deleteTestUser, supabaseAdmin, type TestUser } from './helpers/users.js';
-import { createTestMatch, deleteTestMatch } from './helpers/data.js';
+import { createTestMatch, deleteTestMatch, PAST_DATE } from './helpers/data.js';
 
 describe('Role enforcement', () => {
   let player: TestUser;
@@ -16,7 +16,9 @@ describe('Role enforcement', () => {
       createTestUser('coach', '-role'),
       createTestUser('admin', '-role'),
     ]);
-    const match = await createTestMatch();
+    // Played a week ago: the result-entry tests below need a match that has
+    // already kicked off.
+    const match = await createTestMatch({ match_date: PAST_DATE });
     matchId = match.match_id;
   });
 

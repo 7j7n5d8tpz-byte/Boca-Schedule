@@ -466,6 +466,7 @@
     "opponent": "Modstander",
     "continue": "Fortsæt →",
     "back": "← Tilbage",
+    "notPlayedYet": "Kampen er ikke spillet endnu — resultatet kan først indtastes efter kampstart.",
     "optional": "valgfrit",
     "steps": {
       "score": "Resultat",
@@ -851,6 +852,7 @@
     "afterBatch": "Efter optimeringen",
     "thisBatch": "Denne omgang",
     "player": "Spiller",
+    "historicalFutureDate": "Kampen skal være spillet — vælg en dato, der er passeret.",
     "historicalSub": "Registrér en kamp, der allerede er spillet. Bagefter indtaster du resultat, målscorere, assists og kampens spiller.",
     "whoPlayed": "Hvem spillede?",
     "selectedCount": "({{count}} valgt)",

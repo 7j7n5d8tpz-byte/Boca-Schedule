@@ -486,6 +486,36 @@ export default function MatchResults() {
   const date  = match ? new Date(`${match.matchDate}T${match.matchTime}`) : null;
   const currentEntry = goalEntries[goalIndex] ?? { scorerId: null, assisterId: null };
 
+  // Nothing to record before the match has been played. The backend refuses the
+  // save too — this is so the wizard never opens on a game that hasn't started.
+  if (match && !match.kickoffPassed) {
+    return (
+      <div className="min-h-screen bg-gray-50 boca-page">
+        <AppNav onBack={() => navigate(-1)} />
+        <main className="max-w-lg mx-auto px-4 py-8 space-y-6">
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900">{t('results.title')}</h1>
+            {date && (
+              <p className="text-gray-500 mt-1">
+                {formatDate(date, 'long')} · {match.matchTime.slice(0, 5)}
+                {match.opponent && <span className="text-gray-700 font-medium"> · vs {match.opponent}</span>}
+              </p>
+            )}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <p className="text-sm text-gray-600">{t('results.notPlayedYet')}</p>
+            <button
+              onClick={() => navigate(-1)}
+              className="w-full bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
+            >
+              {t('results.back')}
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
       <AppNav onBack={() => navigate(-1)} />

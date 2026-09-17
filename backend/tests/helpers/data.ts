@@ -3,6 +3,11 @@ import { supabaseAdmin } from './users.js';
 const FUTURE_DATE = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   .toISOString().split('T')[0];
 
+// A week ago. Results can only be recorded after kick-off, so any match a test
+// records a result for has to be dated in the past.
+export const PAST_DATE = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  .toISOString().split('T')[0];
+
 // Singleton promise ensures only one system coach is created even under concurrent calls.
 // process.env persists across module re-evaluations within the same Vitest process.
 let _systemCoachPromise: Promise<string> | null = null;

@@ -12,6 +12,9 @@ interface RosterPlayer {
   preferredPositions: string[];
 }
 
+// Today in the browser's zone — the latest date a backfilled match can carry.
+const todayStr = new Date().toLocaleDateString('en-CA');
+
 export default function HistoricalMatch() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -60,6 +63,9 @@ export default function HistoricalMatch() {
     e.preventDefault();
     setError('');
     if (!matchDate) { setError(t('coach.dateRequired')); return; }
+    // Backfill only: a future date would open the results wizard on a match
+    // that hasn't been played, and the backend rejects it too.
+    if (matchDate > todayStr) { setError(t('coach.historicalFutureDate')); return; }
     mutation.mutate();
   }
 
@@ -83,6 +89,7 @@ export default function HistoricalMatch() {
                 id="matchDate"
                 type="date"
                 required
+                max={todayStr}
                 value={matchDate}
                 onChange={e => setMatchDate(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"

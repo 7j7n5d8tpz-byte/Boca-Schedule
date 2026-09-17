@@ -31,6 +31,7 @@ interface Match {
   userSignedUp: boolean;
   signupId: string | null;
   signupDeadlinePassed: boolean;
+  kickoffPassed: boolean;
   lateSignupOpen: boolean;
   lateSignupSpotsLeft: number | null;
   signupIsLate: boolean;
@@ -520,7 +521,7 @@ export default function PlayerDashboard() {
   const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
   const canEnterResults = isCoachOrAdmin || myPermission?.canEnterResults;
 
-  const { data: resultMatches } = useQuery<{ matchId: string; matchDate: string; matchTime: string; location: string; status: string; matchType: string; opponent: string | null; hasResult: boolean }[]>({
+  const { data: resultMatches } = useQuery<{ matchId: string; matchDate: string; matchTime: string; location: string; status: string; matchType: string; opponent: string | null; hasResult: boolean; kickoffPassed: boolean }[]>({
     queryKey: ['result-matches'],
     queryFn: () => api.get('/matches/upcoming?status=published,completed').then(r => r.data.data.matches ?? []),
     enabled: !!canEnterResults,
@@ -692,7 +693,9 @@ export default function PlayerDashboard() {
           </div>
         )}
         {canEnterResults && (() => {
-          const pending  = (resultMatches ?? []).filter(m => !m.hasResult);
+          // Only matches that have actually kicked off — a published match days
+          // away used to sit here inviting a score for a game nobody had played.
+          const pending  = (resultMatches ?? []).filter(m => !m.hasResult && m.kickoffPassed);
           const recorded = (resultMatches ?? []).filter(m =>  m.hasResult);
           if (!resultMatches || (!pending.length && !recorded.length)) return null;
           return (

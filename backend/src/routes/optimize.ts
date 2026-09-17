@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/requireRole.js';
 import { optimizeMatch } from '../lib/optimizer.js';
 import { sendSelectionNotifications, sendDeselectionNotifications } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
+import { kickoffInstant } from '../lib/clubTime.js';
 
 const router = Router({ mergeParams: true });
 
@@ -158,6 +159,8 @@ router.get('/selections', authenticate, async (req, res, next) => {
           maxPlayers: match.max_players,
           signupOpenDate: match.signup_open_date,
           signupCloseDate: match.signup_close_date,
+          // Result entry opens at kick-off; the results wizard gates on this.
+          kickoffPassed: kickoffInstant(match.match_date, match.match_time) <= new Date(),
           optimizationResult: match.optimization_result ?? null,
         },
         players,

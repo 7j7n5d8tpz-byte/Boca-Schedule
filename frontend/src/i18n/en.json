@@ -466,6 +466,7 @@
     "opponent": "Opponent",
     "continue": "Continue →",
     "back": "← Back",
+    "notPlayedYet": "This match hasn't been played yet — the result can only be entered once it has kicked off.",
     "optional": "optional",
     "steps": {
       "score": "Score",
@@ -851,6 +852,7 @@
     "afterBatch": "After batch",
     "thisBatch": "This batch",
     "player": "Player",
+    "historicalFutureDate": "The match must already have been played — pick a date in the past.",
     "historicalSub": "Backfill an already-played match. Next you'll enter the score, scorers, assists and man of the match.",
     "whoPlayed": "Who played?",
     "selectedCount": "({{count}} selected)",

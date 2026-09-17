@@ -158,8 +158,8 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
       // Past the deadline, sign-ups reopen while the match is short of players.
       // Kick-off counts as the deadline whatever the coach set, so a match that
       // has already been played never shows a sign-up button.
-      const deadlinePassed = new Date(m.signup_close_date) < new Date()
-        || kickoffInstant(m.match_date, m.match_time) <= new Date();
+      const kickoffPassed = kickoffInstant(m.match_date, m.match_time) <= new Date();
+      const deadlinePassed = new Date(m.signup_close_date) < new Date() || kickoffPassed;
       const lateOpen = deadlinePassed && lateSignupOpen(m, signups.length);
       return {
         matchId: m.match_id,
@@ -179,6 +179,10 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
         userSignedUp: !!mySignup,
         signupId: mySignup?.signup_id ?? null,
         signupDeadlinePassed: deadlinePassed,
+        // Kick-off has been and gone, so the match can carry a result. Drives the
+        // "Record results" lists — a published match that hasn't been played yet
+        // must never offer result entry.
+        kickoffPassed,
         // Sign-ups reopened because the match is short of players, and how many
         // more can still come in. Null spots-left outside the late window — there
         // is deliberately no cap on sign-ups before the deadline.
@@ -408,6 +412,18 @@ router.post('/historical', authenticate, requireRole('coach', 'admin'), async (r
     const d = body.data;
 
     const matchTime = d.matchTime ? (d.matchTime.length === 5 ? `${d.matchTime}:00` : d.matchTime) : '18:00:00';
+
+    // "Already played" is the whole point of this endpoint: a future kick-off
+    // would land the coach straight in the results wizard for a match nobody
+    // has played, which result entry rejects anyway.
+    if (kickoffInstant(d.matchDate, matchTime) > new Date()) {
+      res.status(422).json({
+        success: false,
+        error: { code: 'MATCH_NOT_PLAYED', message: 'Kampen skal være spillet — vælg en dato og et tidspunkt, der er passeret' },
+      });
+      return;
+    }
+
     const minPlayers = TYPE_MIN_PLAYERS[d.matchType];
     const maxPlayers = Math.max(minPlayers, d.participantIds.length || minPlayers);
 

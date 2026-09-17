@@ -21,6 +21,7 @@ interface Match {
   minPlayers: number;
   maxPlayers: number;
   signupDeadlinePassed: boolean;
+  kickoffPassed: boolean;
 }
 
 interface Announcement {
@@ -227,7 +228,9 @@ export default function CoachDashboard() {
   });
   const totalSignups = matches.reduce((s, m) => s + m.currentSignups, 0);
   const readyToOptimize = matches.filter(m => m.status === 'signup_closed' || m.status === 'optimized').length;
-  const pendingResults   = matches.filter(m => m.status === 'published');
+  // Published, and played: kick-off has to be behind us before a result can be
+  // entered, otherwise the list offers result entry for matches weeks away.
+  const pendingResults   = matches.filter(m => m.status === 'published' && m.kickoffPassed);
   const completedResults = matches.filter(m => m.status === 'completed');
 
   return (

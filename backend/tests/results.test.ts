@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../src/app.js';
 import { createTestUser, deleteTestUser, supabaseAdmin, type TestUser } from './helpers/users.js';
-import { createTestMatch, deleteTestMatch, signupPlayer, selectPlayer } from './helpers/data.js';
+import { createTestMatch, deleteTestMatch, signupPlayer, selectPlayer, PAST_DATE } from './helpers/data.js';
 
 describe('Results', () => {
   let coach: TestUser;
@@ -16,7 +16,7 @@ describe('Results', () => {
       createTestUser('player', '-res1'),
       createTestUser('player', '-res2'),
     ]);
-    const match = await createTestMatch({ status: 'completed' });
+    const match = await createTestMatch({ status: 'completed', match_date: PAST_DATE });
     matchId = match.match_id;
 
     // Sign up and select both players
@@ -94,6 +94,25 @@ describe('Results', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.result.goalsFor).toBe(5);
     expect(res.body.data.result.gameAssessment).toBe('dominated');
+  });
+
+  it('rejects a result for a match that has not been played yet', async () => {
+    const future = await createTestMatch({ status: 'published' });
+    try {
+      const res = await request(app)
+        .post(`/api/matches/${future.match_id}/results`)
+        .set('Authorization', `Bearer ${coach.token}`)
+        .send(validPayload());
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('MATCH_NOT_PLAYED');
+
+      // Nothing was written.
+      const { data: saved } = await supabaseAdmin
+        .from('match_results').select('result_id').eq('match_id', future.match_id).maybeSingle();
+      expect(saved).toBeNull();
+    } finally {
+      await deleteTestMatch(future.match_id);
+    }
   });
 
   it('rejects results without required score fields', async () => {

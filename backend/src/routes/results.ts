@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { createNotifications } from '../lib/notifications.js';
 import { recomputeForMatch } from '../lib/achievementsStore.js';
+import { kickoffInstant } from '../lib/clubTime.js';
 
 const router = Router();
 
@@ -72,6 +73,27 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
     const { data: userRow } = await supabaseAdmin.from('users').select('can_enter_results').eq('user_id', userId).single();
     if (!canEditResults(req.user!.role, userRow?.can_enter_results ?? false)) {
       res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Du har ikke adgang til at registrere resultater' } });
+      return;
+    }
+
+    // A result can only be recorded once the match has actually been played.
+    // Published matches show up in the "Record results" list as soon as the
+    // squad is out, which let anyone type a score for a game weeks away.
+    // Kick-off is the line: it is also when a match auto-completes.
+    const { data: match } = await supabaseAdmin
+      .from('matches')
+      .select('match_date, match_time, status')
+      .eq('match_id', matchId)
+      .maybeSingle();
+    if (!match) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Kampen blev ikke fundet' } });
+      return;
+    }
+    if (kickoffInstant(match.match_date, match.match_time) > new Date()) {
+      res.status(409).json({
+        success: false,
+        error: { code: 'MATCH_NOT_PLAYED', message: 'Kampen er ikke spillet endnu — resultatet kan først indtastes efter kampstart' },
+      });
       return;
     }
 
@@ -148,8 +170,7 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
     }
 
     // Advance match to completed if still published
-    const { data: match } = await supabaseAdmin.from('matches').select('status').eq('match_id', matchId).single();
-    if (match?.status === 'published') {
+    if (match.status === 'published') {
       await supabaseAdmin.from('matches').update({ status: 'completed' }).eq('match_id', matchId);
     }
 

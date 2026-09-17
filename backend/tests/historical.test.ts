@@ -79,6 +79,17 @@ describe('Historical matches', () => {
     expect(res.status).toBe(403);
   });
 
+  it('rejects a backfill dated in the future', async () => {
+    const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const res = await request(app)
+      .post('/api/matches/historical')
+      .set('Authorization', `Bearer ${coach.token}`)
+      .send({ matchDate: future, matchType: '7-player', participantIds: [] });
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('MATCH_NOT_PLAYED');
+    if (res.body.data?.matchId) matchIds.push(res.body.data.matchId);
+  });
+
   it('works with no participants (score-only backfill)', async () => {
     const res = await request(app)
       .post('/api/matches/historical')

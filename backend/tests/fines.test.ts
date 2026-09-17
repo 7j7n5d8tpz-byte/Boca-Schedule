@@ -223,5 +223,28 @@ describe('Fines', () => {
       expect(Array.isArray(d.typeBreakdown)).toBe(true);
       expect(typeof d.perGameDkk).toBe('number');
     });
+
+    it('breaks fines down per match, including matches with none', async () => {
+      // A fine on the test match, plus the clean-sheet case: the match must appear
+      // in the list either way, and its total must reconcile with its own lines.
+      const issued = await request(app).post('/api/fines').set(auth(admin.token))
+        .send({ playerId: target.userId, fineTypeId, matchId });
+      expect(issued.status).toBe(201);
+
+      const res = await request(app).get('/api/fines/stats').set(auth(admin.token));
+      const perMatch = res.body.data.perMatch as any[];
+      expect(Array.isArray(perMatch)).toBe(true);
+
+      const row = perMatch.find(m => m.matchId === matchId);
+      expect(row).toBeDefined();
+      expect(row.count).toBeGreaterThanOrEqual(1);
+      expect(row.totalDkk).toBe(row.lines.reduce((a: number, l: any) => a + l.amountDkk, 0));
+      expect(row.lines.some((l: any) => l.playerName === target.name)).toBe(true);
+
+      // Matches nobody was fined in still get a row, at 0 kr.
+      expect(perMatch.every(m => m.count > 0 || m.totalDkk === 0)).toBe(true);
+
+      await supabaseAdmin.from('fines').delete().eq('fine_id', issued.body.data.fineId);
+    });
   });
 });

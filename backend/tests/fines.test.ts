@@ -193,6 +193,64 @@ describe('Fines', () => {
 
   // ─── Catalogue + stats ──────────────────────────────────────────────────────────
 
+  describe('editing a fine', () => {
+    it('lists matches a fine can be attached to', async () => {
+      const res = await request(app).get('/api/fines/matches').set(auth(player.token));
+      expect(res.status).toBe(200);
+      const hit = res.body.data.find((m: any) => m.matchId === matchId);
+      expect(hit).toBeDefined();
+      expect(typeof hit.label).toBe('string');
+    });
+
+    it('lets a fine admin file a match-less fine under its match', async () => {
+      const issued = await request(app).post('/api/fines').set(auth(admin.token))
+        .send({ playerId: target.userId, amountDkk: 40, reason: 'Ingen kamp endnu' });
+      const fineId = issued.body.data.fineId;
+
+      const edited = await request(app).put(`/api/fines/${fineId}`).set(auth(admin.token)).send({ matchId });
+      expect(edited.status).toBe(200);
+
+      const stats = await request(app).get('/api/fines/stats').set(auth(admin.token));
+      const row = (stats.body.data.perMatch as any[]).find(m => m.matchId === matchId);
+      expect(row.lines.some((l: any) => l.amountDkk === 40 && l.label === 'Ingen kamp endnu')).toBe(true);
+
+      await supabaseAdmin.from('fines').delete().eq('fine_id', fineId);
+    });
+
+    it('re-snapshots the amount when the type changes, and blocks non-admins', async () => {
+      const issued = await request(app).post('/api/fines').set(auth(admin.token))
+        .send({ playerId: target.userId, amountDkk: 1, reason: 'Forkert beløb' });
+      const fineId = issued.body.data.fineId;
+
+      const denied = await request(app).put(`/api/fines/${fineId}`).set(auth(player.token)).send({ matchId });
+      expect(denied.status).toBe(403);
+
+      const edited = await request(app).put(`/api/fines/${fineId}`).set(auth(admin.token)).send({ fineTypeId });
+      expect(edited.status).toBe(200);
+      const { data } = await supabaseAdmin.from('fines').select('amount_dkk').eq('fine_id', fineId).single();
+      expect(data!.amount_dkk).toBe(typeAmount);
+
+      await supabaseAdmin.from('fines').delete().eq('fine_id', fineId);
+    });
+
+    it('refuses to strip the last thing that says what a fine was for', async () => {
+      const issued = await request(app).post('/api/fines').set(auth(admin.token))
+        .send({ playerId: target.userId, amountDkk: 20, reason: 'Kun en begrundelse' });
+      const fineId = issued.body.data.fineId;
+
+      const res = await request(app).put(`/api/fines/${fineId}`).set(auth(admin.token)).send({ reason: '' });
+      expect(res.status).toBe(422);
+
+      await supabaseAdmin.from('fines').delete().eq('fine_id', fineId);
+    });
+
+    it('still routes PUT /fines/payment-info past the :id route', async () => {
+      const res = await request(app).put('/api/fines/payment-info').set(auth(admin.token)).send({ paymentInfo: '2203EK' });
+      expect(res.status).toBe(200);
+      expect(res.body.data.paymentInfo).toBe('2203EK');
+    });
+  });
+
   describe('catalogue & stats', () => {
     it('restricts fine-type creation to fine admins', async () => {
       const denied = await request(app).post('/api/fine-types').set(auth(player.token))

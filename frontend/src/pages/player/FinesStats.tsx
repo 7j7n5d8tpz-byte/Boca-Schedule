@@ -139,9 +139,7 @@ export default function FinesStats() {
       </div>
 
       {/* Per-match breakdown */}
-      <Panel title={t('fines.perMatchTitle')}>
-        <PerMatchTable matches={data.perMatch} />
-      </Panel>
+      <PerMatchPanel matches={data.perMatch} />
 
       {/* Charts */}
       <Panel title={t('fines.whatWeGetFinedFor')}>
@@ -177,9 +175,113 @@ export default function FinesStats() {
 }
 
 /**
- * Fines per match — every completed match in the period, fined or not, expandable
- * to the individual fines. Stacked cards on phones, table on sm+ (see CLAUDE.md).
+ * Fines per match. The chart is the overview — one column per completed match in
+ * the period, chronological, zero-fine matches included as an empty slot — and
+ * clicking a column drops that match's individual fines underneath.
+ *
+ * The table is the same numbers for anyone who'd rather read them (and for
+ * screen readers, which get nothing from the SVG).
  */
+function PerMatchPanel({ matches }: { matches: PerMatch[] }) {
+  const { t } = useTranslation();
+  const [view, setView] = useState<'chart' | 'table'>('chart');
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h3 className="text-sm font-semibold text-gray-700">{t('fines.perMatchTitle')}</h3>
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+          {(['chart', 'table'] as const).map((v, i) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`px-2.5 py-1 ${i > 0 ? 'border-l border-gray-200' : ''} ${view === v ? 'bg-brand-green text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+            >
+              {v === 'chart' ? t('fines.perMatchChart') : t('fines.perMatchTable')}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {view === 'chart' ? <PerMatchChart matches={matches} /> : <PerMatchTable matches={matches} />}
+      </div>
+    </div>
+  );
+}
+
+// Roughly a thumb's width per column: below this the bars stop being aimable, so
+// the plot scrolls sideways on a phone instead of shrinking into a comb.
+const MIN_COLUMN_PX = 34;
+
+function PerMatchChart({ matches }: { matches: PerMatch[] }) {
+  const { t } = useTranslation();
+  const [selected, setSelected] = useState<string | null>(null);
+
+  if (matches.length === 0) {
+    return <p className="px-4 py-3 text-sm text-gray-400">{t('fines.perMatchEmpty')}</p>;
+  }
+
+  // The API sorts newest-first for the table; time reads left-to-right in a chart.
+  const rows = [...matches].reverse().map(m => ({
+    ...m,
+    short: new Date(m.matchDate).toLocaleDateString('da-DK', { day: 'numeric', month: 'numeric' }),
+  }));
+  const picked = rows.find(m => m.matchId === selected) ?? null;
+
+  return (
+    <div>
+      <div className="overflow-x-auto p-3">
+        <div style={{ minWidth: Math.max(rows.length * MIN_COLUMN_PX, 280) }}>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart
+              data={rows}
+              margin={{ left: -8, right: 8, top: 8, bottom: 0 }}
+              barCategoryGap={2}
+              onClick={(e: any) => {
+                const id = e?.activePayload?.[0]?.payload?.matchId;
+                if (id) setSelected(prev => (prev === id ? null : id));
+              }}
+            >
+              <CartesianGrid vertical={false} stroke="#f3f4f6" />
+              <XAxis dataKey="short" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} width={44} />
+              <Tooltip cursor={{ fill: '#f9fafb' }} content={<PerMatchTooltip />} />
+              <Bar dataKey="totalDkk" fill={GREEN} radius={[4, 4, 0, 0]} maxBarSize={24} cursor="pointer" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {picked ? (
+        <div className="border-t border-gray-100 px-4 py-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm font-medium text-gray-800 min-w-0 truncate">{picked.label}</p>
+            <p className="text-sm font-semibold font-numeric text-gray-900 shrink-0">{kr(picked.totalDkk)}</p>
+          </div>
+          {picked.count === 0
+            ? <p className="text-xs text-gray-400 mt-1">{t('fines.perMatchClean')}</p>
+            : <FineLines lines={picked.lines} />}
+        </div>
+      ) : (
+        <p className="border-t border-gray-100 px-4 py-2.5 text-xs text-gray-400">{t('fines.perMatchPickHint')}</p>
+      )}
+    </div>
+  );
+}
+
+function PerMatchTooltip({ active, payload }: any) {
+  const { t } = useTranslation();
+  if (!active || !payload?.length) return null;
+  const m: PerMatch = payload[0].payload;
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 text-xs max-w-[15rem]">
+      <p className="font-medium text-gray-800">{m.label}</p>
+      <p className="font-numeric text-gray-900">{kr(m.totalDkk)}</p>
+      <p className="text-gray-400">{m.count === 0 ? t('fines.perMatchClean') : t('fines.perMatchCount', { count: m.count })}</p>
+    </div>
+  );
+}
+
 const PER_MATCH_COLLAPSED = 10;
 
 function PerMatchTable({ matches }: { matches: PerMatch[] }) {

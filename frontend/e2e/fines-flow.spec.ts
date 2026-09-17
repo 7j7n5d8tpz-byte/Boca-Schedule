@@ -57,12 +57,18 @@ test.describe('Fines flow', () => {
     await loginAs(page, 'admin');
     await page.goto('/fines/manage');
 
-    const claimRow = page.locator('div.py-3', { hasText: marker });
+    // This fine was issued without a match, so it is also listed in the
+    // "missing a match" queue — scope to the payments section, not the page.
+    const confirmQueue = page
+      .locator('div', { has: page.getByRole('heading', { name: /payments to confirm/i }) })
+      .last();
+
+    const claimRow = confirmQueue.locator('div.py-3', { hasText: marker });
     await expect(claimRow).toBeVisible({ timeout: 8_000 });
     await claimRow.getByRole('button', { name: /^confirm$/i }).click();
 
     // Confirmed → the fine leaves the "payments to confirm" queue.
-    await expect(page.getByText(marker)).toHaveCount(0, { timeout: 8_000 });
+    await expect(confirmQueue.getByText(marker)).toHaveCount(0, { timeout: 8_000 });
 
     // A paid fine stays in every player's transparency table, so void it.
     await clearFines(page.request, adminToken, MARKER_PREFIX);

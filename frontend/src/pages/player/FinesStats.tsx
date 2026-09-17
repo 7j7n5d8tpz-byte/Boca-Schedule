@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -13,6 +13,15 @@ import type { ReactNode } from 'react';
 const GREEN = '#205B3B';
 const CRIMSON = '#c41230';
 
+interface PerMatch {
+  matchId: string;
+  matchDate: string;
+  label: string;
+  totalDkk: number;
+  count: number;
+  lines: { playerName: string | null; label: string; amountDkk: number }[];
+}
+
 interface StatsData {
   availableYears: number[];
   pot: { collectedDkk: number; outstandingDkk: number; totalDkk: number };
@@ -23,6 +32,7 @@ interface StatsData {
   perGameDkk: number;
   biggestFine: { playerName: string; label: string; amountDkk: number; when: string } | null;
   mostExpensiveMatch: { label: string; totalDkk: number } | null;
+  perMatch: PerMatch[];
   typeBreakdown: { label: string; count: number; totalDkk: number }[];
   overTime: { period: string; label: string; totalDkk: number }[];
   fineCount: number;
@@ -128,6 +138,11 @@ export default function FinesStats() {
         </Panel>
       </div>
 
+      {/* Per-match breakdown */}
+      <Panel title={t('fines.perMatchTitle')}>
+        <PerMatchTable matches={data.perMatch} />
+      </Panel>
+
       {/* Charts */}
       <Panel title={t('fines.whatWeGetFinedFor')}>
         <div className="p-3">
@@ -158,6 +173,119 @@ export default function FinesStats() {
         </Panel>
       )}
     </div>
+  );
+}
+
+/**
+ * Fines per match — every completed match in the period, fined or not, expandable
+ * to the individual fines. Stacked cards on phones, table on sm+ (see CLAUDE.md).
+ */
+const PER_MATCH_COLLAPSED = 10;
+
+function PerMatchTable({ matches }: { matches: PerMatch[] }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [showAll, setShowAll] = useState(false);
+
+  if (matches.length === 0) {
+    return <p className="px-4 py-3 text-sm text-gray-400">{t('fines.perMatchEmpty')}</p>;
+  }
+
+  const toggle = (id: string) => setOpen(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+
+  const shown = showAll ? matches : matches.slice(0, PER_MATCH_COLLAPSED);
+
+  return (
+    <>
+      {/* Phones — stacked cards */}
+      <div className="sm:hidden divide-y divide-gray-100">
+        {shown.map(m => (
+          <div key={m.matchId}>
+            <button
+              onClick={() => m.count > 0 && toggle(m.matchId)}
+              disabled={m.count === 0}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left disabled:cursor-default"
+            >
+              <span className="min-w-0">
+                <span className={`block text-sm font-medium truncate ${m.count === 0 ? 'text-gray-400' : 'text-gray-800'}`}>{m.label}</span>
+                <span className="block text-xs text-gray-400">
+                  {m.count === 0 ? t('fines.perMatchClean') : t('fines.perMatchCount', { count: m.count })}
+                </span>
+              </span>
+              <span className="shrink-0 flex items-center gap-2">
+                <span className={`text-sm font-semibold font-numeric ${m.count === 0 ? 'text-gray-300' : 'text-gray-900'}`}>{kr(m.totalDkk)}</span>
+                {m.count > 0 && <span className={`text-gray-300 transition-transform ${open.has(m.matchId) ? 'rotate-90' : ''}`}>›</span>}
+              </span>
+            </button>
+            {open.has(m.matchId) && <div className="px-4 pb-3 -mt-1"><FineLines lines={m.lines} /></div>}
+          </div>
+        ))}
+      </div>
+
+      {/* sm+ — table */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
+              <th className="font-medium px-4 py-2">{t('fines.perMatchMatch')}</th>
+              <th className="font-medium px-4 py-2 text-right whitespace-nowrap">{t('fines.perMatchFines')}</th>
+              <th className="font-medium px-4 py-2 text-right whitespace-nowrap">{t('fines.perMatchAmount')}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {shown.map(m => (
+              <Fragment key={m.matchId}>
+                <tr
+                  onClick={() => m.count > 0 && toggle(m.matchId)}
+                  className={m.count > 0 ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}
+                >
+                  <td className={`px-4 py-2.5 ${m.count === 0 ? 'text-gray-400' : 'text-gray-800 font-medium'}`}>
+                    {m.count > 0 && <span className={`inline-block text-gray-300 mr-1.5 transition-transform ${open.has(m.matchId) ? 'rotate-90' : ''}`}>›</span>}
+                    {m.label}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-numeric text-gray-500">{m.count || '—'}</td>
+                  <td className={`px-4 py-2.5 text-right font-numeric font-semibold ${m.count === 0 ? 'text-gray-300' : 'text-gray-900'}`}>{kr(m.totalDkk)}</td>
+                </tr>
+                {open.has(m.matchId) && (
+                  <tr>
+                    <td colSpan={3} className="px-4 pb-3 pt-0 bg-gray-50/50"><FineLines lines={m.lines} /></td>
+                  </tr>
+                )}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {matches.length > PER_MATCH_COLLAPSED && (
+        <button
+          onClick={() => setShowAll(v => !v)}
+          className="w-full border-t border-gray-100 px-4 py-2.5 text-xs font-medium text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          {showAll ? t('fines.perMatchShowFewer') : t('fines.perMatchShowAll', { count: matches.length })}
+        </button>
+      )}
+    </>
+  );
+}
+
+function FineLines({ lines }: { lines: PerMatch['lines'] }) {
+  return (
+    <ul className="divide-y divide-gray-50">
+      {lines.map((l, i) => (
+        <li key={i} className="flex items-baseline justify-between gap-3 py-1.5 text-xs">
+          <span className="min-w-0 truncate text-gray-600">
+            <span className="font-medium text-gray-800">{l.playerName ?? '—'}</span> · {l.label}
+          </span>
+          <span className="shrink-0 font-numeric text-gray-500">{kr(l.amountDkk)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

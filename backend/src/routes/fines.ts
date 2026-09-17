@@ -301,19 +301,20 @@ router.get('/fines/stats', authenticate, async (req, res, next) => {
     const [{ data: fineRows, error }, { data: roster }, { data: matchRows }, { data: selRows }] = await Promise.all([
       supabaseAdmin.from('fines').select(FINE_SELECT).in('status', ['approved', 'payment_claimed', 'paid']),
       supabaseAdmin.from('users').select('user_id, name').eq('is_active', true).in('role', ['player', 'coach', 'admin']),
-      supabaseAdmin.from('matches').select('match_id, match_date').in('status', ['completed', 'published']),
+      supabaseAdmin.from('matches').select('match_id, match_date, match_time, opponent').in('status', ['completed', 'published']),
       supabaseAdmin.from('selections').select('player_id, match_id'),
     ]);
     if (error) throw error;
 
-    let fines = (fineRows ?? []).map(mapFine);
-    const availableYears = [...new Set(fines.map(f => new Date(f.createdAt).getFullYear()))].sort((a, b) => b - a);
+    const allFines = (fineRows ?? []).map(mapFine);
+    const availableYears = [...new Set(allFines.map(f => new Date(f.createdAt).getFullYear()))].sort((a, b) => b - a);
 
     const inYear = (iso: string) => yearParam === 'all' || new Date(iso).getFullYear() === Number(yearParam);
-    fines = fines.filter(f => inYear(f.createdAt));
+    const fines = allFines.filter(f => inYear(f.createdAt));
 
     // Completed matches in the period, and per-player squad appearances (denominator for kr/game).
-    const completedMatchIds = new Set((matchRows ?? []).filter((m: any) => inYear(m.match_date)).map((m: any) => m.match_id));
+    const periodMatches = (matchRows ?? []).filter((m: any) => inYear(m.match_date));
+    const completedMatchIds = new Set(periodMatches.map((m: any) => m.match_id));
     const matchCount = completedMatchIds.size;
     const gamesPlayed = new Map<string, number>();
     for (const s of (selRows ?? [])) {
@@ -390,6 +391,35 @@ router.get('/fines/stats', authenticate, async (req, res, next) => {
     }
     const mostExpensiveMatch = [...byMatch.values()].sort((a, b) => b.totalDkk - a.totalDkk)[0] ?? null;
 
+    // Bøder pr. kamp — every completed match in the period, fined or not (a clean
+    // sheet is part of the overview, and it keeps the list consistent with the
+    // kr/kamp average, which divides by all completed matches).
+    //
+    // Keyed on the MATCH date, unlike the stats above, which key on when the fine
+    // was issued: a fine entered in January for a December match belongs to that
+    // December match. A fine whose match isn't completed/published — or falls
+    // outside the period — simply has no row to hang on and is left out here.
+    const linesByMatch = new Map<string, { playerName: string | null; label: string; amountDkk: number }[]>();
+    for (const f of allFines) {
+      if (!f.matchId || !completedMatchIds.has(f.matchId)) continue;
+      const lines = linesByMatch.get(f.matchId) ?? [];
+      lines.push({ playerName: f.playerName, label: what(f), amountDkk: f.amountDkk });
+      linesByMatch.set(f.matchId, lines);
+    }
+    const perMatch = periodMatches
+      .map((m: any) => {
+        const lines = (linesByMatch.get(m.match_id) ?? []).sort((a, b) => b.amountDkk - a.amountDkk);
+        return {
+          matchId: m.match_id,
+          matchDate: m.match_date,
+          label: fineMatchLabel(m),
+          totalDkk: lines.reduce((a, l) => a + l.amountDkk, 0),
+          count: lines.length,
+          lines,
+        };
+      })
+      .sort((a, b) => String(b.matchDate).localeCompare(String(a.matchDate)));
+
     // Over time (by month)
     const byMonth = new Map<string, number>();
     for (const f of fines) {
@@ -414,6 +444,7 @@ router.get('/fines/stats', authenticate, async (req, res, next) => {
         perGameDkk,
         biggestFine,
         mostExpensiveMatch,
+        perMatch,
         typeBreakdown,
         overTime,
         fineCount: fines.length,

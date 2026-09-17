@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -43,6 +43,10 @@ interface AdminData {
 
 interface FineType { fineTypeId: string; label: string; amountDkk: number; active: boolean; sortOrder: number }
 interface PlayerLite { userId: string; name: string }
+interface MatchLite { matchId: string; matchDate: string; label: string }
+
+// Shared by the issue form and the edit dialog.
+const matchesQuery = { queryKey: ['fines-matches'], queryFn: () => api.get('/fines/matches').then(r => r.data.data) };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -225,12 +229,17 @@ export default function FinesView() {
 
 // ─── Manage (fine admins) — rendered on its own page ───────────────────────────
 
+// Years of fines were entered before a match could be attached, so this queue can
+// be hundreds long. Show a workable chunk rather than the whole backlog.
+const MISSING_MATCH_SHOWN = 15;
+
 export function ManageFines() {
   const { t } = useTranslation();
   const { formatDate } = useDateFormat();
   const what = useFineWhat();
   const qc = useQueryClient();
   const [drillPlayer, setDrillPlayer] = useState<{ id: string; name: string } | null>(null);
+  const [editFine, setEditFine] = useState<Fine | null>(null);
   const [q, setQ] = useState('');
   const [showHelp, setShowHelp] = useState(false);
   const { data } = useQuery<AdminData>({ queryKey: ['fines-admin'], queryFn: () => api.get('/fines/admin').then(r => r.data.data) });
@@ -241,6 +250,7 @@ export function ManageFines() {
     qc.invalidateQueries({ queryKey: ['fines-team'] });
     qc.invalidateQueries({ queryKey: ['fines-my'] });
     qc.invalidateQueries({ queryKey: ['fines-summary'] });
+    qc.invalidateQueries({ queryKey: ['fines-stats'] });
   };
 
   const approve = useMutation({ mutationFn: ({ id, ok }: { id: string; ok: boolean }) => api.put(`/fines/${id}/approve`, { approve: ok }), onSuccess: invalidate });
@@ -254,6 +264,9 @@ export function ManageFines() {
   const matches = (name: string) => !s || name.toLowerCase().includes(s);
   const paymentClaimed = data.paymentClaimed.filter(f => matches(f.playerName ?? ''));
   const overview = data.overview.filter(p => matches(p.name));
+  // Pending fines live outside the ledger, so both lists have to be checked.
+  const noMatchFines = [...data.pendingApproval, ...(ledger ?? [])]
+    .filter(f => !f.matchId && matches(f.playerName ?? ''));
 
   return (
     <div className="space-y-8">
@@ -339,6 +352,31 @@ export function ManageFines() {
         )}
       </Section>
 
+      {/* Fines nobody filed under a match — they're invisible in the per-match
+          overview until someone attaches one, so they get their own queue. */}
+      {noMatchFines.length > 0 && (
+        <Section title={t('fines.missingMatch', { count: noMatchFines.length })}>
+          <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
+            {noMatchFines.slice(0, MISSING_MATCH_SHOWN).map(f => (
+              <div key={f.fineId} className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{f.playerName} · {kr(f.amountDkk)}</p>
+                  <p className="text-xs text-gray-500 truncate">{what(f)} · {formatDate(f.createdAt, 'dayMonthYear')}</p>
+                </div>
+                <button onClick={() => setEditFine(f)} className="text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg shrink-0">
+                  {t('fines.addMatch')}
+                </button>
+              </div>
+            ))}
+            {noMatchFines.length > MISSING_MATCH_SHOWN && (
+              <p className="px-4 py-2.5 text-xs text-gray-400">
+                {t('fines.missingMatchMore', { shown: MISSING_MATCH_SHOWN, total: noMatchFines.length })}
+              </p>
+            )}
+          </div>
+        </Section>
+      )}
+
       <Section title={t('fines.whoOwesWhat')}>
         {overview.length === 0 ? <Empty>{s ? t('fines.noMatches') : t('fines.noFinesYet')}</Empty> : (
           <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
@@ -373,20 +411,24 @@ export function ManageFines() {
           fines={(ledger ?? []).filter(f => f.playerId === drillPlayer.id)}
           onConfirmPaid={id => confirmPaid.mutate(id)}
           onVoid={(id, reason) => voidFine.mutate({ id, reason })}
+          onEdit={setEditFine}
           onClose={() => setDrillPlayer(null)}
         />
       )}
+
+      {editFine && <EditFineDialog fine={editFine} onClose={() => setEditFine(null)} onSaved={invalidate} />}
     </div>
   );
 }
 
 // ─── Per-player drill-down (fine admins) ───────────────────────────────────────
 
-function PlayerFinesDialog({ playerName, fines, onConfirmPaid, onVoid, onClose }: {
+function PlayerFinesDialog({ playerName, fines, onConfirmPaid, onVoid, onEdit, onClose }: {
   playerName: string;
   fines: Fine[];
   onConfirmPaid: (id: string) => void;
   onVoid: (id: string, reason: string) => void;
+  onEdit: (fine: Fine) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -431,12 +473,20 @@ function PlayerFinesDialog({ playerName, fines, onConfirmPaid, onVoid, onClose }
                     <button onClick={() => { setVoidingId(null); setReason(''); }} className="text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg">{t('common.cancel')}</button>
                   </div>
                 </div>
-              ) : (f.status === 'approved' || f.status === 'payment_claimed') && (
+              ) : (
                 <div className="mt-2 flex gap-2 justify-end">
-                  <button onClick={() => onConfirmPaid(f.fineId)} className="text-xs font-medium bg-brand-green text-white px-3 py-1.5 rounded-lg">
-                    {f.status === 'approved' ? t('fines.markPaid') : t('fines.confirm')}
-                  </button>
-                  <button onClick={() => { setVoidingId(f.fineId); setReason(''); }} className="text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg">{t('fines.void')}</button>
+                  {(f.status === 'approved' || f.status === 'payment_claimed') && (
+                    <>
+                      <button onClick={() => onConfirmPaid(f.fineId)} className="text-xs font-medium bg-brand-green text-white px-3 py-1.5 rounded-lg">
+                        {f.status === 'approved' ? t('fines.markPaid') : t('fines.confirm')}
+                      </button>
+                      <button onClick={() => { setVoidingId(f.fineId); setReason(''); }} className="text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg">{t('fines.void')}</button>
+                    </>
+                  )}
+                  {/* A paid fine can still be filed under the right match. */}
+                  {f.status !== 'voided' && f.status !== 'rejected' && (
+                    <button onClick={() => onEdit(f)} className="text-xs font-medium border border-gray-300 text-gray-600 hover:bg-gray-50 px-3 py-1.5 rounded-lg">{t('fines.edit')}</button>
+                  )}
                 </div>
               )}
             </div>
@@ -458,19 +508,21 @@ function IssueFineForm({ onDone }: { onDone: () => void }) {
   const [fineTypeId, setFineTypeId] = useState('');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [matchId, setMatchId] = useState('');
   const [error, setError] = useState('');
 
   const { data: types } = useQuery<FineType[]>({ queryKey: ['fine-types'], queryFn: () => api.get('/fine-types').then(r => r.data.data), enabled: open });
   const { data: players } = useQuery<PlayerLite[]>({ queryKey: ['players-lite'], queryFn: () => api.get('/players').then(r => r.data.data), enabled: open });
+  const { data: matches } = useQuery<MatchLite[]>({ ...matchesQuery, enabled: open });
 
   // /players excludes the current user, so add a self option — a fine admin can fine themselves too.
   const playerOptions: PlayerLite[] = user ? [{ userId: user.userId, name: t('fines.youSuffix', { name: user.name }) }, ...(players ?? [])] : (players ?? []);
 
   const issue = useMutation({
     mutationFn: () => api.post('/fines', mode === 'list'
-      ? { playerId, fineTypeId, reason: reason || null }
-      : { playerId, amountDkk: Number(amount), reason }),
-    onSuccess: () => { setOpen(false); setPlayerId(''); setFineTypeId(''); setAmount(''); setReason(''); setError(''); onDone(); },
+      ? { playerId, fineTypeId, reason: reason || null, matchId: matchId || null }
+      : { playerId, amountDkk: Number(amount), reason, matchId: matchId || null }),
+    onSuccess: () => { setOpen(false); setPlayerId(''); setFineTypeId(''); setAmount(''); setReason(''); setMatchId(''); setError(''); onDone(); },
     onError: (e: any) => setError(e?.response?.data?.error?.message ?? t('fines.issueFailed')),
   });
 
@@ -507,6 +559,8 @@ function IssueFineForm({ onDone }: { onDone: () => void }) {
         <input type="number" min="0" value={amount} onChange={e => setAmount(e.target.value)} placeholder={t('fines.amountPlaceholder')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green" />
       )}
 
+      <MatchSelect matches={matches} value={matchId} onChange={setMatchId} />
+
       <input value={reason} onChange={e => setReason(e.target.value)} placeholder={mode === 'custom' ? t('fines.reasonRequired') : t('fines.noteOptional')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green" />
 
       {error && <p className="text-sm text-red-500">{error}</p>}
@@ -518,6 +572,107 @@ function IssueFineForm({ onDone }: { onDone: () => void }) {
       </div>
       <p className="text-xs text-gray-400">{t('fines.issueNote')}</p>
     </div>
+  );
+}
+
+/**
+ * Which match a fine belongs to. Almost every fine does, and only a fine that
+ * names its match can show up in the per-match overview — so the picker is part
+ * of issuing one, not an afterthought.
+ */
+function MatchSelect({ matches, value, onChange }: { matches: MatchLite[] | undefined; value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation();
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
+    >
+      <option value="">{t('fines.noMatch')}</option>
+      {(matches ?? []).map(m => <option key={m.matchId} value={m.matchId}>{m.label}</option>)}
+    </select>
+  );
+}
+
+// ─── Edit an existing fine (fine admins) ──────────────────────────────────────
+
+function EditFineDialog({ fine, onClose, onSaved }: { fine: Fine; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const [matchId, setMatchId] = useState(fine.matchId ?? '');
+  const [fineTypeId, setFineTypeId] = useState('');          // '' = keep it a custom fine
+  const [amount, setAmount] = useState(String(fine.amountDkk));
+  const [reason, setReason] = useState(fine.reason ?? '');
+  const [error, setError] = useState('');
+
+  const { data: types } = useQuery<FineType[]>({ queryKey: ['fine-types'], queryFn: () => api.get('/fine-types').then(r => r.data.data) });
+  const { data: matches } = useQuery<MatchLite[]>(matchesQuery);
+
+  // The ledger carries the type's label, not its id — match it back so the
+  // dropdown opens on the type the fine already has. Once only: a refetch of the
+  // catalogue must not undo a deliberate switch to "no type".
+  const typeResolved = useRef(false);
+  useEffect(() => {
+    if (typeResolved.current || !types || !fine.typeLabel) return;
+    typeResolved.current = true;
+    const hit = types.find(ft => ft.label === fine.typeLabel);
+    if (hit) setFineTypeId(hit.fineTypeId);
+  }, [types, fine.typeLabel]);
+
+  const save = useMutation({
+    mutationFn: () => api.put(`/fines/${fine.fineId}`, {
+      matchId: matchId || null,
+      fineTypeId: fineTypeId || null,
+      amountDkk: Number(amount),
+      reason: reason.trim() || null,
+    }),
+    onSuccess: () => { onSaved(); onClose(); },
+    onError: (e: any) => setError(e?.response?.data?.error?.message ?? t('fines.somethingWrong')),
+  });
+
+  // Picking a type pulls its current price in, so the form shows the amount that
+  // will actually be stored.
+  const pickType = (id: string) => {
+    setFineTypeId(id);
+    const hit = (types ?? []).find(ft => ft.fineTypeId === id);
+    if (hit) setAmount(String(hit.amountDkk));
+  };
+
+  return (
+    <Dialog title={t('fines.editFineTitle')} onClose={onClose} wide>
+      <p className="text-sm text-gray-500">{fine.playerName}</p>
+
+      <label className="block">
+        <span className="text-xs text-gray-500">{t('fines.editMatchLabel')}</span>
+        <div className="mt-1"><MatchSelect matches={matches} value={matchId} onChange={setMatchId} /></div>
+      </label>
+
+      <label className="block">
+        <span className="text-xs text-gray-500">{t('fines.editTypeLabel')}</span>
+        <select value={fineTypeId} onChange={e => pickType(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green">
+          <option value="">{t('fines.editNoType')}</option>
+          {(types ?? []).map(ft => <option key={ft.fineTypeId} value={ft.fineTypeId}>{ft.label} — {kr(ft.amountDkk)}</option>)}
+        </select>
+      </label>
+
+      <div className="flex gap-3">
+        <label className="block w-28 shrink-0">
+          <span className="text-xs text-gray-500">{t('fines.editAmountLabel')}</span>
+          <input type="number" min="0" value={amount} onChange={e => setAmount(e.target.value)} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green" />
+        </label>
+        <label className="block flex-1 min-w-0">
+          <span className="text-xs text-gray-500">{t('fines.editReasonLabel')}</span>
+          <input value={reason} onChange={e => setReason(e.target.value)} placeholder={fineTypeId ? t('fines.noteOptional') : t('fines.reasonRequired')} className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green" />
+        </label>
+      </div>
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
+      <div className="flex justify-end gap-2">
+        <button onClick={onClose} className="text-sm text-gray-600 hover:bg-gray-50 px-4 py-2 rounded-lg">{t('common.cancel')}</button>
+        <button onClick={() => save.mutate()} disabled={save.isPending || !amount} className="bg-brand-green text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50">
+          {save.isPending ? t('fines.saving') : t('fines.save')}
+        </button>
+      </div>
+    </Dialog>
   );
 }
 

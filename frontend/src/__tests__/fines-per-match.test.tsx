@@ -1,3 +1,4 @@
+import { cloneElement } from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -7,10 +8,14 @@ import FinesStats from '../pages/player/FinesStats';
 const { mockGet } = vi.hoisted(() => ({ mockGet: vi.fn() }));
 vi.mock('../api/client', () => ({ api: { get: mockGet } }));
 
-// Recharts needs a real box to render into; jsdom gives every element zero size.
+// Recharts measures its container, and jsdom reports every element as 0×0 — so the
+// chart renders nothing unless the size is handed to it directly.
 vi.mock('recharts', async () => {
   const actual = await vi.importActual<any>('recharts');
-  return { ...actual, ResponsiveContainer: ({ children }: any) => <div style={{ width: 400, height: 300 }}>{children}</div> };
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: any) => cloneElement(children, { width: 400, height: 220 }),
+  };
 });
 
 const match = (n: number, totalDkk: number, lines: any[] = []) => ({
@@ -40,7 +45,12 @@ const STATS = {
 function renderStats(data: any = STATS) {
   mockGet.mockImplementation(() => Promise.resolve({ data: { data } }));
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={qc}><FinesStats /></QueryClientProvider>);
+  return render(<QueryClientProvider client={qc}><FinesStats /></QueryClientProvider>);
+}
+
+// The panel opens on the chart; the table is behind the toggle.
+async function showTable() {
+  await userEvent.click(screen.getByRole('button', { name: 'Table' }));
 }
 
 // The table (sm+) and the stacked cards (phones) are both in the DOM — jsdom applies no
@@ -50,9 +60,21 @@ const table = () => screen.getByRole('table');
 describe('FinesStats — fines per match', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('shows the chart first, one column per match', async () => {
+    const { container } = renderStats();
+    await waitFor(() => expect(screen.getByText('Fines per match')).toBeInTheDocument());
+
+    // No table until it is asked for.
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    // A column per match, zero-fine ones included.
+    expect(container.querySelectorAll('.recharts-bar-rectangle')).toHaveLength(3);
+    expect(screen.getByText(/Tap a column/)).toBeInTheDocument();
+  });
+
   it('lists every match, including ones with no fines', async () => {
     renderStats();
     await waitFor(() => expect(screen.getByText('Fines per match')).toBeInTheDocument());
+    await showTable();
 
     const rows = within(table()).getAllByRole('row').slice(1); // drop the header
     expect(rows).toHaveLength(3);
@@ -65,6 +87,7 @@ describe('FinesStats — fines per match', () => {
   it('expands a match to its individual fines, and only that match', async () => {
     renderStats();
     await waitFor(() => expect(screen.getByText('Fines per match')).toBeInTheDocument());
+    await showTable();
 
     expect(within(table()).queryByText(/Dumt gult kort/)).not.toBeInTheDocument();
 
@@ -80,6 +103,7 @@ describe('FinesStats — fines per match', () => {
   it('does not expand a match with no fines', async () => {
     renderStats();
     await waitFor(() => expect(screen.getByText('Fines per match')).toBeInTheDocument());
+    await showTable();
 
     const before = within(table()).getAllByRole('row').length;
     await userEvent.click(within(table()).getByText('1. maj vs Klub 2'));
@@ -93,6 +117,7 @@ describe('FinesStats — fines per match', () => {
     }));
     renderStats({ ...STATS, perMatch: many });
     await waitFor(() => expect(screen.getByText('Fines per match')).toBeInTheDocument());
+    await showTable();
 
     expect(within(table()).getAllByRole('row').slice(1)).toHaveLength(10);
     await userEvent.click(screen.getByText('Show all 12 matches'));

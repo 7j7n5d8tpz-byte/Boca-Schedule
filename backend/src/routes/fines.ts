@@ -293,6 +293,32 @@ router.get('/fines', authenticate, async (_req, res, next) => {
   }
 });
 
+// GET /api/fines/matches — matches a fine can be attached to, newest first.
+// Fines are almost always about a specific match, so both the issue form and the
+// edit dialog need this list; /api/matches is coach/admin-gated, this isn't.
+router.get('/fines/matches', authenticate, async (_req, res, next) => {
+  try {
+    const { data, error } = await supabaseAdmin.from('matches')
+      .select('match_id, match_date, match_time, opponent')
+      .in('status', ['completed', 'published'])
+      .order('match_date', { ascending: false })
+      .order('match_time', { ascending: false })
+      // Deep enough to file fines that were imported from past seasons.
+      .limit(150);
+    if (error) throw error;
+    res.json({
+      success: true,
+      data: (data ?? []).map((m: any) => ({
+        matchId: m.match_id,
+        matchDate: m.match_date,
+        label: fineMatchLabel(m),
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/fines/stats — fun team-wide fine statistics (optionally ?year=YYYY).
 router.get('/fines/stats', authenticate, async (req, res, next) => {
   try {
@@ -668,6 +694,103 @@ router.put('/fines/payment-info', authenticate, async (req, res, next) => {
       .eq('config_key', 'fines_payment_info');
     if (error) throw error;
     res.json({ success: true, data: { paymentInfo } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PUT /api/fines/:id — fine admin edits an existing fine.
+//
+// Mostly used to attach a match to a fine that was issued without one (the
+// per-match overview can only count fines that name their match), but the same
+// endpoint fixes a wrong type, amount or note. Declared after
+// PUT /fines/payment-info, which would otherwise be swallowed by `:id`.
+router.put('/fines/:id', authenticate, async (req, res, next) => {
+  try {
+    if (!(await isFineAdmin(req.user!.userId, req.user!.role))) return forbidden(res);
+
+    const body = req.body as { matchId?: string | null; fineTypeId?: string | null; amountDkk?: number; reason?: string | null };
+    const { data: fine } = await supabaseAdmin.from('fines')
+      .select('player_id, status, amount_dkk, fine_type_id, reason').eq('fine_id', req.params.id).maybeSingle();
+    if (!fine) {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Bøden blev ikke fundet' } });
+      return;
+    }
+    if (fine.status === 'voided' || fine.status === 'rejected') {
+      res.status(400).json({ success: false, error: { code: 'INVALID_STATE', message: 'En annulleret eller afvist bøde kan ikke redigeres' } });
+      return;
+    }
+
+    const patch: Record<string, unknown> = {};
+
+    if ('matchId' in body) {
+      if (body.matchId) {
+        const { data: match } = await supabaseAdmin.from('matches').select('match_id').eq('match_id', body.matchId).maybeSingle();
+        if (!match) {
+          res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Kampen blev ikke fundet' } });
+          return;
+        }
+      }
+      patch.match_id = body.matchId || null;
+    }
+
+    // Changing the type re-snapshots the amount from the catalogue, unless the
+    // caller sets an amount explicitly in the same edit.
+    if ('fineTypeId' in body) {
+      if (body.fineTypeId) {
+        const { data: type } = await supabaseAdmin.from('fine_types').select('amount_dkk').eq('fine_type_id', body.fineTypeId).maybeSingle();
+        if (!type) {
+          res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Bødetypen blev ikke fundet' } });
+          return;
+        }
+        patch.fine_type_id = body.fineTypeId;
+        if (typeof body.amountDkk !== 'number') patch.amount_dkk = type.amount_dkk;
+      } else {
+        patch.fine_type_id = null;
+      }
+    }
+
+    if (typeof body.amountDkk === 'number') {
+      if (body.amountDkk < 0) {
+        res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Beløbet skal være 0 kr eller derover' } });
+        return;
+      }
+      patch.amount_dkk = Math.round(body.amountDkk);
+    }
+
+    if ('reason' in body) patch.reason = body.reason?.trim() || null;
+
+    if (Object.keys(patch).length === 0) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Intet at opdatere' } });
+      return;
+    }
+
+    // Same invariant as issuing: a fine with no catalogue type has to say what it was for.
+    const finalTypeId = 'fine_type_id' in patch ? patch.fine_type_id : fine.fine_type_id;
+    const finalReason = 'reason' in patch ? patch.reason : fine.reason;
+    if (!finalTypeId && !finalReason) {
+      res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'En bøde uden bødetype kræver en begrundelse' } });
+      return;
+    }
+
+    patch.updated_at = new Date().toISOString();
+    const { error } = await supabaseAdmin.from('fines').update(patch).eq('fine_id', req.params.id);
+    if (error) throw error;
+
+    // Only the money is worth pinging the player about; re-filing a fine under
+    // its match changes nothing they owe.
+    const newAmount = patch.amount_dkk as number | undefined;
+    if (typeof newAmount === 'number' && newAmount !== fine.amount_dkk) {
+      createNotifications([fine.player_id], {
+        type: 'fine_issued',
+        title: 'En bøde er ændret',
+        body: `Beløbet er nu ${newAmount} kr — se dine bøder`,
+        link: '/fines',
+        refId: String(req.params.id),
+      });
+    }
+
+    res.json({ success: true, data: { fineId: req.params.id } });
   } catch (err) {
     next(err);
   }

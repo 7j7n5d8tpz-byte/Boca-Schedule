@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -446,7 +447,7 @@ function PlayerFinesDialog({ playerName, fines, onConfirmPaid, onVoid, onEdit, o
       {sorted.length === 0 ? (
         <p className="text-sm text-gray-400">{t('fines.noFines')}</p>
       ) : (
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto -mx-1 px-1">
+        <div className="space-y-2">
           {sorted.map(f => (
             <div key={f.fineId} className="border border-gray-100 rounded-lg p-3">
               <div className="flex items-start justify-between gap-2">
@@ -827,16 +828,50 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-400 text-sm">{children}</div>;
 }
 
+/**
+ * Keeps the page behind a dialog still — on a phone a scroll gesture landing
+ * outside the panel otherwise drags the page under it. Counted, because the
+ * per-player drill-down opens the edit dialog on top of itself.
+ */
+let openDialogs = 0;
+function useLockPageScroll() {
+  useEffect(() => {
+    openDialogs++;
+    document.documentElement.classList.add('boca-modal-open');
+    return () => {
+      openDialogs--;
+      if (openDialogs === 0) document.documentElement.classList.remove('boca-modal-open');
+    };
+  }, []);
+}
+
+/**
+ * Portaled into <body>, not rendered in place: inside the page it sits under
+ * `.boca-page main` / `#root`, both of which carry a transform (the entrance
+ * animation, the push drawer — see index.css). A transformed ancestor becomes
+ * the containing block for `position: fixed`, so the dialog anchors to the page
+ * instead of the viewport and scrolls away on a phone. Same fix as the admin
+ * merge modal (admin/Dashboard.tsx).
+ */
 function Dialog({ title, children, onClose, wide }: { title: string; children: React.ReactNode; onClose: () => void; wide?: boolean }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className={`bg-white rounded-2xl shadow-xl w-full ${wide ? 'max-w-lg' : 'max-w-sm'} p-6 space-y-4 boca-pop`} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between gap-2">
+  useLockPageScroll();
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]"
+      onClick={onClose}
+    >
+      {/* Never taller than the viewport — the body scrolls, the panel doesn't grow. */}
+      <div
+        className={`bg-white rounded-2xl shadow-xl w-full ${wide ? 'max-w-lg' : 'max-w-sm'} max-h-full flex flex-col boca-pop`}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-2 p-6 pb-4 shrink-0">
           <h2 className="font-semibold text-gray-900">{title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-sm shrink-0">✕</button>
         </div>
-        {children}
+        <div className="px-6 pb-6 space-y-4 overflow-y-auto overscroll-contain">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

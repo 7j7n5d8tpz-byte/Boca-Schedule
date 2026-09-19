@@ -136,6 +136,14 @@ html.app-drawer-open #root { transform: translateX(280px); }
    underneath. `clip` (not `hidden`) prevents scrolling without establishing a
    scroll container — so it doesn't break the sticky nav or shift layout. */
 html.app-drawer-open, html.app-drawer-open body { overflow-y: clip; }
+
+/* Same lock behind a modal dialog, so a scroll gesture that misses the panel
+   doesn't drag the page under it. Touch devices only: on a desktop with a
+   visible scrollbar, clipping the page would reflow it the moment a dialog
+   opens. `clip` (not `hidden`) for the same reason as above. */
+@media (hover: none) and (pointer: coarse) {
+  html.boca-modal-open, html.boca-modal-open body { overflow-y: clip; }
+}
 @media (prefers-reduced-motion: reduce) { #root { transition: none; } }
 
 .boca-page::after {

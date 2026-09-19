@@ -58,3 +58,35 @@ export function computeStandings(fines: FineLike[]): Standing[] {
     .map(([playerId, v]) => ({ playerId, ...v }))
     .sort((a, b) => b.outstanding - a.outstanding || a.name.localeCompare(b.name));
 }
+
+// ─── Which match a new fine defaults to ──────────────────────────────────────
+
+// Only the fields the choice needs; the picker's options are a superset.
+export interface MatchDateLike { matchId: string; matchDate: string }
+
+/** Today as `YYYY-MM-DD` in the user's own timezone (not UTC — kick-off is local). */
+export function todayIso(now: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
+ * The match a newly issued fine should be filed under by default.
+ *
+ * Fine admins hand out fines around a match — in the dressing room just before
+ * kick-off and again right after — so today's match is almost always the right
+ * one. Failing that, the most recent match already played; and if the list is
+ * all in the future (a new season), the next one up. Returns null for an empty
+ * list, leaving the picker on "no match".
+ *
+ * `matchDate` is a plain `YYYY-MM-DD`, so string comparison is date comparison.
+ */
+export function pickDefaultMatchId(matches: MatchDateLike[] | undefined, today: string = todayIso()): string | null {
+  if (!matches?.length) return null;
+  const byDate = [...matches].sort((a, b) => a.matchDate.localeCompare(b.matchDate));
+  // Last match on or before today (today's own match wins, as it sorts last).
+  for (let i = byDate.length - 1; i >= 0; i--) {
+    if (byDate[i].matchDate <= today) return byDate[i].matchId;
+  }
+  return byDate[0].matchId; // nothing played yet — the nearest upcoming match
+}

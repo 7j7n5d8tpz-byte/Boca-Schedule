@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { useDateFormat } from '../../i18n/format';
-import { formatKr as kr, STATUS_META, fineWhat, computeTotals, computeStandings, type FineStatus } from './finesUtil';
+import { formatKr as kr, STATUS_META, fineWhat, computeTotals, computeStandings, pickDefaultMatchId, type FineStatus } from './finesUtil';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -510,11 +510,20 @@ function IssueFineForm({ onDone }: { onDone: () => void }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [matchId, setMatchId] = useState('');
+  // Until the admin picks a match themselves, the field follows the default.
+  const [matchTouched, setMatchTouched] = useState(false);
   const [error, setError] = useState('');
 
   const { data: types } = useQuery<FineType[]>({ queryKey: ['fine-types'], queryFn: () => api.get('/fine-types').then(r => r.data.data), enabled: open });
   const { data: players } = useQuery<PlayerLite[]>({ queryKey: ['players-lite'], queryFn: () => api.get('/players').then(r => r.data.data), enabled: open });
   const { data: matches } = useQuery<MatchLite[]>({ ...matchesQuery, enabled: open });
+
+  // Fines are handed out around a match, so open on today's — else the last
+  // played one. The admin can still switch, or clear it to "no match".
+  useEffect(() => {
+    if (!open || matchTouched || !matches) return;
+    setMatchId(pickDefaultMatchId(matches) ?? '');
+  }, [open, matches, matchTouched]);
 
   // /players excludes the current user, so add a self option — a fine admin can fine themselves too.
   const playerOptions: PlayerLite[] = user ? [{ userId: user.userId, name: t('fines.youSuffix', { name: user.name }) }, ...(players ?? [])] : (players ?? []);
@@ -523,7 +532,7 @@ function IssueFineForm({ onDone }: { onDone: () => void }) {
     mutationFn: () => api.post('/fines', mode === 'list'
       ? { playerId, fineTypeId, reason: reason || null, matchId: matchId || null }
       : { playerId, amountDkk: Number(amount), reason, matchId: matchId || null }),
-    onSuccess: () => { setOpen(false); setPlayerId(''); setFineTypeId(''); setAmount(''); setReason(''); setMatchId(''); setError(''); onDone(); },
+    onSuccess: () => { setOpen(false); setPlayerId(''); setFineTypeId(''); setAmount(''); setReason(''); setMatchId(''); setMatchTouched(false); setError(''); onDone(); },
     onError: (e: any) => setError(e?.response?.data?.error?.message ?? t('fines.issueFailed')),
   });
 
@@ -560,7 +569,7 @@ function IssueFineForm({ onDone }: { onDone: () => void }) {
         <input type="number" min="0" value={amount} onChange={e => setAmount(e.target.value)} placeholder={t('fines.amountPlaceholder')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green" />
       )}
 
-      <MatchSelect matches={matches} value={matchId} onChange={setMatchId} />
+      <MatchSelect matches={matches} value={matchId} onChange={v => { setMatchTouched(true); setMatchId(v); }} />
 
       <input value={reason} onChange={e => setReason(e.target.value)} placeholder={mode === 'custom' ? t('fines.reasonRequired') : t('fines.noteOptional')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green" />
 

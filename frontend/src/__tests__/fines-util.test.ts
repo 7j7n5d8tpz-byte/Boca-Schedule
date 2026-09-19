@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  formatKr, fineWhat, STATUS_META, computeTotals, computeStandings, type FineLike,
+  formatKr, fineWhat, STATUS_META, computeTotals, computeStandings,
+  todayIso, pickDefaultMatchId, type FineLike,
 } from '../pages/player/finesUtil';
 
 const f = (over: Partial<FineLike> & Pick<FineLike, 'status' | 'amountDkk'>): FineLike => ({
@@ -76,5 +77,42 @@ describe('computeStandings', () => {
       f({ playerId: 'c', playerName: 'Cara', status: 'paid', amountDkk: 200 }),
     ]);
     expect(standings.map(s => s.playerId)).toEqual(['b', 'a', 'c']);
+  });
+});
+
+describe('todayIso', () => {
+  it('uses the local calendar day, not UTC', () => {
+    // 23:30 local on 1 June is still 1 June, even where UTC has rolled over.
+    expect(todayIso(new Date(2026, 5, 1, 23, 30))).toBe('2026-06-01');
+    expect(todayIso(new Date(2026, 0, 9, 0, 5))).toBe('2026-01-09');
+  });
+});
+
+describe('pickDefaultMatchId', () => {
+  const m = (matchId: string, matchDate: string) => ({ matchId, matchDate });
+
+  it("picks today's match — the usual case, fines handed out around kick-off", () => {
+    const matches = [m('future', '2026-06-20'), m('today', '2026-06-10'), m('past', '2026-06-03')];
+    expect(pickDefaultMatchId(matches, '2026-06-10')).toBe('today');
+  });
+
+  it('falls back to the most recently played match', () => {
+    const matches = [m('next', '2026-06-20'), m('last', '2026-06-10'), m('older', '2026-06-03')];
+    expect(pickDefaultMatchId(matches, '2026-06-12')).toBe('last');
+  });
+
+  it('ignores the incoming order', () => {
+    const matches = [m('older', '2026-06-03'), m('next', '2026-06-20'), m('last', '2026-06-10')];
+    expect(pickDefaultMatchId(matches, '2026-06-12')).toBe('last');
+  });
+
+  it('picks the nearest upcoming match when nothing has been played yet', () => {
+    const matches = [m('later', '2026-08-01'), m('first', '2026-07-15')];
+    expect(pickDefaultMatchId(matches, '2026-06-30')).toBe('first');
+  });
+
+  it('leaves the picker on "no match" when there are none', () => {
+    expect(pickDefaultMatchId([], '2026-06-10')).toBeNull();
+    expect(pickDefaultMatchId(undefined, '2026-06-10')).toBeNull();
   });
 });

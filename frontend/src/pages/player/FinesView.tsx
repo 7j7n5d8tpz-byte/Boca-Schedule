@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { useDateFormat } from '../../i18n/format';
-import { formatKr as kr, STATUS_META, fineWhat, computeTotals, computeStandings, pickDefaultMatchId, type FineStatus } from './finesUtil';
+import { formatKr as kr, STATUS_META, fineWhat, computeTotals, computeStandings, pickDefaultMatchId, sortMatchesByDate, type FineStatus } from './finesUtil';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -589,9 +589,12 @@ function IssueFineForm({ onDone }: { onDone: () => void }) {
  * Which match a fine belongs to. Almost every fine does, and only a fine that
  * names its match can show up in the per-match overview — so the picker is part
  * of issuing one, not an afterthought.
+ *
+ * Options run newest first: the match just played is the one being fined for.
  */
 function MatchSelect({ matches, value, onChange }: { matches: MatchLite[] | undefined; value: string; onChange: (v: string) => void }) {
   const { t } = useTranslation();
+  const options = useMemo(() => sortMatchesByDate(matches), [matches]);
   return (
     <select
       value={value}
@@ -599,7 +602,7 @@ function MatchSelect({ matches, value, onChange }: { matches: MatchLite[] | unde
       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
     >
       <option value="">{t('fines.noMatch')}</option>
-      {(matches ?? []).map(m => <option key={m.matchId} value={m.matchId}>{m.label}</option>)}
+      {options.map(m => <option key={m.matchId} value={m.matchId}>{m.label}</option>)}
     </select>
   );
 }

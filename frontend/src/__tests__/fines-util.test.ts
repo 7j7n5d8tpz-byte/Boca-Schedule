@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatKr, fineWhat, STATUS_META, computeTotals, computeStandings,
-  todayIso, pickDefaultMatchId, type FineLike,
+  todayIso, pickDefaultMatchId, sortMatchesByDate, type FineLike,
 } from '../pages/player/finesUtil';
 
 const f = (over: Partial<FineLike> & Pick<FineLike, 'status' | 'amountDkk'>): FineLike => ({
@@ -85,6 +85,36 @@ describe('todayIso', () => {
     // 23:30 local on 1 June is still 1 June, even where UTC has rolled over.
     expect(todayIso(new Date(2026, 5, 1, 23, 30))).toBe('2026-06-01');
     expect(todayIso(new Date(2026, 0, 9, 0, 5))).toBe('2026-01-09');
+  });
+});
+
+describe('sortMatchesByDate', () => {
+  const m = (matchId: string, matchDate: string) => ({ matchId, matchDate });
+
+  it('orders the picker newest first', () => {
+    const out = sortMatchesByDate([m('b', '2026-06-10'), m('c', '2026-06-03'), m('a', '2026-06-20')]);
+    expect(out.map(x => x.matchId)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('orders across month and year boundaries, not by label text', () => {
+    const out = sortMatchesByDate([m('old', '2025-12-28'), m('new', '2026-01-04'), m('mid', '2026-01-02')]);
+    expect(out.map(x => x.matchId)).toEqual(['new', 'mid', 'old']);
+  });
+
+  it('keeps same-day matches in the order they arrived (stable)', () => {
+    const out = sortMatchesByDate([m('late', '2026-06-10'), m('early', '2026-06-10'), m('older', '2026-06-03')]);
+    expect(out.map(x => x.matchId)).toEqual(['late', 'early', 'older']);
+  });
+
+  it('does not mutate the list it was given', () => {
+    const input = [m('c', '2026-06-03'), m('a', '2026-06-20')];
+    sortMatchesByDate(input);
+    expect(input.map(x => x.matchId)).toEqual(['c', 'a']);
+  });
+
+  it('handles an empty or missing list', () => {
+    expect(sortMatchesByDate([])).toEqual([]);
+    expect(sortMatchesByDate(undefined)).toEqual([]);
   });
 });
 

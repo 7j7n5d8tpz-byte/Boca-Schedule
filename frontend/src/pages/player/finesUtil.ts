@@ -71,6 +71,18 @@ export function todayIso(now: Date = new Date()): string {
 }
 
 /**
+ * Match options newest first, so the picker reads as a date-ordered list.
+ *
+ * The API already sorts them, but the dropdown is the thing that has to be in
+ * order — sorting here means it stays that way whatever the caller hands over.
+ * The sort is stable, so same-day matches keep the order they came in (the API
+ * puts the later kick-off first).
+ */
+export function sortMatchesByDate<T extends MatchDateLike>(matches: T[] | undefined): T[] {
+  return [...(matches ?? [])].sort((a, b) => b.matchDate.localeCompare(a.matchDate));
+}
+
+/**
  * The match a newly issued fine should be filed under by default.
  *
  * Fine admins hand out fines around a match — in the dressing room just before
@@ -83,10 +95,9 @@ export function todayIso(now: Date = new Date()): string {
  */
 export function pickDefaultMatchId(matches: MatchDateLike[] | undefined, today: string = todayIso()): string | null {
   if (!matches?.length) return null;
-  const byDate = [...matches].sort((a, b) => a.matchDate.localeCompare(b.matchDate));
-  // Last match on or before today (today's own match wins, as it sorts last).
-  for (let i = byDate.length - 1; i >= 0; i--) {
-    if (byDate[i].matchDate <= today) return byDate[i].matchId;
-  }
-  return byDate[0].matchId; // nothing played yet — the nearest upcoming match
+  const newestFirst = sortMatchesByDate(matches);
+  // First match on or before today (today's own match leads, as it sorts first).
+  const played = newestFirst.find(m => m.matchDate <= today);
+  // Nothing played yet — fall back to the nearest upcoming match.
+  return (played ?? newestFirst[newestFirst.length - 1]).matchId;
 }

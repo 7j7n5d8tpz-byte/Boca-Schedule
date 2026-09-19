@@ -15,11 +15,12 @@ const ADMIN = {
   treasury: { collectedDkk: 0, outstandingDkk: 0 }, paymentInfo: '12345678',
 };
 
-// Today's match, the one before it, and one still to come.
+// Today's match, the one before it, and one still to come — deliberately not
+// in date order, so the dropdown's own ordering is what the test sees.
 const MATCHES = [
-  { matchId: 'next', matchDate: '2026-06-20', label: 'lør. 20. jun vs Næste' },
   { matchId: 'today', matchDate: '2026-06-10', label: 'ons. 10. jun vs I dag' },
   { matchId: 'past', matchDate: '2026-06-03', label: 'ons. 3. jun vs Sidste' },
+  { matchId: 'next', matchDate: '2026-06-20', label: 'lør. 20. jun vs Næste' },
 ];
 
 const ROUTES: Record<string, any> = {
@@ -76,5 +77,13 @@ describe('Issue a fine — default match', () => {
 
     await userEvent.selectOptions(matchSelect(), '');
     expect(matchSelect().value).toBe('');
+  });
+
+  it('lists the matches newest first, whatever order they arrive in', async () => {
+    vi.setSystemTime(new Date(2026, 5, 10, 19, 0));
+    await openIssueForm();
+
+    const values = [...matchSelect().options].map(o => o.value);
+    expect(values).toEqual(['', 'next', 'today', 'past']); // '' is the "No match" option
   });
 });

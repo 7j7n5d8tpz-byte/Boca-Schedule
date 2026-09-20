@@ -152,6 +152,24 @@ export async function recomputeForMatch(matchId: string, playerIds: string[]): P
   }
 }
 
+/**
+ * Recompute + persist every season for a single player.
+ *
+ * Used after a placeholder merge: the merge folds the placeholder's sign-ups,
+ * selections and performances into the target, which changes the target's
+ * counts and streaks, but nothing else would re-run the engine for them until
+ * the next result is recorded.
+ */
+export async function recomputeForPlayer(playerId: string): Promise<void> {
+  const { matches, winByMatch } = await loadCompletedMatches();
+  const seasons = [...new Set(matches.map(m => seasonYearOf(m.match_date)))];
+  for (const seasonYear of seasons) {
+    const seasonMatches = matches.filter(m => seasonYearOf(m.match_date) === seasonYear);
+    const input = await buildInput(playerId, seasonYear, seasonMatches, winByMatch);
+    await persist(playerId, seasonYear, computeForPlayer(input));
+  }
+}
+
 /** Live result for one player/season (for the read route), no persistence. */
 export async function computePlayerSeason(playerId: string, seasonYear: number): Promise<PlayerAchievementResult> {
   const { matches, winByMatch } = await loadCompletedMatches();

@@ -87,7 +87,7 @@ router.get('/players/achievements/team-wall', authenticate, async (req, res, nex
     const [{ data: rows }, team] = await Promise.all([
       supabaseAdmin
         .from('player_achievements')
-        .select('player_id, achievement_code, tier, progress, earned_at, users!player_achievements_player_id_fkey(name, avatar_url)')
+        .select('player_id, achievement_code, tier, progress, earned_at, users!player_achievements_player_id_fkey(name, avatar_url, merged_into)')
         .eq('season_year', season),
       computeTeamSeason(season),
     ]);
@@ -97,6 +97,12 @@ router.get('/players/achievements/team-wall', authenticate, async (req, res, nex
     const byPlayer = new Map<string, { name: string; avatarUrl: string | null; best: Map<string, Best> }>();
     for (const r of (rows ?? []) as any[]) {
       const u = Array.isArray(r.users) ? r.users[0] : r.users;
+      // Skip merged-away placeholders. Their crests are handed to the real
+      // account by merge_placeholder_player, but a tombstone that still holds
+      // rows would otherwise render here as a ghost teammate who exists on no
+      // other page (the squad, stats and selection lists all filter on
+      // `merged_into is null`).
+      if (u?.merged_into) continue;
       let entry = byPlayer.get(r.player_id);
       if (!entry) {
         entry = { name: u?.name ?? 'Player', avatarUrl: u?.avatar_url ?? null, best: new Map() };

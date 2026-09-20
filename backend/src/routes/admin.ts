@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
+import { recomputeForPlayer } from '../lib/achievementsStore.js';
 
 const router = Router();
 
@@ -136,6 +137,13 @@ router.post('/users/:placeholderId/merge', async (req, res, next) => {
 
     await writeAudit(req.user!.userId, 'placeholder_merged', 'user', placeholderId,
       { name: placeholder?.name }, { mergedInto: targetUserId, targetName: target?.name });
+
+    // The merge moved the placeholder's history onto the target, so the target's
+    // crests and streaks are now stale. Fire-and-forget: a gamification hiccup
+    // must never fail the merge itself.
+    recomputeForPlayer(targetUserId).catch(err =>
+      console.error('[achievements] recompute failed after merge into', targetUserId, err),
+    );
 
     res.json({ success: true, message: 'Pladsholderen er flettet', data: { placeholderId, targetUserId } });
   } catch (err) {

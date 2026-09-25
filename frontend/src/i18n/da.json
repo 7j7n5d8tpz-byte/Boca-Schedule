@@ -1058,6 +1058,8 @@
     "delete": "Slet",
     "mergeBody1": "Flyt",
     "mergeBody2": "s kamphistorik, bøder og optrædener over på en rigtig registreret konto. Pladsholderen pensioneres derefter — det kan ikke fortrydes.",
+    "mergeAccount": "Flet dobbeltkonto",
+    "mergeAccountBody": "Al historik fra {{name}} ({{email}}) — kampe, statistik, bøder, trofæer og notifikationer — flyttes over på den konto, spilleren skal beholde. Den gamle konto lukkes derefter og kan ikke længere logge ind. Det kan ikke fortrydes.",
     "selectAccount": "Vælg en konto…",
     "uptime": "Oppetid: {{value}}",
     "key": "Nøgle",

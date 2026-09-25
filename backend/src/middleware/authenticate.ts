@@ -19,9 +19,16 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   // Fetch role from our users table
   const { data: profile } = await supabaseAdmin
     .from('users')
-    .select('role')
+    .select('role, merged_into')
     .eq('user_id', user.id)
     .single();
+
+  // A merged-away duplicate account is retired: its still-valid tokens must not
+  // keep acting as the tombstone (sign-ups would land on the dead account).
+  if (profile?.merged_into) {
+    res.status(401).json({ success: false, error: { code: 'ACCOUNT_MERGED', message: 'Denne konto er flettet ind i en anden konto' } });
+    return;
+  }
 
   req.user = {
     userId: user.id,

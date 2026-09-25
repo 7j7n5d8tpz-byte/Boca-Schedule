@@ -132,4 +132,18 @@ describe('mailer transport', () => {
     expect(result.sent).toBe(3);
     expect(result.failed).toHaveLength(1);
   });
+
+  it('sends the activated player a login link', async () => {
+    const { sendAccountActivatedEmail } = await loadMailer(1000);
+    sendMock.mockResolvedValue(ok);
+
+    await sendAccountActivatedEmail({ name: 'Jacob Meier', email: 'jacob@example.com' });
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    const sent = sendMock.mock.calls[0][0];
+    expect(sent.to).toBe('jacob@example.com');
+    expect(sent.subject).toMatch(/aktiveret/);
+    expect(sent.text).toContain('Jacob Meier');
+    expect(sent.text).toContain('/login');
+  });
 });

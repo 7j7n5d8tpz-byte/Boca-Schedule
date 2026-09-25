@@ -393,6 +393,21 @@ export async function sendAdminRegistrationNotification(playerName: string, play
   );
 }
 
+// ─── Account activated ────────────────────────────────────────────────────────
+
+// Sent when an admin approves a pending registration, so the player knows they
+// can log in (until now they only saw "your request has been sent").
+export async function sendAccountActivatedEmail(player: Recipient) {
+  await send(
+    player.email,
+    'Din konto er aktiveret',
+    `<p>Hej <strong>${player.name}</strong>,</p>
+     <p>Din konto hos Boca Boldisch er nu godkendt og aktiveret. Du kan logge ind og tilmelde dig kampe.</p>
+     <a href="${FRONTEND_URL}/login" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Log ind →</a>`,
+    `Hej ${player.name},\n\nDin konto hos Boca Boldisch er nu godkendt og aktiveret. Du kan logge ind og tilmelde dig kampe.\n\n${FRONTEND_URL}/login`,
+  );
+}
+
 // ─── Daily reminders (sent at 18:00 Europe/Copenhagen by the cron) ──────────────
 
 interface ReminderMatch {

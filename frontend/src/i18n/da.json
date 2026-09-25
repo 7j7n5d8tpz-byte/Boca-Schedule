@@ -108,6 +108,8 @@
     "createAccount": "Opret konto",
     "nameTooShort": "Navnet skal være på mindst 2 tegn.",
     "invalidEmail": "Indtast en gyldig e-mailadresse.",
+    "emailDidYouMean": "Mente du",
+    "emailDomainInvalid": "Den e-mailadresse kan ikke modtage mails. Tjek den for stavefejl.",
     "passwordTooShort": "Adgangskoden skal være på mindst 8 tegn.",
     "passwordNeedsUppercase": "Adgangskoden skal indeholde et stort bogstav.",
     "passwordNeedsNumber": "Adgangskoden skal indeholde et tal.",

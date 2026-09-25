@@ -4,6 +4,8 @@ import { supabaseAdmin } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { recomputeForPlayer } from '../lib/achievementsStore.js';
+import { emailDomainAcceptsMail, shouldCheckEmailDomain } from '../lib/emailDomain.js';
+import { sendAccountActivatedEmail } from '../lib/mailer.js';
 
 const router = Router();
 
@@ -75,6 +77,11 @@ router.get('/users', async (req, res, next) => {
 router.post('/users', async (req, res, next) => {
   try {
     const { email, password, name, role, preferredPositions } = req.body;
+
+    if (shouldCheckEmailDomain() && !(await emailDomainAcceptsMail(String(email ?? '')))) {
+      res.status(422).json({ success: false, error: { code: 'INVALID_EMAIL_DOMAIN', message: 'E-mailadressens domæne kan ikke modtage mails — tjek for stavefejl' } });
+      return;
+    }
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -221,6 +228,15 @@ router.put('/users/:userId/active', async (req, res, next) => {
     if (error) throw error;
 
     await writeAudit(req.user!.userId, isActive ? 'user_activated' : 'user_deactivated', 'user', userId, { isActive: current?.is_active }, { isActive });
+
+    // Tell the player they can log in now. Only on an actual inactive → active
+    // flip, and never for a placeholder (no login, and a fake address).
+    // Fire-and-forget: a mail hiccup must not fail the activation.
+    if (isActive && current && !current.is_active && !data.is_placeholder && !data.merged_into) {
+      sendAccountActivatedEmail({ name: data.name, email: data.email }).catch(err =>
+        console.error('Failed to send account-activated email to', data.email, err),
+      );
+    }
 
     res.json({ success: true, data: { userId, isActive, updatedAt: data.updated_at } });
   } catch (err) {

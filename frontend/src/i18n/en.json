@@ -1058,6 +1058,8 @@
     "delete": "Delete",
     "mergeBody1": "Move",
     "mergeBody2": "'s match history, fines, and appearances into a real registered account. The placeholder is then retired — this can't be undone.",
+    "mergeAccount": "Merge duplicate account",
+    "mergeAccountBody": "All history from {{name}} ({{email}}) — matches, stats, fines, crests and notifications — moves to the account the player keeps. The old account is then closed and can no longer log in. This can't be undone.",
     "selectAccount": "Select an account…",
     "uptime": "Uptime: {{value}}",
     "key": "Key",

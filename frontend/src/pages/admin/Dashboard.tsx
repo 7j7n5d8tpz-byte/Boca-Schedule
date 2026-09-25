@@ -127,7 +127,8 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
     },
   });
 
-  // Candidate target accounts for a merge: real registered accounts only.
+  // Candidate target accounts for a merge: real registered accounts only (for a
+  // duplicate account, the one the player keeps).
   const { data: mergeCandidatesData } = useQuery<{ users: AdminUser[] }>({
     queryKey: ['admin-users-merge-candidates'],
     queryFn: () => api.get('/admin/users?limit=500&isPlaceholder=false').then(r => r.data.data),
@@ -138,11 +139,12 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const mergeMutation = useMutation({
-    mutationFn: ({ placeholderId, targetUserId }: { placeholderId: string; targetUserId: string }) =>
-      api.post(`/admin/users/${placeholderId}/merge`, { targetUserId }),
+    mutationFn: ({ sourceId, targetUserId }: { sourceId: string; targetUserId: string }) =>
+      api.post(`/admin/users/${sourceId}/merge`, { targetUserId }),
     onSuccess: () => {
       setMergeFor(null); setMergeTarget(''); setMergeError('');
       qc.invalidateQueries({ queryKey: ['admin-users'] });
+      qc.invalidateQueries({ queryKey: ['admin-users-merge-candidates'] });
     },
     onError: (err: any) => setMergeError(err.response?.data?.error?.message ?? t('admin.mergeFailed')),
   });
@@ -334,12 +336,20 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setConfirmDelete(u.userId)}
-                    className="shrink-0 text-xs text-red-400 hover:text-red-600 transition-colors"
-                  >
-                    {t('admin.delete')}
-                  </button>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button
+                      onClick={() => { setMergeFor(u); setMergeTarget(''); setMergeError(''); }}
+                      className="text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
+                    >
+                      {t('admin.mergeArrow')}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(u.userId)}
+                      className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      {t('admin.delete')}
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -450,7 +460,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                             onClick={() => { setMergeFor(u); setMergeTarget(''); setMergeError(''); }}
                             className="shrink-0 text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
                           >
-                            Merge →
+                            {t('admin.mergeArrow')}
                           </button>
                         </>
                       )}
@@ -536,12 +546,20 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setConfirmDelete(u.userId)}
-                        className="text-xs text-red-400 hover:text-red-600 transition-colors"
-                      >
-                        {t('admin.delete')}
-                      </button>
+                      <div className="flex items-center gap-3 justify-end">
+                        <button
+                          onClick={() => { setMergeFor(u); setMergeTarget(''); setMergeError(''); }}
+                          className="text-xs font-medium text-brand-green hover:text-brand-green-700 transition-colors"
+                        >
+                          {t('admin.mergeArrow')}
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(u.userId)}
+                          className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                        >
+                          {t('admin.delete')}
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -552,7 +570,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
         </>
       )}
 
-      {/* Merge placeholder modal — portaled into <body> so it isn't anchored to
+      {/* Merge modal (placeholder or duplicate account) — portaled into <body> so it isn't anchored to
           the transformed .boca-page main / #root (see index.css), which would
           otherwise push it down the page instead of centering in the viewport. */}
       {mergeFor && createPortal(
@@ -561,9 +579,11 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
           onClick={() => setMergeFor(null)}
         >
           <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4" onClick={e => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-900">{t('admin.mergePlaceholder')}</h3>
+            <h3 className="font-semibold text-gray-900">{t(mergeFor.isPlaceholder ? 'admin.mergePlaceholder' : 'admin.mergeAccount')}</h3>
             <p className="text-sm text-gray-600">
-              {t('admin.mergeBody1')} <span className="font-medium text-gray-900">{mergeFor.name}</span>{t('admin.mergeBody2')}
+              {mergeFor.isPlaceholder ? (
+                <>{t('admin.mergeBody1')} <span className="font-medium text-gray-900">{mergeFor.name}</span>{t('admin.mergeBody2')}</>
+              ) : t('admin.mergeAccountBody', { name: mergeFor.name, email: mergeFor.email })}
             </p>
             <div>
               <label htmlFor="mergeTarget" className="block text-xs font-medium text-gray-500 mb-1">{t('admin.mergeInto')}</label>
@@ -591,7 +611,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
                 {t('common.cancel')}
               </button>
               <button
-                onClick={() => mergeMutation.mutate({ placeholderId: mergeFor.userId, targetUserId: mergeTarget })}
+                onClick={() => mergeMutation.mutate({ sourceId: mergeFor.userId, targetUserId: mergeTarget })}
                 disabled={!mergeTarget || mergeMutation.isPending}
                 className="text-sm bg-brand-green hover:bg-brand-green-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
               >

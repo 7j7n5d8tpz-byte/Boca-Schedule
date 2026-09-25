@@ -106,14 +106,16 @@ router.post('/users', async (req, res, next) => {
   }
 });
 
-// POST /api/admin/users/:placeholderId/merge
-// Fold a historical-import placeholder into a real (registered) account: all of
-// the placeholder's history moves across and the placeholder is retired. Done
-// in a single SQL function (merge_placeholder_player) so it's atomic.
+// POST /api/admin/users/:sourceId/merge
+// Fold one account into another: all of the source's history (appearances,
+// stats, fines, crests, notifications, …) moves to the target and the source is
+// retired as a tombstone that can no longer log in. Works for a historical-import
+// placeholder as well as for a real duplicate account (a player who registered
+// twice). Done in a single SQL function (merge_player) so it's atomic.
 const MergeSchema = z.object({ targetUserId: z.string().uuid() });
-router.post('/users/:placeholderId/merge', async (req, res, next) => {
+router.post('/users/:sourceId/merge', async (req, res, next) => {
   try {
-    const { placeholderId } = req.params;
+    const { sourceId } = req.params;
     const body = MergeSchema.safeParse(req.body);
     if (!body.success) {
       res.status(422).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'targetUserId (uuid) is required' } });
@@ -121,13 +123,19 @@ router.post('/users/:placeholderId/merge', async (req, res, next) => {
     }
     const { targetUserId } = body.data;
 
+    // Retiring your own account would lock you out mid-session.
+    if (sourceId === req.user!.userId) {
+      res.status(400).json({ success: false, error: { code: 'CANNOT_MERGE_SELF', message: 'Du kan ikke flette din egen konto væk' } });
+      return;
+    }
+
     const { data: pair } = await supabaseAdmin
-      .from('users').select('user_id, name, is_placeholder, merged_into').in('user_id', [placeholderId, targetUserId]);
-    const placeholder = (pair ?? []).find((u: any) => u.user_id === placeholderId);
+      .from('users').select('user_id, name, email, is_placeholder, merged_into').in('user_id', [sourceId, targetUserId]);
+    const source = (pair ?? []).find((u: any) => u.user_id === sourceId);
     const target = (pair ?? []).find((u: any) => u.user_id === targetUserId);
 
-    const { error } = await supabaseAdmin.rpc('merge_placeholder_player', {
-      p_placeholder: placeholderId,
+    const { error } = await supabaseAdmin.rpc('merge_player', {
+      p_source: sourceId,
       p_target: targetUserId,
     });
     if (error) {
@@ -135,17 +143,17 @@ router.post('/users/:placeholderId/merge', async (req, res, next) => {
       return;
     }
 
-    await writeAudit(req.user!.userId, 'placeholder_merged', 'user', placeholderId,
-      { name: placeholder?.name }, { mergedInto: targetUserId, targetName: target?.name });
+    await writeAudit(req.user!.userId, source?.is_placeholder ? 'placeholder_merged' : 'user_merged', 'user', sourceId,
+      { name: source?.name, email: source?.email }, { mergedInto: targetUserId, targetName: target?.name });
 
-    // The merge moved the placeholder's history onto the target, so the target's
+    // The merge moved the source's history onto the target, so the target's
     // crests and streaks are now stale. Fire-and-forget: a gamification hiccup
     // must never fail the merge itself.
     recomputeForPlayer(targetUserId).catch(err =>
       console.error('[achievements] recompute failed after merge into', targetUserId, err),
     );
 
-    res.json({ success: true, message: 'Pladsholderen er flettet', data: { placeholderId, targetUserId } });
+    res.json({ success: true, message: 'Spillerne er flettet', data: { sourceId, targetUserId } });
   } catch (err) {
     next(err);
   }

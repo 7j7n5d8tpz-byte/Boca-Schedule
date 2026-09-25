@@ -108,6 +108,8 @@
     "createAccount": "Create account",
     "nameTooShort": "Name must be at least 2 characters.",
     "invalidEmail": "Enter a valid email address.",
+    "emailDidYouMean": "Did you mean",
+    "emailDomainInvalid": "That email address can't receive mail. Check it for typos.",
     "passwordTooShort": "Password must be at least 8 characters.",
     "passwordNeedsUppercase": "Password needs an uppercase letter.",
     "passwordNeedsNumber": "Password needs a number.",

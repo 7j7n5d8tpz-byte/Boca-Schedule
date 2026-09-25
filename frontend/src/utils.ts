@@ -72,3 +72,49 @@ export function downloadIcs(filename: string, content: string): void {
   link.click();
   URL.revokeObjectURL(url);
 }
+
+// ─── Email typo suggestion ───────────────────────────────────────────────────
+
+// Mail providers players actually use. A registration whose domain is a near
+// miss of one of these ("gmial.com", "hotmail.dl") almost certainly has a typo —
+// and the domain may still exist (typo-squatters register them), so the
+// backend's DNS check can't catch it. Suggest the fix instead.
+const COMMON_EMAIL_DOMAINS = [
+  'gmail.com', 'googlemail.com', 'hotmail.com', 'hotmail.dk', 'outlook.com', 'outlook.dk',
+  'live.com', 'live.dk', 'msn.com', 'yahoo.com', 'yahoo.dk', 'icloud.com', 'me.com', 'mac.com',
+  'mail.dk', 'jubii.dk', 'sol.dk', 'ofir.dk', 'protonmail.com', 'proton.me', 'gmx.com', 'gmx.net',
+  'aol.com',
+];
+
+function editDistance(a: string, b: string): number {
+  const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = tmp;
+    }
+  }
+  return prev[b.length];
+}
+
+/** The corrected address if the domain looks like a typo of a common provider, else null. */
+export function suggestEmailCorrection(email: string): string | null {
+  const at = email.trim().lastIndexOf('@');
+  if (at < 1) return null;
+  const local = email.trim().slice(0, at);
+  const domain = email.trim().slice(at + 1).toLowerCase();
+  if (!domain.includes('.') || COMMON_EMAIL_DOMAINS.includes(domain)) return null;
+
+  let best: { domain: string; dist: number } | null = null;
+  for (const candidate of COMMON_EMAIL_DOMAINS) {
+    const dist = editDistance(domain, candidate);
+    if (!best || dist < best.dist) best = { domain: candidate, dist };
+  }
+  // One slip for short domains, two for longer ones — close enough to be a typo,
+  // far enough that a real custom domain (e.g. "brendstrup.dk") isn't flagged.
+  const maxDist = domain.length <= 7 ? 1 : 2;
+  return best && best.dist > 0 && best.dist <= maxDist ? `${local}@${best.domain}` : null;
+}

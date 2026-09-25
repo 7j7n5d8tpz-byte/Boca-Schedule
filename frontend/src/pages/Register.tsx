@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
+import { suggestEmailCorrection } from '../utils';
 import AvatarCropper from '../components/AvatarCropper';
 
 // The codes themselves stay English — they're what the optimizer and the squad
@@ -62,6 +63,7 @@ export default function Register() {
     preferredPositions: [],
   });
   const [clientError, setClientError] = useState('');
+  const emailSuggestion = suggestEmailCorrection(form.email);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -119,7 +121,13 @@ export default function Register() {
         ...(avatar ? { avatar } : {}),
       });
       setSubmitted(true);
-    } catch {
+    } catch (err: any) {
+      // An undeliverable domain is the one error worth surfacing: it's about the
+      // address typed, not whether it's registered, so nothing leaks.
+      if (err?.response?.data?.error?.code === 'INVALID_EMAIL_DOMAIN') {
+        setClientError(t('auth.emailDomainInvalid'));
+        return;
+      }
       // Show the same success screen even on network errors to avoid leaking state.
       // Real errors (network down) are logged server-side.
       setSubmitted(true);
@@ -237,6 +245,19 @@ export default function Register() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green"
               placeholder={t('auth.emailPlaceholder')}
             />
+            {emailSuggestion && (
+              <p className="text-xs text-amber-700 mt-1">
+                {t('auth.emailDidYouMean')}{' '}
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, email: emailSuggestion }))}
+                  className="font-semibold underline hover:text-amber-900"
+                >
+                  {emailSuggestion}
+                </button>
+                ?
+              </p>
+            )}
           </div>
 
           {/* Password */}

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin, supabaseAnon } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { sendAdminRegistrationNotification } from '../lib/mailer.js';
+import { emailDomainAcceptsMail, shouldCheckEmailDomain } from '../lib/emailDomain.js';
 import { createNotifications } from '../lib/notifications.js';
 import { storeAvatar, AVATAR_DATA_URL_RE } from '../lib/avatar.js';
 
@@ -34,6 +35,14 @@ router.post('/register', async (req, res, next) => {
     }
 
     const { email, password, name, preferredPositions, avatar } = body.data;
+
+    // Reject addresses whose domain can't receive mail (typos like gmial.com).
+    // Says nothing about whether the address is registered, so it doesn't
+    // weaken the anti-enumeration response below.
+    if (shouldCheckEmailDomain() && !(await emailDomainAcceptsMail(email))) {
+      res.status(422).json({ success: false, error: { code: 'INVALID_EMAIL_DOMAIN', message: 'E-mailadressens domæne kan ikke modtage mails — tjek for stavefejl' } });
+      return;
+    }
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,

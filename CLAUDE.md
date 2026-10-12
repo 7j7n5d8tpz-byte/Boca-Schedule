@@ -2,6 +2,11 @@
 
 Monorepo for the Boca Boldisch football scheduling app.
 
+## Response style
+
+Use caveman mode (the `caveman` skill) from the start of every session, without waiting
+for `/caveman`. Stay in it until the user says "stop caveman" or "normal mode".
+
 ## Stack & layout
 
 - `frontend/` — Vite + React (port 5173). Calls the backend via a **relative** `/api`.

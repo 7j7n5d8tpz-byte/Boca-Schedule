@@ -32,6 +32,9 @@ develop locally  →  test locally  →  commit  →  push to main  →  CI gate
 - Before manual testing or pushing, run the `/test` skill: it runs the same gates as CI
   locally (typecheck → frontend unit → backend integration → E2E), cheapest-first and
   stops at the first failure. Requires the stack up via `/start`; it does not auto-start.
+- For interactive browser work (checking the running app, screenshots, console/network
+  debugging, performance), use the `chrome-devtools-mcp` plugin by default, not Claude in
+  Chrome. Automated E2E stays on Playwright via `/test`.
 - For larger changes, branch off `main`, open a PR (CI runs on PRs), then merge.
   For small changes, committing straight to `main` is fine.
 

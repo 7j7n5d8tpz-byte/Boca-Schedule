@@ -85,3 +85,11 @@ on unattended migrations.
   (`sm:hidden`), the `<table>` above it (`hidden sm:block`, `overflow-x-auto`). Never wrap
   a table in `overflow-hidden` — it clips columns on phones with no way to scroll. See
   `frontend/src/pages/admin/Dashboard.tsx` and `frontend/src/pages/player/Statistics.tsx`.
+- Astryx (`@astryxdesign/core`, see [frontend/AGENTS.md](frontend/AGENTS.md)) is the design
+  system for new and migrated UI. The mobile rule above still holds there, as a **swap**:
+  Astryx `Table` at `sm` and up, Astryx `List`/`Item` rows below it (not Card-wrapped
+  lists, not a sideways-scrolling `Table`). Existing Tailwind tables keep the pattern
+  above until they are migrated.
+- Backend zod is v4: validate IDs with `z.string().guid()`, not `.uuid()`. v4's `.uuid()`
+  enforces RFC version/variant bits and rejects seeded IDs such as
+  `a1000000-0000-0000-0000-000000000001` (migration `20260528000003`).

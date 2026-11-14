@@ -1,7 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Theme } from '@astryxdesign/core/theme';
+import { TopNav, TopNavHeading, TopNavItem } from '@astryxdesign/core/TopNav';
+import { DropdownMenu } from '@astryxdesign/core/DropdownMenu';
+import { themes, defaultThemeSlug } from '../astryx-themes';
 import { useAuth } from '../context/AuthContext';
 import RavenIcon from './RavenIcon';
 import NotificationBell from './NotificationBell';
@@ -13,304 +16,254 @@ interface AppNavProps {
   onBack?: () => void;
 }
 
-export default function AppNav({ backHref, backLabel, onBack }: AppNavProps) {
-  const { user, logout } = useAuth();
-  const { t } = useTranslation();
-  const back = backLabel ?? t('nav.back');
-  const { pathname } = useLocation();
-  const [open, setOpen] = useState(false);
-  const [hidden, setHidden] = useState(false);
+type TabId = 'home' | 'stats' | 'achievements' | 'fines' | 'coach' | 'more';
 
-  // Hide the (sticky) nav when scrolling down, reveal it when scrolling up —
-  // so it's reachable from anywhere on the page, not just the top.
-  const lastY = useRef(0);
-  const autoHide = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const openRef = useRef(open);
-  openRef.current = open;
-  const hoveringRef = useRef(false);
-  const notifOpenRef = useRef(false);
+// Outline glyphs for the navigation (24×24, currentColor) — one per page.
+const GLYPH: Record<TabId, string> = {
+  home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z',
+  stats: 'M4 20V10M10 20V4M16 20v-7M2 20h20',
+  achievements: 'M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3Zm-3 9 2.2 2.2L15 10.5',
+  fines: 'M3 7h18v10H3V7Zm9 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6.5 10.5v3M17.5 10.5v3',
+  coach: 'M9 4h6v3H9V4ZM6 7h12v13H6V7Zm3 5h6M9 16h4',
+  more: 'M5 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm7 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm7 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z',
+};
 
-  // Re-hide 1s after the nav is revealed mid-page so it doesn't linger. Held
-  // off whenever the user is hovering the bar, the menu is open, or the
-  // notification panel is open — so they can actually use it. Callers re-arm
-  // this on the matching "released" event (mouse leave, panel/menu close).
-  const armAutoHide = useCallback(() => {
-    clearTimeout(autoHide.current);
-    if (window.scrollY > 0 && !openRef.current && !notifOpenRef.current && !hoveringRef.current) {
-      autoHide.current = setTimeout(() => setHidden(true), 1000);
-    }
+function Glyph({ id, className = 'w-[22px] h-[22px]' }: { id: TabId; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d={GLYPH[id]} />
+    </svg>
+  );
+}
+
+// Astryx link slots hand over an `href`; route it through react-router so the
+// top bar navigates client-side instead of reloading the page.
+function RouterLink({ href, ...rest }: Omit<ComponentProps<'a'>, 'href'> & { href?: string }) {
+  return <Link to={href ?? '#'} {...rest} />;
+}
+
+// Phones get the bottom bar, `sm` and up the top bar. Only one is ever mounted
+// (so there is a single notification bell / menu in the tree), which is why
+// this is a hook and not a pair of `sm:hidden` / `hidden sm:block` wrappers.
+function useIsDesktop() {
+  const query = '(min-width: 640px)';
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return;
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
   }, []);
+  return isDesktop;
+}
 
+// Safari-style: the bottom bar contracts while the page scrolls down and
+// expands again on any scroll up (or at the very top).
+function useScrollCompact() {
+  const [compact, setCompact] = useState(false);
+  const lastY = useRef(0);
   useEffect(() => {
     lastY.current = window.scrollY;
     function onScroll() {
       const y = window.scrollY;
       const delta = y - lastY.current;
-      // Ignore tiny jitter. Hide as soon as the user starts scrolling down;
-      // reveal on any scroll up. Every scroll resets the auto-hide timer.
-      if (Math.abs(delta) > 6) {
-        lastY.current = y;
-        // Never yank the nav away from an open menu / notification panel — if
-        // the user scrolls while one is open, keep the nav put.
-        if (openRef.current || notifOpenRef.current) {
-          setHidden(false);
-          clearTimeout(autoHide.current);
-          return;
-        }
-        const nextHidden = delta > 0 && y > 0;
-        setHidden(nextHidden);
-        if (nextHidden) clearTimeout(autoHide.current);
-        else armAutoHide();
-      }
+      if (Math.abs(delta) < 6) return; // ignore jitter
+      lastY.current = y;
+      setCompact(delta > 0 && y > 24);
     }
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      clearTimeout(autoHide.current);
-    };
-  }, [armAutoHide]);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  return [compact, setCompact] as const;
+}
 
-  // Keep the nav shown while the menu is open (and cancel any pending auto-hide
-  // so it can't close under the open menu). When the menu closes again mid-page,
-  // re-arm the idle auto-hide — otherwise opening/closing it would pin the nav.
-  const prevOpen = useRef(open);
-  useEffect(() => {
-    if (open) {
-      clearTimeout(autoHide.current);
-      setHidden(false);
-    } else if (prevOpen.current) {
-      armAutoHide();
-    }
-    prevOpen.current = open;
-  }, [open, armAutoHide]);
+export default function AppNav({ backHref, backLabel, onBack }: AppNavProps) {
+  const { user, logout } = useAuth();
+  const { t } = useTranslation();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
+  const [compact, setCompact] = useScrollCompact();
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  // Mirror the hidden state onto <html> so sticky sidebars can offset their
-  // `top` by the nav's current visible height and slide up/down in lockstep.
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle('app-nav-hidden', hidden);
-    return () => root.classList.remove('app-nav-hidden');
-  }, [hidden]);
-
+  const back = backLabel ?? t('nav.back');
   const isCoach = user?.role === 'coach' || user?.role === 'admin';
-  const isAdmin  = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin';
   const isFineAdmin = isAdmin || !!user?.isFineAdmin;
-
-  // Profile picture (uploaded via the profile page); null → initials fallback.
+  const profilePath = `/players/${user?.userId}`;
   const avatarUrl = user?.avatarUrl ?? null;
   const initial = user?.name?.charAt(0).toUpperCase() ?? '?';
 
-  const navLink = (to: string, label: string, color = 'text-white/75') => {
-    const active = pathname === to || pathname.startsWith(to + '/');
-    return (
-      <Link
-        to={to}
-        onClick={() => setOpen(false)}
-        className={`flex items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-white/10 ${
-          active ? 'text-white font-semibold bg-white/10' : `${color} hover:text-white`
-        }`}
-      >
-        {label}
-      </Link>
+  const under = (to: string) => pathname === to || pathname.startsWith(to + '/');
+  // Phones use short labels that fit a fifth of the bar; the desktop top bar has
+  // room for the full page names.
+  const tabs: { id: TabId; to: string; label: string; active: boolean }[] = [
+    { id: 'home', to: '/dashboard', label: t('nav.tabHome'), active: under('/dashboard') },
+    { id: 'stats', to: '/statistics', label: isDesktop ? t('nav.teamStats') : t('nav.tabStats'), active: under('/statistics') },
+    { id: 'achievements', to: '/achievements', label: isDesktop ? t('nav.achievements') : t('nav.tabAchievements'), active: under('/achievements') },
+    { id: 'fines', to: '/fines', label: isDesktop ? t('nav.fines') : t('nav.tabFines'), active: under('/fines') && !under('/fines/manage') },
+  ];
+  // Whatever isn't one of the four tabs lives behind "More" on phones.
+  const current = tabs.find(tab => tab.active) ?? { id: 'more' as TabId, label: t('nav.more') };
+
+  const avatar = (size: string) => (
+    <span className={`${size} rounded-full overflow-hidden bg-brand-green text-white font-bold flex items-center justify-center shrink-0`}>
+      {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : initial}
+    </span>
+  );
+
+  // Profile first, then the management views, then settings / log out. On
+  // desktop the coach view sits in the top bar itself, so it is left out here.
+  const menuItems = [
+    { label: user?.name ?? t('nav.yourProfile'), description: t('nav.viewProfile'), onClick: () => navigate(profilePath, { state: DASHBOARD_ORIGIN }) },
+    ...(isCoach && !isDesktop ? [{ label: t('nav.coachView'), onClick: () => navigate('/coach') }] : []),
+    ...(isFineAdmin ? [{ label: t('nav.manageFines'), onClick: () => navigate('/fines/manage') }] : []),
+    ...(isAdmin ? [{ label: t('nav.adminPanel'), onClick: () => navigate('/admin') }] : []),
+    { label: t('nav.settings'), onClick: () => navigate('/settings') },
+    { label: t('nav.logOut'), variant: 'destructive' as const, onClick: () => { void logout(); } },
+  ];
+
+  const backControl = (cls: string): ReactNode => {
+    if (!backHref && !onBack) return null;
+    const inner = (
+      <>
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 shrink-0" aria-hidden>
+          <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {back}
+      </>
     );
+    return backHref
+      ? <Link to={backHref} aria-label={t('nav.backTo', { label: back })} className={cls}>{inner}</Link>
+      : <button onClick={onBack} aria-label={t('nav.backTo', { label: back })} className={cls}>{inner}</button>;
   };
 
-  // Push the whole app (#root) aside while the drawer is open — see index.css.
-  // The drawer/backdrop are portaled out of #root so this transform doesn't
-  // capture their fixed positioning.
-  useEffect(() => {
-    document.documentElement.classList.toggle('app-drawer-open', open);
-    return () => document.documentElement.classList.remove('app-drawer-open');
-  }, [open]);
+  // ── Desktop: Astryx top bar in the dark chrome ───────────────────────────
+  if (isDesktop) {
+    return (
+      <Theme theme={themes[defaultThemeSlug]} mode="dark">
+        <header className="sticky top-0 z-40 bg-brand-dark">
+          <TopNav
+            label={t('nav.main')}
+            heading={
+              <TopNavHeading
+                as={RouterLink}
+                headingHref="/dashboard"
+                heading="Boca Boldisch"
+                logo={
+                  // Crest on the kit stripe, which runs the full height of the bar.
+                  <span className="relative flex items-center shrink-0 mx-1">
+                    <span className="absolute left-1/2 -translate-x-1/2 -top-2 -bottom-2 flex" aria-hidden>
+                      <span className="w-3.5 bg-brand-green" />
+                      <span className="w-3.5 bg-brand-red" />
+                      <span className="w-3.5 bg-brand-green" />
+                    </span>
+                    <RavenIcon className="relative w-12 h-12 shrink-0" />
+                  </span>
+                }
+              />
+            }
+            startContent={backControl('inline-flex items-center gap-1 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-medium pl-2 pr-3 h-9 transition-colors shrink-0')}
+            centerContent={
+              <>
+                {tabs.map(tab => (
+                  <TopNavItem key={tab.id} as={RouterLink} href={tab.to} label={tab.label} icon={<Glyph id={tab.id} className="w-5 h-5" />} isSelected={tab.active} />
+                ))}
+                {isCoach && (
+                  <TopNavItem as={RouterLink} href="/coach" label={t('nav.coachView')} icon={<Glyph id="coach" className="w-5 h-5" />} isSelected={under('/coach')} />
+                )}
+              </>
+            }
+            endContent={
+              <>
+                <NotificationBell />
+                <DropdownMenu
+                  items={menuItems}
+                  placement="below"
+                  alignment="end"
+                  menuWidth={240}
+                  hasChevron={false}
+                  renderTrigger={props => (
+                    <button {...props} aria-label={t('nav.openMenu')} className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-white/70">
+                      {avatar('w-10 h-10 text-sm')}
+                    </button>
+                  )}
+                />
+              </>
+            }
+          />
+        </header>
+      </Theme>
+    );
+  }
 
-  // Close on Escape (the backdrop handles click-outside).
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false); }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
+  // ── Phones: floating bell + bottom bar ───────────────────────────────────
+  const tabCls = (active: boolean) =>
+    `flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 h-[52px] rounded-full transition-colors ${
+      active ? 'bg-brand-green text-white' : 'text-white/80 hover:text-white'
+    }`;
 
   return (
-    <nav
-      // Pointer events (not mouse) so a touch tap — which synthesizes mouse
-      // events and would otherwise leave `hovering` stuck true with no
-      // leave — never engages the hover bypass. Hover is a mouse-only concept.
-      onPointerEnter={e => { if (e.pointerType === 'mouse') { hoveringRef.current = true; clearTimeout(autoHide.current); } }}
-      onPointerLeave={e => { if (e.pointerType === 'mouse') { hoveringRef.current = false; armAutoHide(); } }}
-      // In the installed (full-screen) app the transparent status bar overlays
-      // the page, so pad the nav's top by the safe-area inset to keep its
-      // content (burger/logo/bell) clear of the status bar / notch. env() is 0
-      // in a normal Safari tab, leaving the plain py-3. The full-height
-      // hide-translate carries this padding, so the nav still clears completely.
-      style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
-      className={`sticky top-0 z-40 bg-brand-dark px-4 py-3 flex items-center gap-3 transition-[transform,opacity] ${
-        hidden ? '-translate-y-full opacity-0 duration-[450ms]' : 'translate-y-0 opacity-100 duration-300'
-      }`}
-    >
-
-      {/* ── Hamburger (far left) → opens the left push drawer ── */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        aria-label={t('nav.openMenu')}
-        aria-expanded={open}
-        className="flex flex-col justify-center items-center w-9 h-9 rounded-lg hover:bg-white/10 transition-colors gap-[5px] shrink-0"
+    <>
+      {/* Top strip: no ribbon any more, just room for the optional back pill
+          on the left and the floating bell on the right. The strip scrolls
+          away with the page; the bell stays put. */}
+      <div
+        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
+        className="flex items-center min-h-[3.5rem] px-3 pb-1"
       >
-        {/* Static three lines — the drawer carries its own close (×) button, so
-            the burger doesn't morph to an X (it would get pushed alongside the
-            drawer's × and read as a duplicate). */}
-        <span className="block w-5 h-0.5 bg-white/80 rounded" />
-        <span className="block w-5 h-0.5 bg-white/80 rounded" />
-        <span className="block w-5 h-0.5 bg-white/80 rounded" />
-      </button>
-
-      {/* ── Optional back button ── a pill (subtle bg + arrow icon) so it reads
-             as a clear, tappable control against the dark nav, not faint text. ── */}
-      {(backHref || onBack) && (() => {
-        const cls = 'inline-flex items-center gap-1 rounded-lg bg-white/10 hover:bg-white/20 text-white/90 hover:text-white text-sm font-medium pl-2 pr-3 py-1.5 transition-colors shrink-0';
-        const inner = (
-          <>
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 shrink-0" aria-hidden>
-              <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {back}
-          </>
-        );
-        return backHref
-          ? <Link to={backHref} aria-label={t('nav.backTo', { label: back })} className={cls}>{inner}</Link>
-          : <button onClick={onBack} aria-label={t('nav.backTo', { label: back })} className={cls}>{inner}</button>;
-      })()}
-
-      {/* ── Logo + name → player dashboard, the shared home for everyone (coaches
-             and admins are players too; their /coach and /admin views are
-             management-only and reached via the menu). Wordmark hidden on phones
-             so the back link + nav icons always fit. ── */}
-      <Link
-        to="/dashboard"
-        onClick={() => setOpen(false)}
-        aria-label={t('nav.home')}
-        className="flex items-center gap-2 sm:gap-3 shrink-0 rounded-lg hover:opacity-80 transition-opacity"
+        {backControl('inline-flex items-center gap-1 rounded-full bg-white/90 border border-gray-200 shadow-sm text-brand-dark text-sm font-medium pl-2.5 pr-3.5 h-11 transition-colors')}
+      </div>
+      <div
+        style={{ top: 'calc(0.75rem + env(safe-area-inset-top))' }}
+        className="fixed right-3 z-40"
       >
-        {/* Crest on the kit stripe — mirrors the login hero lockup. The stripe
-            runs the full nav height (extends past the crest via -top-3/-bottom-3
-            into the nav's py-3 padding) and the crest sits on top of it. */}
-        <span className="relative flex items-center shrink-0">
-          <span className="absolute left-1/2 -translate-x-1/2 -top-3 -bottom-3 flex" aria-hidden>
-            <span className="w-3 sm:w-3.5 bg-brand-green" />
-            <span className="w-3 sm:w-3.5 bg-brand-red" />
-            <span className="w-3 sm:w-3.5 bg-brand-green" />
-          </span>
-          <RavenIcon className="relative z-10 w-12 h-12 sm:w-14 sm:h-14 shrink-0" />
-        </span>
-        <span className="hidden sm:block font-display font-extrabold uppercase tracking-wide text-white text-lg leading-tight">Boca Boldisch</span>
-      </Link>
+        <NotificationBell floating />
+      </div>
 
-      {/* ── Spacer ── */}
-      <div className="flex-1" />
-
-      {/* ── Notification bell ── */}
-      <NotificationBell
-        onOpenChange={o => {
-          notifOpenRef.current = o;
-          if (o) clearTimeout(autoHide.current);
-          else armAutoHide();
-        }}
-      />
-
-      {/* ── Profile avatar (far right) → your own player hub (photo, stats,
-             crests). Account settings are reached from there or the drawer. ── */}
-      <Link
-        to={`/players/${user?.userId}`}
-        state={DASHBOARD_ORIGIN}
-        aria-label={t('nav.yourProfile')}
-        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden text-sm font-bold transition-all ${
-          pathname === `/players/${user?.userId}` ? 'ring-2 ring-white/40' : 'hover:opacity-90'
-        } ${avatarUrl ? 'bg-white/10' : pathname === `/players/${user?.userId}` ? 'bg-brand-green text-white' : 'bg-brand-green/30 text-brand-green'}`}
+      <nav
+        data-app-bottom-nav
+        aria-label={t('nav.main')}
+        style={{ bottom: `calc(${compact ? '10px' : '18px'} + env(safe-area-inset-bottom))` }}
+        className={`fixed left-1/2 -translate-x-1/2 z-40 rounded-full bg-brand-dark/95 backdrop-blur shadow-[0_12px_28px_-10px_rgba(16,47,31,0.55)] overflow-hidden transition-[width,height,bottom] duration-300 ease-[cubic-bezier(0.22,0.8,0.2,1)] motion-reduce:transition-none ${
+          compact ? 'w-44 h-11' : 'w-[calc(100vw-2rem)] max-w-[26rem] h-[68px]'
+        }`}
       >
-        {avatarUrl
-          ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-          : initial}
-      </Link>
-
-      {/* ── Left push drawer ── portaled into <body> (outside #root) so it stays
-             fixed to the viewport while #root slides aside. ── */}
-      {createPortal(
-        <>
-          {/* Backdrop over the pushed-aside page */}
-          <div
-            onClick={() => setOpen(false)}
-            aria-hidden
-            className={`fixed inset-0 z-[60] bg-black/40 transition-opacity duration-300 ${
-              open ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-          />
-
-          {/* Drawer panel */}
-          <aside
-            aria-hidden={!open}
-            className={`fixed inset-y-0 left-0 z-[70] w-[280px] max-w-[85vw] bg-[#0f1f0f] border-r border-white/10 shadow-2xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.22,0.8,0.2,1)] ${
-              open ? 'translate-x-0' : '-translate-x-full'
-            }`}
+        {compact ? (
+          <button
+            onClick={() => setCompact(false)}
+            aria-label={t('nav.showNav')}
+            className="w-full h-full flex items-center justify-center gap-2 text-white"
           >
-            {/* Header: user + close. In the installed (full-screen) app the
-                transparent status bar overlays the drawer too, so pad the top
-                by the safe-area inset to keep the profile clear of the
-                clock/notch. env() is 0 in a normal Safari tab, leaving py-4. */}
-            <div
-              style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
-              className="flex items-center gap-3 px-4 py-4 border-b border-white/10"
-            >
-              <span className="w-9 h-9 rounded-full overflow-hidden bg-brand-green/30 text-brand-green text-sm font-bold flex items-center justify-center shrink-0">
-                {avatarUrl
-                  ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                  : initial}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-white font-semibold text-sm truncate">{user?.name ?? t('nav.menu')}</div>
-                {user?.role && <div className="text-white/40 text-xs capitalize">{t(`nav.roles.${user.role}`)}</div>}
-              </div>
-              <button
-                onClick={() => setOpen(false)}
-                aria-label={t('nav.closeMenu')}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors shrink-0"
-              >
-                <span className="text-xl leading-none">&times;</span>
-              </button>
-            </div>
-
-            {/* Navigation */}
-            <div className="flex-1 overflow-y-auto py-2">
-              {isCoach
-                ? navLink('/dashboard', t('nav.playerView'))
-                : navLink('/dashboard', t('nav.dashboard'))
-              }
-              {navLink('/statistics', t('nav.teamStats'))}
-              {navLink('/achievements', t('nav.achievements'))}
-              {navLink('/fines', t('nav.fines'))}
-              {isFineAdmin && navLink('/fines/manage', t('nav.manageFines'))}
-              {isCoach && navLink('/coach', t('nav.coachView'))}
-              {isAdmin && navLink('/admin', t('nav.adminPanel'), 'text-purple-300')}
-            </div>
-
-            {/* Footer: settings + log out. Pad the bottom by the safe-area inset
-                so Log out clears the home indicator in the installed full-screen
-                app (env() is 0 in a normal Safari tab, leaving py-2). */}
-            <div
-              style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
-              className="border-t border-white/10 py-2"
-            >
-              {navLink('/settings', t('nav.settings'))}
-              <button
-                onClick={() => { logout(); setOpen(false); }}
-                className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-white/10 transition-colors"
-              >
-                {t('nav.logOut')}
-              </button>
-            </div>
-          </aside>
-        </>,
-        document.body,
-      )}
-    </nav>
+            <Glyph id={current.id} className="w-[18px] h-[18px]" />
+            <span className="text-[13px] font-semibold truncate">{current.label}</span>
+          </button>
+        ) : (
+          <div className="h-full flex items-center gap-0.5 px-2">
+            {tabs.map(tab => (
+              <Link key={tab.id} to={tab.to} aria-current={tab.active ? 'page' : undefined} className={tabCls(tab.active)}>
+                <Glyph id={tab.id} />
+                <span className="text-[11px] font-semibold leading-tight max-w-full truncate px-1">{tab.label}</span>
+              </Link>
+            ))}
+            <DropdownMenu
+              items={menuItems}
+              presentation="bottom-sheet"
+              hasChevron={false}
+              isMenuOpen={menuOpen}
+              onOpenChange={setMenuOpen}
+              renderTrigger={props => (
+                <button {...props} className={tabCls(current.id === 'more')}>
+                  <Glyph id="more" />
+                  <span className="text-[11px] font-semibold leading-tight">{t('nav.more')}</span>
+                </button>
+              )}
+            />
+          </div>
+        )}
+      </nav>
+    </>
   );
 }

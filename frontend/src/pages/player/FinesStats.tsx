@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react';
+import BocaLoader from '../../components/BocaLoader';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -46,7 +47,7 @@ export default function FinesStats() {
     queryFn: () => api.get(`/fines/stats${year === 'all' ? '' : `?year=${year}`}`).then(r => r.data.data),
   });
 
-  if (!data) return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">{t('common.loading')}</div>;
+  if (!data) return <div className="bg-white rounded-xl border border-gray-200"><BocaLoader /></div>;
 
   if (data.fineCount === 0) {
     return (

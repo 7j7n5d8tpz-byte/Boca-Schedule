@@ -90,6 +90,19 @@ on unattended migrations.
   Astryx `Table` at `sm` and up, Astryx `List`/`Item` rows below it (not Card-wrapped
   lists, not a sideways-scrolling `Table`). Existing Tailwind tables keep the pattern
   above until they are migrated.
+- Theme: `boca` (Astryx neutral + club green/red/raven black, Archivo headings). Change it
+  with `npx astryx experimental theme editor set boca …` from `frontend/` — never edit
+  `frontend/src/themes/` by hand (generated). The app runs it in **light** mode only
+  (`<Theme mode="light">` in `App.tsx`) until the Tailwind pages have dark styles.
+- CSS cascade layers: `frontend/src/layers.css` must stay the first stylesheet imported in
+  `main.tsx`, and `@tailwind base` stays wrapped in `@layer tw-preflight` (index.css).
+  Unlayered preflight silently flattens every Astryx component.
+- Navigation is `frontend/src/components/AppNav.tsx`: floating bottom bar on phones (shrinks
+  on scroll down, expands on scroll up; "More" opens a bottom sheet with profile, coach /
+  admin views, settings, log out), Astryx `TopNav` at `sm` and up. No top ribbon on phones;
+  the notification bell floats top-right.
+- Loading states: `BocaLoader` (crest coin-flip) for page / card / inline loads; skeletons
+  stay for lists. Don't add plain "Loading…" texts or CSS spinners.
 - Backend zod is v4: validate IDs with `z.string().guid()`, not `.uuid()`. v4's `.uuid()`
   enforces RFC version/variant bits and rejects seeded IDs such as
   `a1000000-0000-0000-0000-000000000001` (migration `20260528000003`).

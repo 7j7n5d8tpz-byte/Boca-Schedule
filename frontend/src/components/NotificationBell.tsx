@@ -102,7 +102,10 @@ function timeAgo(iso: string, t: Translate): string {
   return t('notifications.daysAgo', { count: d });
 }
 
-export default function NotificationBell({ onOpenChange }: { onOpenChange?: (open: boolean) => void }) {
+// `floating` = the light round button that hovers in the top-right corner on
+// phones (no top bar there); default = the flat white-on-dark icon in the
+// desktop top bar.
+export default function NotificationBell({ onOpenChange, floating = false }: { onOpenChange?: (open: boolean) => void; floating?: boolean }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -177,7 +180,9 @@ export default function NotificationBell({ onOpenChange }: { onOpenChange?: (ope
         onClick={() => setOpen(o => !o)}
         aria-label={t('notifications.aria')}
         aria-expanded={open}
-        className="relative flex items-center justify-center w-9 h-9 rounded-lg hover:bg-white/10 transition-colors"
+        className={floating
+          ? 'relative flex items-center justify-center w-11 h-11 rounded-full bg-white/90 border border-gray-200 shadow-md backdrop-blur hover:bg-white transition-colors'
+          : 'relative flex items-center justify-center w-11 h-11 rounded-full hover:bg-white/10 transition-colors'}
       >
         {/* Monochrome bell — matches the nav's flat white/80 line work */}
         <svg
@@ -188,13 +193,13 @@ export default function NotificationBell({ onOpenChange }: { onOpenChange?: (ope
           strokeLinecap="round"
           strokeLinejoin="round"
           aria-hidden="true"
-          className="w-5 h-5 text-white/80"
+          className={floating ? 'w-5 h-5 text-brand-dark' : 'w-5 h-5 text-white/80'}
         >
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-brand-red text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+          <span className="absolute top-0 right-0 min-w-[18px] h-[18px] bg-brand-red text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
             {unread > 9 ? '9+' : unread}
           </span>
         )}

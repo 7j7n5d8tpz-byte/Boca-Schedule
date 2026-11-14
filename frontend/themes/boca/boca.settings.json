@@ -1,0 +1,78 @@
+{
+  "name": "boca",
+  "like": "neutral",
+  "mode": "both",
+  "settings": [
+    {
+      "thing": "accent",
+      "value": "#205B3B",
+      "source": "dial"
+    },
+    {
+      "thing": "danger",
+      "value": "#c41230",
+      "source": "dial"
+    },
+    {
+      "thing": "neutral",
+      "value": "#1A1D22",
+      "source": "dial"
+    },
+    {
+      "thing": "corners",
+      "value": "large",
+      "source": "dial"
+    },
+    {
+      "thing": "font",
+      "value": "system",
+      "source": "dial"
+    },
+    {
+      "thing": "headings",
+      "value": "heavy",
+      "source": "dial",
+      "axis": "weight"
+    },
+    {
+      "thing": "headings",
+      "value": "tight",
+      "source": "dial",
+      "axis": "tracking"
+    },
+    {
+      "thing": "font",
+      "value": "Archivo",
+      "source": "dial",
+      "on": "heading"
+    },
+    {
+      "thing": "--color-background-body",
+      "value": "#F2F2F2",
+      "source": "token",
+      "mode": "light"
+    },
+    {
+      "thing": "background",
+      "value": "#205B3B",
+      "source": "property",
+      "on": "top-nav-item",
+      "state": "selected"
+    },
+    {
+      "thing": "color",
+      "value": "#FFFFFF",
+      "source": "property",
+      "on": "top-nav-item",
+      "state": "selected"
+    },
+    {
+      "thing": "corners",
+      "value": "pill",
+      "source": "dial",
+      "on": "top-nav-item"
+    }
+  ],
+  "lifted": [],
+  "palette": "1fb9d632c19077e949af4d2237191165ce8f729e937667f9557a0226d38d1453"
+}

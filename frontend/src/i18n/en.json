@@ -21,6 +21,14 @@
     "special": "Special character"
   },
   "nav": {
+    "tabAchievements": "Crests",
+    "tabHome": "Home",
+    "tabStats": "Stats",
+    "tabFines": "Fines",
+    "more": "More",
+    "viewProfile": "View your profile",
+    "showNav": "Show navigation",
+    "main": "Main navigation",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "back": "Back",

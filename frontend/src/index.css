@@ -1,18 +1,16 @@
-@tailwind base;
+/* Preflight is layered below Astryx (see layers.css); components and
+   utilities stay unlayered so existing utility classes keep winning. */
+@layer tw-preflight {
+  @tailwind base;
+}
 @tailwind components;
 @tailwind utilities;
 
-/* Height of the sticky AppNav (crest height + py-3 on each side). Sticky
-   sidebars offset their `top` by `--app-nav-offset` so they sit just below the
-   nav. When the nav hides on scroll-down (`.app-nav-hidden` on <html>) the
-   offset collapses to 0, so sidebars follow the nav up to the top; it expands
-   again on scroll-up. Sidebars transition `top` with the same 300ms as the
-   nav's slide so the two move seamlessly together. */
-:root { --app-nav-h: 72px; --app-nav-offset: var(--app-nav-h); --app-nav-dur: 300ms; }
-@media (min-width: 640px) { :root { --app-nav-h: 80px; } }
-/* Collapsing (hiding) runs a touch slower than the reveal; sidebars read this
-   duration so they stay in lockstep with the nav in both directions. */
-:root.app-nav-hidden { --app-nav-offset: 0px; --app-nav-dur: 450ms; }
+/* Height of the sticky desktop top bar (AppNav). Sticky sidebars offset their
+   `top` by `--app-nav-offset` so they sit just below it. Phones have no top
+   bar (the navigation is the floating bottom bar), so the offset is 0 there. */
+:root { --app-nav-h: 0px; --app-nav-offset: var(--app-nav-h); --app-nav-dur: 300ms; }
+@media (min-width: 640px) { :root { --app-nav-h: 64px; } }
 
 /* Display typeface (Archivo) for all headings. */
 @layer base {
@@ -103,12 +101,19 @@ input[type="time"]::-webkit-date-and-time-value {
   /* In the installed full-screen app the home-indicator overlays the page;
      keep page content clear of it. 0 in a normal Safari tab. */
   padding-bottom: env(safe-area-inset-bottom);
+  /* Page grey from the Astryx theme; beats the legacy `bg-gray-50` utility on
+     the same element because this rule comes later in the file. */
+  background-color: var(--color-background-body, #f2f2f2);
+}
+/* Pages that show the floating bottom bar (phones) keep their last content
+   clear of it. */
+.boca-page:has([data-app-bottom-nav]) {
+  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
 }
 
 /* Clamp horizontal overflow at the root, at every breakpoint. Two reasons:
-   (1) the fixed watermark below intentionally bleeds past the right edge, which
-   would otherwise make the page horizontally scrollable; (2) the push drawer
-   translates #root sideways, pushing the page off the opposite edge on purpose.
+   the fixed watermark below intentionally bleeds past the right edge, which
+   would otherwise make the page horizontally scrollable.
    Use `clip`, not `hidden`: `overflow: hidden` establishes a scroll container
    and breaks `position: sticky` descendants (the AppNav is sticky at every
    breakpoint), whereas `clip` just clips. */
@@ -119,23 +124,7 @@ html, body { overflow-x: clip; }
    grey theme-color so the chrome blends edge-to-edge. `color-scheme: light`
    keeps the browser chrome from ever defaulting dark. */
 :root { color-scheme: light; }
-html, body { background-color: #f9fafb; } /* tailwind gray-50 — matches .boca-page */
-
-/* ─── Push drawer ──────────────────────────────────────────────────────────
-   The whole app (#root) slides right when the left nav drawer opens, so the
-   page overflows off the right edge (clipped above). The drawer + backdrop are
-   portaled OUTSIDE #root (into <body>) so this transform doesn't anchor their
-   `position: fixed` to #root — they stay fixed to the viewport while the page
-   moves under them. */
-#root {
-  transition: transform var(--app-nav-dur, 300ms) cubic-bezier(0.22, 0.8, 0.2, 1);
-}
-html.app-drawer-open #root { transform: translateX(280px); }
-/* While the drawer is open, lock the page behind it so a swipe/scroll only
-   moves the drawer's own list (it has its own `overflow-y-auto`), not the page
-   underneath. `clip` (not `hidden`) prevents scrolling without establishing a
-   scroll container — so it doesn't break the sticky nav or shift layout. */
-html.app-drawer-open, html.app-drawer-open body { overflow-y: clip; }
+html, body { background-color: #f2f2f2; } /* page grey — matches .boca-page / the theme's body colour */
 
 /* Same lock behind a modal dialog, so a scroll gesture that misses the panel
    doesn't drag the page under it. Touch devices only: on a desktop with a
@@ -144,21 +133,35 @@ html.app-drawer-open, html.app-drawer-open body { overflow-y: clip; }
 @media (hover: none) and (pointer: coarse) {
   html.boca-modal-open, html.boca-modal-open body { overflow-y: clip; }
 }
-@media (prefers-reduced-motion: reduce) { #root { transition: none; } }
 
 .boca-page::after {
   content: '';
   position: fixed;
   top: 50%;
   right: 0;
-  width: 100vw;
-  height: 100vw;
+  /* Screen-wide on desktop; on phones a fixed 600px so the raven reads larger
+     than the screen. Half of it bleeds off the right edge either way. */
+  width: max(100vw, 600px);
+  height: max(100vw, 600px);
   background-image: url('/boca-logo.png');
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center;
   transform: translateY(-50%) translateX(50%);
-  opacity: 0.055;
+  opacity: 0.15;
   pointer-events: none;
   z-index: -1;
+}
+
+/* ─── Loader ───────────────────────────────────────────────────────────────
+   The crest flips like a coin (around its vertical axis, so the raven never
+   ends up upside down). Reduced motion gets a gentle fade instead. */
+@keyframes bocaCoin {
+  from { transform: perspective(600px) rotateY(0deg); }
+  to   { transform: perspective(600px) rotateY(360deg); }
+}
+@keyframes bocaBreathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.boca-coin { animation: bocaCoin 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .boca-coin { animation: bocaBreathe 2s ease-in-out infinite; }
 }

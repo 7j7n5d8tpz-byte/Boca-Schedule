@@ -1,4 +1,5 @@
 import AppNav from './../components/AppNav';
+import BocaLoader from '../components/BocaLoader';
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -479,7 +480,7 @@ export default function MatchResults() {
   const manOfMatchName   = motmId ? (selectedPlayers.find(p => p.userId === motmId)?.name ?? null) : null;
 
   if (selectionsLoading || resultsLoading) {
-    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">{t('common.loading')}</div>;
+    return <BocaLoader size="page" />;
   }
 
   const match = selectionsData?.match;

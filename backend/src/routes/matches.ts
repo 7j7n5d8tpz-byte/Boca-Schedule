@@ -60,7 +60,7 @@ const CreateMatchSchema = z.object({
   minPlayers: z.number().int().positive(),
   maxPlayers: z.number().int().positive(),
   opponent: z.string().max(100).optional(),
-  opponentId: z.string().uuid().optional(),
+  opponentId: z.string().guid().optional(),
   matchCategory: z.enum(['serie', 'pokal']).default('serie'),
   serieLetter: z.string().max(10).optional(),
   priorityEnabled: z.boolean().default(true),
@@ -389,11 +389,11 @@ const HistoricalMatchSchema = z.object({
   matchDate: z.string().date(),
   matchTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
   opponent: z.string().max(100).optional(),
-  opponentId: z.string().uuid().optional(),
+  opponentId: z.string().guid().optional(),
   matchType: z.enum(['futsal', '7-player', '11-player']),
   matchCategory: z.enum(['serie', 'pokal']).default('serie'),
   serieLetter: z.string().max(10).optional(),
-  participantIds: z.array(z.string().uuid()).default([]),
+  participantIds: z.array(z.string().guid()).default([]),
 });
 
 const TYPE_MIN_PLAYERS: Record<string, number> = { futsal: 5, '7-player': 7, '11-player': 11 };
@@ -482,7 +482,7 @@ const UpdateMatchSchema = z.object({
   matchTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
   location: z.string().min(1).max(200).optional(),
   opponent: z.string().max(100).nullable().optional(),
-  opponentId: z.string().uuid().nullable().optional(),
+  opponentId: z.string().guid().nullable().optional(),
   matchCategory: z.enum(['serie', 'pokal']).optional(),
   serieLetter: z.string().max(10).nullable().optional(),
   status: z.enum(['draft','signup_open','signup_closed','optimized','published','completed','cancelled']).optional(),

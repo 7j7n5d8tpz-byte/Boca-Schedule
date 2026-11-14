@@ -119,7 +119,7 @@ router.post('/users', async (req, res, next) => {
 // retired as a tombstone that can no longer log in. Works for a historical-import
 // placeholder as well as for a real duplicate account (a player who registered
 // twice). Done in a single SQL function (merge_player) so it's atomic.
-const MergeSchema = z.object({ targetUserId: z.string().uuid() });
+const MergeSchema = z.object({ targetUserId: z.string().guid() });
 router.post('/users/:sourceId/merge', async (req, res, next) => {
   try {
     const { sourceId } = req.params;

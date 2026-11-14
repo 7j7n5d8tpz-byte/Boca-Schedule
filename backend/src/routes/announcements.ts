@@ -9,7 +9,7 @@ const router = Router();
 
 const CreateSchema = z.object({
   body: z.string().trim().min(1).max(500),
-  matchId: z.string().uuid().nullish(),
+  matchId: z.string().guid().nullish(),
 });
 
 // GET /api/announcements — active announcements for any authenticated user.

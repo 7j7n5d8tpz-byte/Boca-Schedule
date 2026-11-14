@@ -1,4 +1,5 @@
 import AppNav from '../../components/AppNav';
+import BocaLoader from '../../components/BocaLoader';
 import { useState } from 'react';
 import { meetingTime } from '../../utils';
 import { useDateFormat } from '../../i18n/format';
@@ -238,7 +239,7 @@ export default function Selections() {
     setAddFilter('');
   }
 
-  if (isLoading) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">Loading…</div>;
+  if (isLoading) return <BocaLoader size="page" />;
   if (!data) return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-red-500">{t('coach.matchNotFound')}</div>;
 
   const { match, players } = data;

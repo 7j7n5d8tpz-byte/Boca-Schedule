@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures';
 import { loginAs } from './helpers/auth';
+import { openOwnProfile } from './helpers/nav';
 
 // The player hub's header packs the crest, the tier caption, the XP bar and the
 // rating column into one flex row. The rating column is shrink-0, so if the tier
@@ -21,9 +22,9 @@ test.use({ viewport: { width: 360, height: 800 } });
 test.describe('Player hub on a phone', () => {
   test('own hub does not scroll sideways', async ({ page }) => {
     await loginAs(page, 'player');
-    // The nav avatar goes straight to your own hub, avoiding the /statistics
-    // roster whose clickable rows are the desktop-only table.
-    await page.getByRole('link', { name: /your profile/i }).click();
+    // The "More" menu's first row goes straight to your own hub, avoiding the
+    // /statistics roster whose clickable rows are the desktop-only table.
+    await openOwnProfile(page);
     await expect(page).toHaveURL(/\/players\//);
     await expect(page.getByRole('heading').first()).toBeVisible({ timeout: 8_000 });
 
@@ -91,7 +92,7 @@ test.describe('Player hub on a phone', () => {
     }));
 
     await loginAs(page, 'player');
-    await page.getByRole('link', { name: /your profile/i }).click();
+    await openOwnProfile(page);
     await expect(page).toHaveURL(/\/players\//);
 
     // The career rating renders, and the tier caption is the long one we asked for.

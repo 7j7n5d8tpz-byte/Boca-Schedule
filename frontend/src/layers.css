@@ -1,0 +1,7 @@
+/* Cascade-layer order for Astryx + Tailwind v3 coexistence. Must be the FIRST
+   stylesheet imported (see main.tsx). Later layers beat earlier ones, and
+   unlayered CSS (Tailwind utilities, the app's own rules in index.css) beats
+   every layer — so legacy pages keep their look while Astryx components keep
+   theirs. Tailwind's preflight is wrapped in `tw-preflight` (index.css) so it
+   can no longer flatten Astryx component styles. */
+@layer reset, tw-preflight, astryx-base, astryx-theme;

@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Theme } from '@astryxdesign/core/theme';
+import { themes, defaultThemeSlug } from './astryx-themes';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -37,6 +39,9 @@ function RoleRouter() {
 
 export default function App() {
   return (
+    // Light only for now: the Tailwind pages have no dark styles yet, so the
+    // Astryx theme must not follow the OS into dark mode on its own.
+    <Theme theme={themes[defaultThemeSlug]} mode="light">
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <CrestSprite />
@@ -70,6 +75,7 @@ export default function App() {
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
+    </Theme>
   );
 }
 

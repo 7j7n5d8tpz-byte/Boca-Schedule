@@ -1,4 +1,5 @@
 import AppNav from '../../components/AppNav';
+import BocaLoader from '../../components/BocaLoader';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -223,7 +224,7 @@ export default function Settings() {
 
           <div className="h-px bg-gray-100" />
 
-          {isLoading && <p className="text-sm text-gray-400">{t('common.loading')}</p>}
+          {isLoading && <BocaLoader size="inline" />}
 
           {!isLoading && data && (
             <>

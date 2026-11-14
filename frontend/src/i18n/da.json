@@ -21,6 +21,14 @@
     "special": "Specialtegn"
   },
   "nav": {
+    "tabAchievements": "Bedrifter",
+    "tabHome": "Hjem",
+    "tabStats": "Statistik",
+    "tabFines": "Bøder",
+    "more": "Mere",
+    "viewProfile": "Se din profil",
+    "showNav": "Vis navigation",
+    "main": "Hovednavigation",
     "openMenu": "Åbn menu",
     "closeMenu": "Luk menu",
     "back": "Tilbage",

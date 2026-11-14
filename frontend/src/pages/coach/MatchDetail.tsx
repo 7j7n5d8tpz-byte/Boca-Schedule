@@ -1,4 +1,5 @@
 import AppNav from '../../components/AppNav';
+import BocaLoader from '../../components/BocaLoader';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
@@ -200,7 +201,7 @@ export default function MatchDetail() {
   }
 
   if (isLoading) {
-    return <div className="min-h-screen bg-gray-50 boca-page flex items-center justify-center text-gray-400">{t('common.loading')}</div>;
+    return <BocaLoader size="page" />;
   }
 
   if (!data) {

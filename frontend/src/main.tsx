@@ -1,3 +1,7 @@
+// layers.css must stay the first stylesheet: it declares the cascade-layer order.
+import './layers.css';
+import '@astryxdesign/core/reset.css';
+import '@astryxdesign/core/astryx.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource/archivo/500.css';

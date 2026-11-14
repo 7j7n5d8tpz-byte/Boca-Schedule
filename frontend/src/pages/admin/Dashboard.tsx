@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import BocaLoader from '../../components/BocaLoader';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -293,7 +294,7 @@ function UsersTab({ inactiveCount }: { inactiveCount: number }) {
 
       {/* Table */}
       {isLoading ? (
-        <p className="text-sm text-gray-400">{t('common.loading')}</p>
+        <BocaLoader />
       ) : (
         <>
         {/* Mobile cards */}
@@ -661,7 +662,7 @@ function HealthTab() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-gray-400">{t('common.loading')}</p>
+        <BocaLoader />
       ) : data ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -775,7 +776,7 @@ function AuditLogTab() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-gray-400">{t('common.loading')}</p>
+        <BocaLoader />
       ) : logs.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
           {t('admin.noAuditEntries')}

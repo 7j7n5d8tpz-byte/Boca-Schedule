@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures';
 import { loginAs } from './helpers/auth';
+import { openMenu, menuItem, openOwnProfile } from './helpers/nav';
 
 test.describe('Player flow', () => {
   test('logs in and sees the dashboard', async ({ page }) => {
@@ -10,8 +11,7 @@ test.describe('Player flow', () => {
 
   test('can navigate to team statistics', async ({ page }) => {
     await loginAs(page, 'player');
-    // Open hamburger menu
-    await page.getByRole('button', { name: /open menu/i }).click();
+    // Team stats is a link in the top bar
     await page.getByRole('link', { name: /team stats/i }).click();
     await expect(page).toHaveURL(/statistics/);
     // Stats page should render without error
@@ -98,14 +98,15 @@ test.describe('Player flow', () => {
     await expect(matchState).toBeVisible({ timeout: 8_000 });
   });
 
-  test('nav avatar opens your hub; settings load from the menu', async ({ page }) => {
+  test('menu opens your hub; settings load from the menu', async ({ page }) => {
     await loginAs(page, 'player');
-    // The avatar button on the right of the nav opens your own player hub.
-    await page.getByRole('link', { name: /your profile/i }).click();
+    // The avatar on the right of the top bar opens the menu; its first row is
+    // your own player hub.
+    await openOwnProfile(page);
     await expect(page).toHaveURL(/\/players\//);
-    // Account settings live in the drawer menu footer.
-    await page.getByRole('button', { name: /open menu/i }).click();
-    await page.getByRole('link', { name: 'Settings' }).click();
+    // Account settings live in the same menu.
+    await openMenu(page);
+    await menuItem(page, 'Settings').click();
     await expect(page).toHaveURL(/\/settings/);
     await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible();
   });

@@ -1,5 +1,6 @@
 import { test, expect } from './fixtures';
 import { loginAs } from './helpers/auth';
+import { openMenu, menuItem } from './helpers/nav';
 
 test.describe('Admin flow', () => {
   test('logs in to the shared dashboard and reaches the admin panel from the menu', async ({ page }) => {
@@ -7,8 +8,8 @@ test.describe('Admin flow', () => {
     // Every role lands on the shared player dashboard; management views are
     // reached from the menu.
     await expect(page).toHaveURL(/dashboard/);
-    await page.getByRole('button', { name: /open menu/i }).click();
-    await page.getByRole('link', { name: /admin panel/i }).click();
+    await openMenu(page);
+    await menuItem(page, /admin panel/i).click();
     await expect(page).toHaveURL(/admin/);
     await expect(page.getByRole('heading', { name: /admin/i })).toBeVisible();
   });

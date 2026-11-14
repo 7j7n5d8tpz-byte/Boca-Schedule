@@ -8,10 +8,9 @@ const PUBLISH_VENUE = 'E2E Publish Pitch';
 test.describe('Coach flow', () => {
   test('logs in to the shared dashboard and reaches the coach view from the menu', async ({ page }) => {
     await loginAs(page, 'coach');
-    // Every role lands on the shared player dashboard; the coach view is reached
-    // from the menu.
+    // Every role lands on the shared player dashboard; the coach view is a link
+    // in the top bar.
     await expect(page).toHaveURL(/dashboard/);
-    await page.getByRole('button', { name: /open menu/i }).click();
     await page.getByRole('link', { name: /coach view/i }).click();
     await expect(page).toHaveURL(/coach/);
     await expect(page.getByRole('heading', { name: /matches|squad|schedule/i }).first()).toBeVisible();
@@ -58,7 +57,6 @@ test.describe('Coach flow', () => {
 
   test('can view team statistics', async ({ page }) => {
     await loginAs(page, 'coach');
-    await page.getByRole('button', { name: /open menu/i }).click();
     await page.getByRole('link', { name: /team stats/i }).click();
     await expect(page).toHaveURL(/statistics/);
   });

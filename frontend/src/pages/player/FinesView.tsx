@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import BocaLoader from '../../components/BocaLoader';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -116,7 +117,7 @@ export default function FinesView() {
 
   const myOutstanding = my?.totals.outstandingDkk ?? 0;
 
-  if (!ledger || !my) return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">{t('common.loading')}</div>;
+  if (!ledger || !my) return <div className="bg-white rounded-xl border border-gray-200"><BocaLoader /></div>;
 
   return (
     <div className="space-y-6">
@@ -259,7 +260,7 @@ export function ManageFines() {
   const rejectClaim = useMutation({ mutationFn: (id: string) => api.put(`/fines/${id}/reject-claim`), onSuccess: invalidate });
   const voidFine = useMutation({ mutationFn: ({ id, reason }: { id: string; reason: string }) => api.put(`/fines/${id}/void`, { reason }), onSuccess: invalidate });
 
-  if (!data) return <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">{t('common.loading')}</div>;
+  if (!data) return <div className="bg-white rounded-xl border border-gray-200"><BocaLoader /></div>;
 
   const s = q.trim().toLowerCase();
   const matches = (name: string) => !s || name.toLowerCase().includes(s);

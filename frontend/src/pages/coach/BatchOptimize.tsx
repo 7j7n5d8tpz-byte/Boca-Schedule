@@ -1,4 +1,5 @@
 import AppNav from '../../components/AppNav';
+import BocaLoader from '../../components/BocaLoader';
 import { useTranslation } from 'react-i18next';
 import { useDateFormat } from '../../i18n/format';
 import { useState, useEffect } from 'react';
@@ -282,10 +283,7 @@ export default function BatchOptimize() {
 
         {/* ── Step 3: Optimizing ─────────────────────────────────────────── */}
         {step === 'optimizing' && (
-          <div className="flex flex-col items-center justify-center py-20 space-y-4">
-            <div className="w-10 h-10 border-4 border-brand-green border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-gray-500">Running joint optimization across {orderedSelected.length} matches…</p>
-          </div>
+          <BocaLoader className="flex-col py-20" label={`Running joint optimization across ${orderedSelected.length} matches…`} />
         )}
 
         {/* ── Step 4: Review ─────────────────────────────────────────────── */}

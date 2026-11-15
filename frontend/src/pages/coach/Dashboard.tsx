@@ -22,6 +22,7 @@ interface Match {
   maxPlayers: number;
   signupDeadlinePassed: boolean;
   kickoffPassed: boolean;
+  hasResult: boolean;
 }
 
 interface Announcement {
@@ -230,8 +231,11 @@ export default function CoachDashboard() {
   const readyToOptimize = matches.filter(m => m.status === 'signup_closed' || m.status === 'optimized').length;
   // Published, and played: kick-off has to be behind us before a result can be
   // entered, otherwise the list offers result entry for matches weeks away.
-  const pendingResults   = matches.filter(m => m.status === 'published' && m.kickoffPassed);
-  const completedResults = matches.filter(m => m.status === 'completed');
+  // Split on hasResult, not status: loading this page auto-completes a match at
+  // kick-off, so `completed` only means "played" — not "result recorded".
+  const played = matches.filter(m => m.kickoffPassed && (m.status === 'published' || m.status === 'completed'));
+  const pendingResults   = played.filter(m => !m.hasResult);
+  const completedResults = played.filter(m =>  m.hasResult);
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">

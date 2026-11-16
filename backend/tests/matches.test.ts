@@ -455,4 +455,20 @@ describe('Matches', () => {
     expect(data!.status).toBe('completed');
     expect(data!.completed_at).toBeTruthy();
   });
+
+  it('player home leaves out a played match even when its status never moved on', async () => {
+    // No coach view has loaded since kick-off, so nothing auto-completed it.
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    const played = await createTestMatch({ status: 'published', match_date: yesterday, match_time: '18:00' });
+    const future = await createTestMatch({ status: 'published' });
+    createdMatchIds.push(played.match_id, future.match_id);
+
+    const res = await request(app)
+      .get('/api/matches/upcoming?limit=200')
+      .set('Authorization', `Bearer ${player.token}`);
+    expect(res.status).toBe(200);
+    const ids = res.body.data.matches.map((m: any) => m.matchId);
+    expect(ids).not.toContain(played.match_id);
+    expect(ids).toContain(future.match_id);
+  });
 });

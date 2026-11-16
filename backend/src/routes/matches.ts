@@ -116,7 +116,16 @@ router.get('/upcoming', authenticate, async (req, res, next) => {
         .neq('status', 'cancelled')
         .or(`status.neq.completed,and(status.eq.completed,match_date.gte.${cutoffStr})`);
     } else if (!statusParam || statusParam === 'all') {
-      matchQuery = matchQuery.neq('status', 'completed').neq('status', 'cancelled');
+      // "Upcoming" means kick-off is still ahead — not merely "status isn't
+      // completed". Status only flips when a coach view loads or a result is
+      // saved, so a played match would otherwise sit here until then (or
+      // forever, if its result was saved while it was never published).
+      const now = new Date();
+      const todayStr = clubDateString(now);
+      const nowTimeStr = clubTimeString(now);
+      matchQuery = matchQuery
+        .neq('status', 'completed').neq('status', 'cancelled')
+        .or(`match_date.gt.${todayStr},and(match_date.eq.${todayStr},match_time.gt.${nowTimeStr})`);
     } else if (statusParam.includes(',')) {
       const statuses = statusParam.split(',');
       matchQuery = matchQuery.in('status', statuses);

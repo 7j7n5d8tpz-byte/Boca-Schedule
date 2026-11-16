@@ -5,8 +5,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from '../context/AuthContext';
 import PlayerHub from '../pages/player/PlayerHub';
 
-// AppNav pulls in the polling NotificationBell — stub it out for this test.
-vi.mock('../components/AppNav', () => ({ default: () => null }));
+// AppNav pulls in the polling NotificationBell — stub it down to the back
+// control, which is all the hub hands it.
+vi.mock('../components/AppNav', () => ({
+  default: ({ backHref, backLabel }: { backHref?: string; backLabel?: string }) =>
+    backHref ? <a href={backHref}>{backLabel}</a> : null,
+}));
 
 const { mockGet } = vi.hoisted(() => ({ mockGet: vi.fn() }));
 vi.mock('../api/client', () => ({ api: { get: mockGet } }));

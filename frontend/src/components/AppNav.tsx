@@ -207,14 +207,19 @@ export default function AppNav({ backHref, backLabel, onBack }: AppNavProps) {
 
   return (
     <>
-      {/* Top strip: no ribbon any more, just room for the optional back pill
-          on the left and the floating bell on the right. The strip scrolls
-          away with the page; the bell stays put. */}
+      {/* Top strip: no ribbon any more, just an in-flow spacer the height of
+          the floating controls. The optional back pill (left) and the bell
+          (right) are both fixed, so they stay put while the page scrolls. */}
       <div
         style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
-        className="flex items-center min-h-[3.5rem] px-3 pb-1"
+        className="box-content h-11 pb-1"
+        aria-hidden
+      />
+      <div
+        style={{ top: 'calc(0.75rem + env(safe-area-inset-top))' }}
+        className="fixed left-3 z-40 max-w-[calc(100vw-5.5rem)]"
       >
-        {backControl('inline-flex items-center gap-1 rounded-full bg-white/90 border border-gray-200 shadow-sm text-brand-dark text-sm font-medium pl-2.5 pr-3.5 h-11 transition-colors')}
+        {backControl('flex items-center gap-1 max-w-full truncate rounded-full bg-white/90 border border-gray-200 shadow-md backdrop-blur hover:bg-white text-brand-dark text-sm font-medium pl-2.5 pr-3.5 h-11 transition-colors')}
       </div>
       <div
         style={{ top: 'calc(0.75rem + env(safe-area-inset-top))' }}

@@ -169,9 +169,14 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
       await supabaseAdmin.from('match_performance').upsert(rows, { onConflict: 'match_id,player_id' });
     }
 
-    // Advance match to completed if still published
-    if (match.status === 'published') {
-      await supabaseAdmin.from('matches').update({ status: 'completed' }).eq('match_id', matchId);
+    // A recorded result means the match is over — complete it from any live
+    // status, not just `published`. A match played without ever being
+    // closed/published would otherwise keep its old status and linger under
+    // "Upcoming" on the player home. Drafts and cancelled matches stay put.
+    if (['signup_open', 'signup_closed', 'optimized', 'published'].includes(match.status)) {
+      await supabaseAdmin.from('matches')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('match_id', matchId);
     }
 
     // Recompute achievements/streaks for every player in this result. Fire-and-

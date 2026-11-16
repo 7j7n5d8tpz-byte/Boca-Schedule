@@ -192,15 +192,10 @@ export default function PlayerHub() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav />
+      {/* Back to the list this profile was opened from. */}
+      <AppNav backHref={backHref} backLabel={t(backLabel)} />
 
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-
-        {/* Back to the list this profile was opened from — same plain green
-            control as "All opponents" on the statistics page. */}
-        <Link to={backHref} className="inline-block text-sm font-medium text-brand-green hover:text-brand-green-700 transition-colors">
-          ← {t(backLabel)}
-        </Link>
 
         {notFound && (
           <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">

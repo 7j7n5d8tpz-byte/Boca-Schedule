@@ -169,15 +169,14 @@ export default function SeasonOverview() {
 
   return (
     <div className="min-h-screen bg-gray-50 boca-page">
-      <AppNav />
+      <AppNav backHref="/coach" backLabel={t('nav.coachView')} />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* One block sized to the grid and centred, so the header lines up with
             the grid's left edge instead of hugging the page edge. */}
         <div className="w-fit max-w-full mx-auto space-y-5">
           <div>
-            <Link to="/coach" className="text-sm text-gray-500 hover:text-gray-700">← {t('nav.coachView')}</Link>
-            <h1 className="text-2xl font-extrabold text-gray-900 mt-1">{t('seasonOverview.title')}</h1>
+            <h1 className="text-2xl font-extrabold text-gray-900">{t('seasonOverview.title')}</h1>
             <p className="text-sm text-gray-500 mt-1">{t('seasonOverview.subtitle')}</p>
           </div>
 

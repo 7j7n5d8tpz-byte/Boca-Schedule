@@ -5,7 +5,12 @@
     "remove": "Fjern",
     "optional": "(valgfrit)",
     "loading": "Indlæser…",
-    "chooseImageFile": "Vælg en billedfil."
+    "chooseImageFile": "Vælg en billedfil.",
+    "actionFailed": "Det lykkedes ikke. Prøv igen.",
+    "loadFailed": "Kunne ikke hente indholdet. Tjek din forbindelse.",
+    "retry": "Prøv igen",
+    "crashed": "Noget gik galt på denne side.",
+    "reload": "Tilbage til forsiden"
   },
   "positions": {
     "GK": "Målmand",
@@ -83,6 +88,7 @@
     "signingIn": "Logger ind...",
     "tooManyAttempts": "For mange loginforsøg. Vent et par minutter, og prøv igen.",
     "invalidCredentials": "Forkert e-mail eller adgangskode.",
+    "accountInactive": "Din konto er ikke aktiv endnu. En administrator skal godkende den, før du kan logge ind.",
     "forgotPrompt": "Indtast din e-mail, så sender vi dig et link til at nulstille din adgangskode.",
     "resetSent": "Hvis e-mailadressen er registreret, har vi sendt et link til nulstilling. Tjek din indbakke.",
     "backToSignIn": "Tilbage til login",

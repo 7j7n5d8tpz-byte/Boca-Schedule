@@ -122,10 +122,18 @@ router.post('/login', async (req, res, next) => {
 
     const { data: profile } = await supabaseAdmin.from('users').select('*').eq('user_id', data.user.id).single();
 
-    // Inactive accounts (pending admin approval) return the same error as bad credentials
-    // to avoid revealing that the account exists but isn't approved yet.
-    if (!profile?.is_active) {
+    // A merged-away duplicate is retired for good; it keeps the plain refusal.
+    if (!profile || profile.merged_into) {
       res.status(401).json({ success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Forkert e-mail eller adgangskode' } });
+      return;
+    }
+
+    // The password was correct, so saying the account is inactive reveals
+    // nothing to someone guessing — and "wrong password" sent newly registered
+    // players off to reset a password that was fine. One message covers both
+    // pending approval and deactivation.
+    if (!profile.is_active) {
+      res.status(403).json({ success: false, error: { code: 'ACCOUNT_INACTIVE', message: 'Din konto er ikke aktiv endnu — den afventer godkendelse fra en administrator' } });
       return;
     }
 
@@ -175,6 +183,15 @@ router.post('/refresh', async (req, res, next) => {
       return;
     }
 
+    // A deactivated account must not keep minting tokens. Failing here is also
+    // what sends the app back to the login screen (it logs out when a refresh
+    // is refused) instead of leaving it open with every request failing.
+    const { data: profile } = await supabaseAdmin.from('users').select('is_active').eq('user_id', data.session.user.id).maybeSingle();
+    if (!profile?.is_active) {
+      res.status(401).json({ success: false, error: { code: 'ACCOUNT_INACTIVE', message: 'Din konto er ikke aktiv' } });
+      return;
+    }
+
     res.json({ success: true, data: { accessToken: data.session.access_token, expiresIn: data.session.expires_in } });
   } catch (err) {
     next(err);
@@ -221,16 +238,17 @@ router.post('/reset-password', async (req, res, next) => {
       return;
     }
 
-    // Ensure this token came from a password-recovery flow, not a regular session
+    // Ensure this token came from a password-recovery link, not a regular
+    // session — otherwise anyone holding a session token could set a new
+    // password without knowing the current one. A token minted from an emailed
+    // link carries amr method "otp" (or "recovery"); a password login carries
+    // "password". (`aal` is no use here: every ordinary session is aal1.)
     const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64url').toString());
-    if (payload?.type !== 'recovery' && payload?.aal !== 'aal1') {
-      // Supabase recovery tokens set amr to [{"method":"otp"}] and token_type may differ
-      // Fall back to checking the amr claim for 'otp' which recovery tokens carry
-      const isRecovery = (payload?.amr ?? []).some((a: any) => a.method === 'otp');
-      if (!isRecovery) {
-        res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Linket er ugyldigt eller udløbet — bestil et nyt.' } });
-        return;
-      }
+    const isRecovery = Array.isArray(payload?.amr)
+      && payload.amr.some((a: any) => a?.method === 'otp' || a?.method === 'recovery');
+    if (!isRecovery) {
+      res.status(401).json({ success: false, error: { code: 'INVALID_TOKEN', message: 'Linket er ugyldigt eller udløbet — bestil et nyt.' } });
+      return;
     }
 
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, { password: newPassword });

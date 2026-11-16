@@ -13,10 +13,12 @@ describe('Notifications', () => {
       createTestUser('player', '-notif1'),
       createTestUser('player', '-notif2'),
     ]);
-    // Deactivate so the all-active-users announcement broadcast from other
-    // suites can't land stray notifications here (auth doesn't check is_active,
-    // so these users can still call the API). Keeps counts deterministic.
-    await supabaseAdmin.from('users').update({ is_active: false }).in('user_id', [player.userId, other.userId]);
+    // Broadcasts to all active users are fire-and-forget, so one started by the
+    // previous suite can still be in flight and would land a stray notification
+    // on these brand-new users. Give it a moment to arrive; beforeEach then
+    // clears it. (These users used to be deactivated instead — which only
+    // worked while an inactive account could still call the API.)
+    await new Promise(r => setTimeout(r, 500));
   });
 
   // Reset to a known state before each test. Announcements notify *all* active

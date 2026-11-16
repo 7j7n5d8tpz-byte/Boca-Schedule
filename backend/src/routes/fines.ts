@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, must, fetchAll } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { createNotifications } from '../lib/notifications.js';
 
@@ -282,12 +282,12 @@ router.get('/fines/my', authenticate, async (req, res, next) => {
 // Only fines that have cleared approval are visible to the team.
 router.get('/fines', authenticate, async (_req, res, next) => {
   try {
-    const { data, error } = await supabaseAdmin.from('fines')
+    const { data } = await fetchAll((a, b) => supabaseAdmin.from('fines')
       .select(FINE_SELECT)
       .in('status', ['approved', 'payment_claimed', 'paid'])
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    res.json({ success: true, data: (data ?? []).map(mapFine) });
+      .order('created_at', { ascending: false }).order('fine_id')
+      .range(a, b));
+    res.json({ success: true, data: data.map(mapFine) });
   } catch (err) {
     next(err);
   }
@@ -325,10 +325,10 @@ router.get('/fines/stats', authenticate, async (req, res, next) => {
     const yearParam = typeof req.query.year === 'string' ? req.query.year : 'all';
 
     const [{ data: fineRows, error }, { data: roster }, { data: matchRows }, { data: selRows }] = await Promise.all([
-      supabaseAdmin.from('fines').select(FINE_SELECT).in('status', ['approved', 'payment_claimed', 'paid']),
+      fetchAll((a, b) => supabaseAdmin.from('fines').select(FINE_SELECT).in('status', ['approved', 'payment_claimed', 'paid']).order('fine_id').range(a, b)),
       supabaseAdmin.from('users').select('user_id, name').eq('is_active', true).in('role', ['player', 'coach', 'admin']),
-      supabaseAdmin.from('matches').select('match_id, match_date, match_time, opponent').in('status', ['completed', 'published']),
-      supabaseAdmin.from('selections').select('player_id, match_id'),
+      fetchAll((a, b) => supabaseAdmin.from('matches').select('match_id, match_date, match_time, opponent').in('status', ['completed', 'published']).order('match_id').range(a, b)),
+      fetchAll((a, b) => supabaseAdmin.from('selections').select('player_id, match_id').order('selection_id').range(a, b)),
     ]);
     if (error) throw error;
 
@@ -519,9 +519,9 @@ router.post('/fines/:id/dispute', authenticate, async (req, res, next) => {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Bøden blev ikke fundet' } });
       return;
     }
-    await supabaseAdmin.from('fines')
+    await must(supabaseAdmin.from('fines')
       .update({ disputed: true, dispute_note: note?.trim() || null, updated_at: new Date().toISOString() })
-      .eq('fine_id', req.params.id);
+      .eq('fine_id', req.params.id));
     fineAdminIds().then(ids => createNotifications(ids, {
       type: 'fine_pending_approval',
       title: 'Indsigelse mod bøde',
@@ -543,7 +543,7 @@ router.get('/fines/admin', authenticate, async (req, res, next) => {
     if (!(await isFineAdmin(req.user!.userId, req.user!.role))) return forbidden(res);
 
     const [{ data: all, error }, paymentInfo] = await Promise.all([
-      supabaseAdmin.from('fines').select(FINE_SELECT).order('created_at', { ascending: false }),
+      fetchAll((a, b) => supabaseAdmin.from('fines').select(FINE_SELECT).order('created_at', { ascending: false }).order('fine_id').range(a, b)),
       getPaymentInfo(),
     ]);
     if (error) throw error;
@@ -586,12 +586,12 @@ router.put('/fines/:id/approve', authenticate, async (req, res, next) => {
       return;
     }
     const now = new Date().toISOString();
-    await supabaseAdmin.from('fines').update({
+    await must(supabaseAdmin.from('fines').update({
       status: approve ? 'approved' : 'rejected',
       approved_by: req.user!.userId,
       approved_at: now,
       updated_at: now,
-    }).eq('fine_id', req.params.id);
+    }).eq('fine_id', req.params.id));
 
     if (approve) {
       createNotifications([fine.player_id], {
@@ -618,7 +618,7 @@ router.put('/fines/:id/confirm-paid', authenticate, async (req, res, next) => {
       return;
     }
     const now = new Date().toISOString();
-    await supabaseAdmin.from('fines').update({ status: 'paid', confirmed_by: req.user!.userId, confirmed_at: now, updated_at: now }).eq('fine_id', req.params.id);
+    await must(supabaseAdmin.from('fines').update({ status: 'paid', confirmed_by: req.user!.userId, confirmed_at: now, updated_at: now }).eq('fine_id', req.params.id));
     createNotifications([fine.player_id], {
       type: 'fine_payment_confirmed',
       title: 'Betaling bekræftet',
@@ -641,7 +641,7 @@ router.put('/fines/:id/reject-claim', authenticate, async (req, res, next) => {
       res.status(400).json({ success: false, error: { code: 'INVALID_STATE', message: 'Der er ingen angivet betaling at afvise' } });
       return;
     }
-    await supabaseAdmin.from('fines').update({ status: 'approved', paid_claimed_at: null, updated_at: new Date().toISOString() }).eq('fine_id', req.params.id);
+    await must(supabaseAdmin.from('fines').update({ status: 'approved', paid_claimed_at: null, updated_at: new Date().toISOString() }).eq('fine_id', req.params.id));
     createNotifications([fine.player_id], {
       type: 'fine_claim_rejected',
       title: 'Betaling ikke modtaget',
@@ -666,7 +666,7 @@ router.put('/fines/:id/void', authenticate, async (req, res, next) => {
       return;
     }
     const now = new Date().toISOString();
-    await supabaseAdmin.from('fines').update({ status: 'voided', voided_by: req.user!.userId, voided_at: now, void_reason: reason?.trim() || null, updated_at: now }).eq('fine_id', req.params.id);
+    await must(supabaseAdmin.from('fines').update({ status: 'voided', voided_by: req.user!.userId, voided_at: now, void_reason: reason?.trim() || null, updated_at: now }).eq('fine_id', req.params.id));
     createNotifications([fine.player_id], {
       type: 'fine_voided',
       title: 'En bøde er annulleret',

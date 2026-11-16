@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, fetchAll } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { storeAvatar, AvatarTooLargeError, AVATAR_DATA_URL_RE } from '../lib/avatar.js';
 import { seasonStartYear, seasonRange, seasonLabel } from '../lib/season.js';
@@ -98,9 +98,9 @@ router.get('/statistics/team', authenticate, async (req, res, next) => {
       }
 
       const [{ data: perfData }, { data: signupData }, { data: selectionData }, { data: historyData }, { data: completedMatchData }, { data: gkData }] = await Promise.all([
-        supabaseAdmin.from('match_performance').select('match_id, player_id, attended, goals, assists, clean_sheet, yellow_cards, red_cards, man_of_match').in('match_id', matchIds),
-        supabaseAdmin.from('signups').select('player_id').eq('is_active', true).in('match_id', matchIds),
-        supabaseAdmin.from('selections').select('player_id, match_id').in('match_id', matchIds),
+        fetchAll((a, b) => supabaseAdmin.from('match_performance').select('match_id, player_id, attended, goals, assists, clean_sheet, yellow_cards, red_cards, man_of_match').in('match_id', matchIds).order('performance_id').range(a, b)),
+        fetchAll((a, b) => supabaseAdmin.from('signups').select('player_id').eq('is_active', true).in('match_id', matchIds).order('signup_id').range(a, b)),
+        fetchAll((a, b) => supabaseAdmin.from('selections').select('player_id, match_id').in('match_id', matchIds).order('selection_id').range(a, b)),
         supabaseAdmin.from('match_results')
           .select('match_id, goals_for, goals_against, matches(match_date, location, opponent, cancelled_by)')
           .in('match_id', matchIds).order('recorded_at', { ascending: true }),

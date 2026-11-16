@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, must } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { lateSignupOpen, LATE_SIGNUP_COLUMNS, REOPENABLE_STATUSES } from '../lib/lateSignup.js';
@@ -77,6 +77,12 @@ router.post('/', authenticate, async (req, res, next) => {
       player_id: req.user!.userId,
     }).select().single();
 
+    // Two requests can both pass the check above (a double tap on a slow
+    // connection); the unique index on active sign-ups lets only one through.
+    if (error?.code === '23505') {
+      res.status(409).json({ success: false, error: { code: 'ALREADY_SIGNED_UP', message: 'Du er allerede tilmeldt denne kamp' } });
+      return;
+    }
     if (error) throw error;
 
     res.status(201).json({ success: true, data: { signupId: data.signup_id, matchId, playerId: req.user!.userId, signedUpAt: data.signed_up_at } });
@@ -110,7 +116,7 @@ router.delete('/:signupId', authenticate, async (req, res, next) => {
       return;
     }
 
-    await supabaseAdmin.from('signups').update({ withdrawn_at: new Date().toISOString() }).eq('signup_id', signupId);
+    await must(supabaseAdmin.from('signups').update({ withdrawn_at: new Date().toISOString() }).eq('signup_id', signupId));
 
     res.json({ success: true, message: 'Du er afmeldt kampen' });
   } catch (err) {

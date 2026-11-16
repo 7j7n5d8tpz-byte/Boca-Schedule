@@ -44,21 +44,37 @@ app.use('/api/players/:playerId/avatar', express.json({ limit: '4mb' }));
 app.use(express.json());
 
 const isTest = process.env.NODE_ENV === 'test';
+const windowMs = 15 * 60 * 1000;
+// Production traffic arrives through the Vercel /api rewrite, so req.ip is a
+// Vercel egress address shared by the whole club — an IP-keyed limit of 300
+// throttled everyone together. So the address only gets a flood guard, sized
+// for the club sharing it, and the per-client limit is keyed on the login token.
+const floodLimiter = rateLimit({ windowMs, max: isTest ? 100_000 : 5000 });
 // General per-client limit. Generous enough for the app's background polling
-// (notification bell every 30s, admin/coach dashboards) now that each client
-// gets its own bucket.
-const limiter     = rateLimit({ windowMs: 15 * 60 * 1000, max: isTest ? 10_000 : 300 });
+// (notification bell every 30s, admin/coach dashboards).
+const limiter = rateLimit({
+  windowMs,
+  max: isTest ? 10_000 : 300,
+  keyGenerator: req => req.headers.authorization ?? req.ip ?? '',
+});
 // Strict brute-force protection for credential endpoints only — scoped to the
 // sensitive routes below, NOT all of /api/auth, so token refresh and logout
-// (which the frontend calls automatically) don't consume the budget.
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: isTest ? 10_000 : 10 });
+// (which the frontend calls automatically) don't consume the budget. Keyed on
+// the account being tried, not the shared address: ten players logging in
+// after a club-wide email must not lock the eleventh out.
+const authLimiter = rateLimit({
+  windowMs,
+  max: isTest ? 10_000 : 10,
+  keyGenerator: req => (typeof req.body?.email === 'string' && req.body.email.trim().toLowerCase()) || req.ip || '',
+});
 
+app.use(floodLimiter);
 app.use(limiter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
-// Keepalive: unlike /health (process-only), this issues a real Supabase query so
-// a scheduled ping resets the free-tier project's 7-day inactivity pause timer.
+// Unlike /health (process-only), this issues a real Supabase query, so it tells
+// "backend up" apart from "backend up but the database is unreachable or paused".
 // Public and intentionally cheap (a head count, no rows transferred).
 app.get('/health/db', async (_req, res) => {
   const { error } = await supabaseAdmin.from('users').select('user_id', { head: true, count: 'exact' });

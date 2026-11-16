@@ -480,7 +480,7 @@ export default function PlayerDashboard() {
   const { formatDate } = useDateFormat();
   const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['matches'],
     queryFn: () => api.get('/matches/upcoming').then(r => r.data.data),
   });
@@ -642,7 +642,14 @@ export default function PlayerDashboard() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('dashboard.upcomingTitle')}</h2>
           {isLoading && <CardListSkeleton />}
-          {!isLoading && !data?.matches?.length && (
+          {/* A failed load must not read as "no matches" — that sends players away. */}
+          {isError && !data && (
+            <p className="text-sm text-red-500">
+              {t('common.loadFailed')}{' '}
+              <button onClick={() => refetch()} className="underline font-medium">{t('common.retry')}</button>
+            </p>
+          )}
+          {!isLoading && !isError && !data?.matches?.length && (
             <p className="text-sm text-gray-400">{t('dashboard.upcomingEmpty')}</p>
           )}
           <div className="space-y-4">

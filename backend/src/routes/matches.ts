@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, must, fetchAll } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { sendSelectionNotifications, sendCancellationNotifications, sendReleaseNotification, sendSpotOpenNotification } from '../lib/mailer.js';
@@ -13,6 +13,7 @@ import { kickoffInstant, clubDateString, clubTimeString } from '../lib/clubTime.
 import { seasonStartYear, seasonRange, seasonLabel } from '../lib/season.js';
 import { buildPlayedKeys } from '../lib/participation.js';
 import { cellState, selectionPct, type CellState } from '../lib/seasonOverview.js';
+import { notifyPublishedSquadChange } from './optimize.js';
 
 // Human-readable match label for notification copy, e.g. "Sat 7 Jun vs FC X".
 function matchLabel(m: { match_date: string; match_time?: string; opponent?: string | null }): string {
@@ -41,11 +42,13 @@ async function autoCompletePastMatches(): Promise<void> {
   const now = new Date();
   const todayStr = clubDateString(now);                     // YYYY-MM-DD
   const nowTimeStr = clubTimeString(now);                   // HH:MM:SS
-  await supabaseAdmin
+  // Housekeeping on the way into a read: log a failure, don't fail the page over it.
+  const { error } = await supabaseAdmin
     .from('matches')
     .update({ status: 'completed', completed_at: now.toISOString() })
     .in('status', ['signup_open', 'signup_closed', 'optimized', 'published'])
     .or(`match_date.lt.${todayStr},and(match_date.eq.${todayStr},match_time.lte.${nowTimeStr})`);
+  if (error) console.error('Failed to auto-complete past matches:', error);
 }
 
 const router = Router();
@@ -257,9 +260,9 @@ router.get('/season-overview', authenticate, requireRole('coach', 'admin'), asyn
     const matchIds = (matchRows ?? []).map((m: any) => m.match_id);
     const [{ data: signupData }, { data: selectionData }, { data: perfData }] = matchIds.length > 0
       ? await Promise.all([
-          supabaseAdmin.from('signups').select('match_id, player_id, is_active').in('match_id', matchIds),
-          supabaseAdmin.from('selections').select('match_id, player_id').in('match_id', matchIds),
-          supabaseAdmin.from('match_performance').select('match_id, player_id, attended').in('match_id', matchIds),
+          fetchAll((a, b) => supabaseAdmin.from('signups').select('match_id, player_id, is_active').in('match_id', matchIds).order('signup_id').range(a, b)),
+          fetchAll((a, b) => supabaseAdmin.from('selections').select('match_id, player_id').in('match_id', matchIds).order('selection_id').range(a, b)),
+          fetchAll((a, b) => supabaseAdmin.from('match_performance').select('match_id, player_id, attended').in('match_id', matchIds).order('performance_id').range(a, b)),
         ])
       : [{ data: [] }, { data: [] }, { data: [] }];
 
@@ -465,19 +468,27 @@ router.post('/historical', authenticate, requireRole('coach', 'admin'), async (r
     // Seed a signup + selection for each known participant.
     const participantIds = [...new Set(d.participantIds)];
     if (participantIds.length > 0) {
-      await supabaseAdmin.from('signups').insert(
-        participantIds.map(pid => ({ match_id: match.match_id, player_id: pid })),
-      );
-      await supabaseAdmin.from('selections').insert(
-        participantIds.map(pid => ({
-          match_id: match.match_id,
-          player_id: pid,
-          selected_by_optimization: false,
-          manually_adjusted: true,
-          is_priority_selection: false,
-          selected_by: req.user!.userId,
-        })),
-      );
+      try {
+        await must(supabaseAdmin.from('signups').insert(
+          participantIds.map(pid => ({ match_id: match.match_id, player_id: pid })),
+        ));
+        await must(supabaseAdmin.from('selections').insert(
+          participantIds.map(pid => ({
+            match_id: match.match_id,
+            player_id: pid,
+            selected_by_optimization: false,
+            manually_adjusted: true,
+            is_priority_selection: false,
+            selected_by: req.user!.userId,
+          })),
+        ));
+      } catch (err) {
+        // No transaction across these calls, so undo by hand: a completed match
+        // with half its squad would count in everyone's stats, and a retry
+        // would add a second copy. Sign-ups and selections cascade with it.
+        await supabaseAdmin.from('matches').delete().eq('match_id', match.match_id);
+        throw err;
+      }
     }
 
     res.status(201).json({ success: true, data: { matchId: match.match_id } });
@@ -600,16 +611,16 @@ router.put('/:matchId', authenticate, requireRole('coach', 'admin'), async (req,
     if (cancelledBy !== prevCancelledBy) {
       if (cancelledBy) {
         const { goalsFor, goalsAgainst } = walkoverScore(cancelledBy);
-        await supabaseAdmin.from('match_results').upsert({
+        await must(supabaseAdmin.from('match_results').upsert({
           match_id: matchId,
           goals_for: goalsFor,
           goals_against: goalsAgainst,
           recorded_by: req.user!.userId,
           updated_at: new Date().toISOString(),
-        }, { onConflict: 'match_id' });
+        }, { onConflict: 'match_id' }));
       } else {
         // Only ever removes a walkover — a played match's result is never touched.
-        await supabaseAdmin.from('match_results').delete().eq('match_id', matchId);
+        await must(supabaseAdmin.from('match_results').delete().eq('match_id', matchId));
       }
     }
 
@@ -774,11 +785,19 @@ router.post('/:matchId/publish', authenticate, requireRole('coach', 'admin'), as
       return;
     }
 
-    const { data } = await supabaseAdmin.from('matches')
-      .update({ status: 'published', published_at: new Date().toISOString() })
+    // Set when a published squad was re-optimized (see lastPublishedSquad): the
+    // squad the players last saw. Publishing consumes it.
+    const previouslyPublishedIds: string[] | null = match.optimization_result?.previouslyPublishedIds ?? null;
+
+    const { data } = await must(supabaseAdmin.from('matches')
+      .update({
+        status: 'published',
+        published_at: new Date().toISOString(),
+        ...(previouslyPublishedIds && { optimization_result: { ...match.optimization_result, previouslyPublishedIds: null } }),
+      })
       .eq('match_id', matchId)
       .select()
-      .single();
+      .single());
 
     await supabaseAdmin.from('audit_log').insert({
       user_id: req.user!.userId,
@@ -795,6 +814,21 @@ router.post('/:matchId/publish', authenticate, requireRole('coach', 'admin'), as
       .eq('match_id', matchId)
       .then(({ data: sel }) => {
         const rows = (sel ?? []).map((s: any) => s.users);
+
+        // A re-publish: the players have seen a squad for this match already,
+        // so tell only those whose place changed — including the ones dropped.
+        if (previouslyPublishedIds) {
+          const before = new Set(previouslyPublishedIds);
+          const now = new Set<string>(rows.map((u: any) => u.user_id));
+          notifyPublishedSquadChange(
+            match,
+            [...now].filter(id => !before.has(id)),
+            previouslyPublishedIds.filter(id => !now.has(id)),
+            String(matchId),
+          );
+          return;
+        }
+
         const players = rows.filter((u: any) => u.email).map((u: any) => ({ name: u.name, email: u.email }));
         if (players.length > 0) {
           sendSelectionNotifications(players, {
@@ -848,7 +882,7 @@ router.post('/:matchId/release', authenticate, async (req, res, next) => {
       return;
     }
 
-    await supabaseAdmin.from('selections').delete().eq('selection_id', selection.selection_id);
+    await must(supabaseAdmin.from('selections').delete().eq('selection_id', selection.selection_id));
 
     const { data: playerProfile } = await supabaseAdmin.from('users').select('name').eq('user_id', playerId).single();
 

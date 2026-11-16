@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, must } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { optimizeMatch } from '../lib/optimizer.js';
@@ -16,9 +16,28 @@ function matchLabel(m: { match_date: string; match_time?: string; opponent?: str
   return m.opponent ? `${date} vs ${m.opponent}` : date;
 }
 
+// The optimizer replaces the squad wholesale, so it must not run on a match
+// that is over or off — that would rewrite who played, or revive a cancelled match.
+export const NOT_OPTIMIZABLE = ['completed', 'cancelled'];
+
+// Re-optimizing a published squad un-publishes it until the coach publishes
+// again. Remember who was in the squad the players last saw, so that publish
+// can tell exactly the players whose place changed — otherwise a player the
+// optimizer dropped is never told and turns up on match day. The list rides
+// along in `optimization_result` across repeated runs and manual edits until
+// the next publish clears it.
+export async function lastPublishedSquad(
+  match: { match_id: string; status: string; optimization_result?: { previouslyPublishedIds?: string[] | null } | null },
+): Promise<string[] | null> {
+  if (match.status !== 'published') return match.optimization_result?.previouslyPublishedIds ?? null;
+  const { data } = await must(supabaseAdmin.from('selections').select('player_id').eq('match_id', match.match_id));
+  return (data ?? []).map((s: any) => s.player_id);
+}
+
 // Fire-and-forget: notify players added to / removed from an already-published
-// squad after a manual coach swap. Mirrors the publish/cancellation pattern.
-function notifyPublishedSquadChange(
+// squad after a manual coach swap, or a re-publish. Mirrors the
+// publish/cancellation pattern.
+export function notifyPublishedSquadChange(
   match: { match_date: string; match_time: string; location: string; opponent: string | null },
   addedIds: string[],
   removedIds: string[],
@@ -239,7 +258,7 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
         if (activeSignedUp.has(playerId)) continue;
         const withdrawnId = withdrawnByPlayer.get(playerId);
         if (withdrawnId) {
-          await supabaseAdmin.from('signups').update({ withdrawn_at: null }).eq('signup_id', withdrawnId);
+          await must(supabaseAdmin.from('signups').update({ withdrawn_at: null }).eq('signup_id', withdrawnId));
         } else {
           toInsert.push({ match_id: String(matchId), player_id: playerId });
         }
@@ -250,7 +269,7 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
       }
     }
 
-    await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
+    await must(supabaseAdmin.from('selections').delete().eq('match_id', matchId));
 
     const rows = selectedPlayerIds.map(playerId => ({
       match_id: matchId,
@@ -272,7 +291,7 @@ router.put('/selections', authenticate, requireRole('coach', 'admin'), async (re
     const newStatus = match.status === 'published' ? 'published'
       : match.status === 'completed' ? 'completed'
       : 'optimized';
-    await supabaseAdmin.from('matches').update({ status: newStatus }).eq('match_id', matchId);
+    await must(supabaseAdmin.from('matches').update({ status: newStatus }).eq('match_id', matchId));
 
     // Swapping players on a published squad → notify the affected players.
     if (match.status === 'published') {
@@ -300,6 +319,10 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
     const { data: match } = await supabaseAdmin.from('matches').select('*').eq('match_id', matchId).single();
     if (!match) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Kampen blev ikke fundet' } });
+      return;
+    }
+    if (NOT_OPTIMIZABLE.includes(match.status)) {
+      res.status(409).json({ success: false, error: { code: 'INVALID_STATE', message: 'Truppen kan ikke optimeres for en afsluttet eller aflyst kamp' } });
       return;
     }
 
@@ -364,9 +387,9 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
       return;
     }
 
-    const selectedSet = new Set<string>(result.selected_ids);
+    const previouslyPublishedIds = await lastPublishedSquad(match);
 
-    await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
+    await must(supabaseAdmin.from('selections').delete().eq('match_id', matchId));
 
     const rows = result.selected_ids.map((playerId: string) => ({
       match_id: matchId,
@@ -388,11 +411,12 @@ router.post('/optimize', authenticate, requireRole('coach', 'admin'), async (req
       selectedCount: result.selected_ids.length,
       solveTimeMs: result.solve_time_ms ?? null,
       optimizedAt: new Date().toISOString(),
+      previouslyPublishedIds,
     };
 
-    await supabaseAdmin.from('matches')
+    await must(supabaseAdmin.from('matches')
       .update({ status: 'optimized', optimization_result: optimizationResult })
-      .eq('match_id', matchId);
+      .eq('match_id', matchId));
 
     res.json({
       success: true,

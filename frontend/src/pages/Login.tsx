@@ -25,6 +25,8 @@ export default function Login() {
       const msg = err?.response?.data?.error?.message ?? '';
       if (msg.toLowerCase().includes('too many requests') || err?.response?.status === 429) {
         setError(t('auth.tooManyAttempts'));
+      } else if (err?.response?.data?.error?.code === 'ACCOUNT_INACTIVE') {
+        setError(t('auth.accountInactive'));
       } else {
         setError(t('auth.invalidCredentials'));
       }

@@ -2,7 +2,10 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 import { api } from '../api/client';
 import { DEFAULT_LANGUAGE, setLanguage, type Language } from '../i18n';
 
-const INACTIVITY_MS = 60 * 60 * 1000; // 1 hour
+// Players open the app a few times a week from their phone's home screen; a
+// one-hour limit meant logging in again on nearly every visit. The server-side
+// refresh token and the per-request account check are what bound the session.
+const INACTIVITY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const ACTIVITY_KEY  = 'lastActivity';
 
 function isExpired(): boolean {

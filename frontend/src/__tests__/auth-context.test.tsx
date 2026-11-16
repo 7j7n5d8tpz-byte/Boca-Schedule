@@ -56,11 +56,21 @@ describe('AuthContext', () => {
     expect(screen.getByTestId('role').textContent).toBe('player');
   });
 
-  it('treats an expired session as logged-out', () => {
-    const oneHourAgo = Date.now() - 61 * 60 * 1000;
+  it('keeps a session that was last used yesterday', () => {
+    // Players open the app a few times a week; a day away must not log them out.
     localStorage.setItem('user', JSON.stringify(mockUser));
     localStorage.setItem('accessToken', 'tok');
-    localStorage.setItem('lastActivity', String(oneHourAgo));
+    localStorage.setItem('lastActivity', String(Date.now() - 24 * 60 * 60 * 1000));
+
+    render(<AuthProvider><TestConsumer /></AuthProvider>);
+    expect(screen.getByTestId('auth').textContent).toBe('yes');
+  });
+
+  it('treats an expired session as logged-out', () => {
+    const monthAgo = Date.now() - 31 * 24 * 60 * 60 * 1000; // limit is 30 days
+    localStorage.setItem('user', JSON.stringify(mockUser));
+    localStorage.setItem('accessToken', 'tok');
+    localStorage.setItem('lastActivity', String(monthAgo));
 
     render(<AuthProvider><TestConsumer /></AuthProvider>);
     expect(screen.getByTestId('auth').textContent).toBe('no');

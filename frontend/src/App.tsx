@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Theme } from '@astryxdesign/core/theme';
+import { ToastViewport } from '@astryxdesign/core/Toast';
+import { ErrorBoundary, RequestErrorToasts } from './components/AppErrors';
 import { themes, defaultThemeSlug } from './astryx-themes';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
@@ -43,6 +45,10 @@ export default function App() {
     // Astryx theme must not follow the OS into dark mode on its own.
     <Theme theme={themes[defaultThemeSlug]} mode="light">
     <QueryClientProvider client={queryClient}>
+      {/* Bottom inset lifts toasts clear of the floating nav bar on phones. */}
+      <ToastViewport position="bottomEnd" inset={{ bottom: 96 }}>
+      <RequestErrorToasts />
+      <ErrorBoundary>
       <AuthProvider>
         <CrestSprite />
         <BrowserRouter>
@@ -74,6 +80,8 @@ export default function App() {
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      </ErrorBoundary>
+      </ToastViewport>
     </QueryClientProvider>
     </Theme>
   );

@@ -19,7 +19,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
   // Fetch role from our users table
   const { data: profile } = await supabaseAdmin
     .from('users')
-    .select('role, merged_into')
+    .select('role, merged_into, is_active')
     .eq('user_id', user.id)
     .single();
 
@@ -30,10 +30,18 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     return;
   }
 
+  // Login refuses an inactive account, but a token can be obtained without
+  // logging in (a password-recovery link, or a session opened before the admin
+  // deactivated the account). Approval has to hold on every request.
+  if (!profile?.is_active) {
+    res.status(401).json({ success: false, error: { code: 'ACCOUNT_INACTIVE', message: 'Din konto er ikke aktiv' } });
+    return;
+  }
+
   req.user = {
     userId: user.id,
     email: user.email!,
-    role: profile?.role ?? 'player',
+    role: profile.role,
   };
 
   next();

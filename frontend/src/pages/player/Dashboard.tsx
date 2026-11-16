@@ -12,7 +12,6 @@ import { meetingTime, mapsUrl, buildMatchIcs, downloadIcs } from '../../utils';
 import { CardListSkeleton } from '../../components/Skeleton';
 import Icon from '../../components/Icon';
 import CountUp from '../../components/CountUp';
-import Crest, { tierRank } from '../../components/Crest';
 import CrestUnlock from '../../components/CrestUnlock';
 import { useCatalog, type PlayerAchievements } from '../../api/achievements';
 
@@ -503,20 +502,12 @@ export default function PlayerDashboard() {
     enabled: !!user,
   });
 
-  const { data: finesSummary } = useQuery<{ totals: { outstandingDkk: number; claimedDkk: number; paidDkk: number } }>({
-    queryKey: ['fines-summary'],
-    queryFn: () => api.get('/fines/my').then(r => r.data.data),
-    enabled: !!user,
-  });
-
   const { data: achievements } = useQuery<PlayerAchievements>({
     queryKey: ['achievements', user?.userId],
     queryFn: () => api.get(`/players/${user!.userId}/achievements`).then(r => r.data.data),
     enabled: !!user,
   });
-  const { data: achCatalog } = useCatalog(); // also warms the cache for the unlock modal
-  const glyphFor = (code: string) =>
-    achCatalog?.individual.find(c => c.code === code)?.glyph ?? 'medal';
+  useCatalog(); // warms the cache for the unlock modal
 
   const isCoachOrAdmin = user?.role === 'coach' || user?.role === 'admin';
   const canEnterResults = isCoachOrAdmin || myPermission?.canEnterResults;
@@ -607,63 +598,7 @@ export default function PlayerDashboard() {
                 ))}
               </Link>
 
-              {/* Quick links */}
-              <div className="space-y-3">
-                <Link to="/statistics" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{t('dashboard.teamStatsTitle')}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{t('dashboard.teamStatsSub')}</p>
-                  </div>
-                  <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
-                </Link>
-                <Link to="/achievements" className="bg-white rounded-xl border border-gray-200 hover:border-brand-green p-4 flex items-center justify-between gap-3 transition-colors group lift">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900">{t('dashboard.achievementsTitle')}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {achievements && achievements.earned.length > 0
-                        ? t('dashboard.achievementsEarned', { count: achievements.earned.length })
-                        : t('dashboard.achievementsEmpty')}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {achievements && [...achievements.earned]
-                      .sort((a, b) => tierRank(b.tier) - tierRank(a.tier))
-                      .slice(0, 3)
-                      .map(e => (
-                        <Crest key={`${e.code}:${e.tier}`} glyph={glyphFor(e.code)} tier={e.tier} size={34} showRibbon={false} />
-                      ))}
-                    <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
-                  </div>
-                </Link>
-              </div>
             </div>
-          );
-        })()}
-
-        {/* Fines */}
-        {finesSummary && (() => {
-          const totals = finesSummary.totals;
-          const due = totals.outstandingDkk;
-          const awaiting = totals.claimedDkk;
-          return (
-            <Link
-              to="/fines"
-              className={`block rounded-xl border p-4 flex items-center justify-between gap-3 transition-colors group lift ${
-                due > 0 ? 'bg-amber-50 border-amber-300 hover:border-amber-400' : 'bg-white border-gray-200 hover:border-brand-green'
-              }`}
-            >
-              <div>
-                <p className="text-sm font-semibold text-gray-900">{t('dashboard.finesTitle')}</p>
-                <p className="text-xs mt-0.5 text-gray-500">
-                  {due > 0
-                    ? <span className="text-amber-700 font-medium">{t('dashboard.finesOutstanding', { amount: due.toLocaleString('da-DK') })}</span>
-                    : awaiting > 0
-                      ? <span className="text-blue-600">{t('dashboard.finesAwaiting', { amount: awaiting.toLocaleString('da-DK') })}</span>
-                      : t('dashboard.finesSettled')}
-                </p>
-              </div>
-              <span className="text-gray-300 group-hover:text-brand-green transition-colors text-lg">→</span>
-            </Link>
           );
         })()}
 

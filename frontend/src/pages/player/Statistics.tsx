@@ -425,10 +425,10 @@ export default function Statistics() {
         <div className="flex flex-col sm:flex-row gap-6 items-stretch sm:items-start">
 
           {/* Sidebar — horizontal tab bar on mobile, sidebar on sm+. */}
-          <nav className="w-full sm:w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-2 flex sm:flex-col gap-1 sm:sticky sm:top-[calc(var(--app-nav-offset)+0.5rem)] transition-[top] duration-[var(--app-nav-dur)]">
+          <nav className="w-full sm:w-44 shrink-0 bg-white rounded-xl border border-gray-200 p-1.5 sm:p-2 flex sm:flex-col gap-0.5 sm:gap-1 overflow-x-auto sm:overflow-visible sm:sticky sm:top-[calc(var(--app-nav-offset)+0.5rem)] transition-[top] duration-[var(--app-nav-dur)]">
             <button
               onClick={() => setView('team')}
-              className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-auto sm:flex-none whitespace-nowrap text-center sm:text-left px-1.5 sm:px-3 py-2 rounded-lg text-[13px] sm:text-sm font-medium transition-colors ${
                 view === 'team' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -438,7 +438,7 @@ export default function Statistics() {
             </button>
             <button
               onClick={() => setView('players')}
-              className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-auto sm:flex-none whitespace-nowrap text-center sm:text-left px-1.5 sm:px-3 py-2 rounded-lg text-[13px] sm:text-sm font-medium transition-colors ${
                 view === 'players' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -446,7 +446,7 @@ export default function Statistics() {
             </button>
             <button
               onClick={() => setView('highlights')}
-              className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-auto sm:flex-none whitespace-nowrap text-center sm:text-left px-1.5 sm:px-3 py-2 rounded-lg text-[13px] sm:text-sm font-medium transition-colors ${
                 view === 'highlights' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
@@ -455,7 +455,7 @@ export default function Statistics() {
             </button>
             <button
               onClick={() => setView('opponents')}
-              className={`flex-1 sm:flex-none text-center sm:text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-auto sm:flex-none whitespace-nowrap text-center sm:text-left px-1.5 sm:px-3 py-2 rounded-lg text-[13px] sm:text-sm font-medium transition-colors ${
                 view === 'opponents' ? 'bg-brand-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >

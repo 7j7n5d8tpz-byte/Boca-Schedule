@@ -477,6 +477,10 @@
     "addPlayers": "+ Tilføj flere spillere",
     "addPlayersTitle": "Tilføj spillere",
     "searchPlayers": "Søg spillere…",
+    "guestTag": "Gæst",
+    "addGuestTitle": "Tilføj en gæstespiller",
+    "guestNamePlaceholder": "Gæstens navn",
+    "guestNote": "Gæster kan få mål og assists, men ikke kort, målmand, kampens spiller eller bøder.",
     "noPlayersToAdd": "Ingen flere spillere at tilføje",
     "steps": {
       "squad": "Trup",

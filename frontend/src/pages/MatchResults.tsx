@@ -30,7 +30,14 @@ interface SelectedPlayer {
   userId: string;
   name: string;
   preferredPositions: string[];
+  // A guest has no account, so no stats row: they can take a goal or an assist
+  // (stored by name on the goal event) but nothing that lives on a performance.
+  isGuest?: boolean;
 }
+
+const GUEST_PREFIX = 'guest:';
+const guestId = (name: string) => `${GUEST_PREFIX}${name}`;
+const guestNameOf = (id: string | null) => id?.startsWith(GUEST_PREFIX) ? id.slice(GUEST_PREFIX.length) : null;
 
 interface GoalEntry {
   scorerId: string | null;
@@ -216,6 +223,11 @@ function HighlightsCard({ props, cardRef }: { props: HighlightsProps; cardRef?: 
   );
 }
 
+function GuestTag() {
+  const { t } = useTranslation();
+  return <span className="text-xs px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-normal shrink-0">{t('results.guestTag')}</span>;
+}
+
 // ─── Player button ────────────────────────────────────────────────────────────
 
 function PlayerButton({ player, selected, onClick, disabled }: {
@@ -231,6 +243,7 @@ function PlayerButton({ player, selected, onClick, disabled }: {
     >
       <span className="flex-1 truncate">{player.name}</span>
       <span className="flex gap-1 shrink-0">
+        {player.isGuest && <GuestTag />}
         {player.preferredPositions.map(pos => (
           <span key={pos} className={`text-xs px-1 py-0.5 rounded ${POS_COLOR[pos] ?? 'bg-gray-100 text-gray-500'}`}>{pos}</span>
         ))}
@@ -303,6 +316,8 @@ export default function MatchResults() {
   const [extraIds, setExtraIds]       = useState<string[]>([]);
   const [showAddPlayers, setShowAddPlayers] = useState(false);
   const [playerSearch, setPlayerSearch]     = useState('');
+  const [guestNames, setGuestNames]         = useState<string[]>([]);
+  const [guestDraft, setGuestDraft]         = useState('');
   const squadSeeded = useRef(false);
   const cardRef    = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -315,6 +330,12 @@ export default function MatchResults() {
   const { data: existingResults, isLoading: resultsLoading } = useQuery({
     queryKey: ['match-results', matchId],
     queryFn: () => api.get(`/matches/${matchId}/results`).then(r => r.data.data),
+  });
+
+  // Guests the coach already put on the squad page.
+  const { data: matchGuests } = useQuery<{ guest_id: string; name: string; position: string | null }[]>({
+    queryKey: ['match-guests', matchId],
+    queryFn: () => api.get(`/matches/${matchId}/guests`).then(r => r.data.data),
   });
 
   const { data: fineTypes } = useQuery<{ fineTypeId: string; label: string; amountDkk: number }[]>({
@@ -332,9 +353,14 @@ export default function MatchResults() {
 
     // Use stored goal_events if available (preserves scorer+assister pairings)
     const stored: GoalEntry[] = (existingResults.result.goalEvents ?? []).map((e: any) => ({
-      scorerId: e.scorerId ?? null,
-      assisterId: e.assisterId ?? null,
+      scorerId:   e.scorerId   ?? (e.scorerGuest   ? guestId(e.scorerGuest)   : null),
+      assisterId: e.assisterId ?? (e.assisterGuest ? guestId(e.assisterGuest) : null),
     }));
+    // Guests only exist on the goals they were credited with — bring them back.
+    setGuestNames(prev => [...new Set([
+      ...prev,
+      ...stored.flatMap(e => [guestNameOf(e.scorerId), guestNameOf(e.assisterId)]).filter((n): n is string => !!n),
+    ])]);
     // Fall back to per-player totals if no events stored yet
     if (stored.length === 0) {
       for (const p of (existingResults.performances ?? [])) {
@@ -393,10 +419,17 @@ export default function MatchResults() {
     })
     .filter((p): p is SelectedPlayer => p !== null);
   // Everyone on the squad step, playing or not…
-  const poolPlayers = [...squadPlayers, ...extraPlayers];
+  const guestPlayers: SelectedPlayer[] = [...new Map<string, SelectedPlayer>([
+    ...(matchGuests ?? []).map(g => ({ name: g.name, position: g.position })),
+    ...guestNames.map(name => ({ name, position: null as string | null })),
+  ].map(g => [g.name, { userId: guestId(g.name), name: g.name, preferredPositions: g.position ? [g.position] : [], isGuest: true }] as [string, SelectedPlayer])).values()];
+  const poolPlayers = [...squadPlayers, ...extraPlayers, ...guestPlayers];
   const poolIds = new Set(poolPlayers.map(p => p.userId));
   // …and those who actually played: the list every later step picks from.
   const selectedPlayers = poolPlayers.filter(p => !absentIds.includes(p.userId));
+  // Club members among them — the only ones who can hold a card, the gloves,
+  // man of the match or a fine.
+  const memberPlayers = selectedPlayers.filter(p => !p.isGuest);
   const addablePlayers = rosterPlayers.filter(p =>
     !poolIds.has(p.userId) && p.name.toLowerCase().includes(playerSearch.trim().toLowerCase()));
 
@@ -425,6 +458,14 @@ export default function MatchResults() {
     if (motmId === playerId) setMotmId(null);
     if (gkFirstHalfId === playerId)  { setGkFirstHalfId(null);  setGkFirstHalfCleanSheet(false); }
     if (gkSecondHalfId === playerId) { setGkSecondHalfId(null); setGkSecondHalfCleanSheet(false); }
+  }
+
+  function addGuest() {
+    const name = guestDraft.trim();
+    if (!name) return;
+    setGuestNames(prev => prev.includes(name) ? prev : [...prev, name]);
+    setAbsentIds(prev => prev.filter(id => id !== guestId(name)));
+    setGuestDraft('');
   }
 
   function addPlayer(playerId: string) {
@@ -469,7 +510,7 @@ export default function MatchResults() {
       if (gkSecondHalfId && gkSecondHalfCleanSheet) csIds.add(gkSecondHalfId);
       // Send the whole pool, so a squad member who didn't make it is stored as
       // not attended instead of silently counting as having played.
-      const players = poolPlayers.map(p => ({
+      const players = poolPlayers.filter(p => !p.isGuest).map(p => ({
         playerId: p.userId,
         attended: !absentIds.includes(p.userId),
         goals:       goalEntries.filter(g => g.scorerId  === p.userId).length,
@@ -478,7 +519,12 @@ export default function MatchResults() {
         yellowCards: yellowCardIds.includes(p.userId) ? 1 : 0,
         redCards:    redCardIds.includes(p.userId) ? 1 : 0,
       }));
-      const res = await api.post(`/matches/${matchId}/results`, { goalsFor, goalsAgainst, gameAssessment, goalEvents: goalEntries, longRead: longRead || null, manOfMatchId: motmId, gkFirstHalfId, gkSecondHalfId, players });
+      const res = await api.post(`/matches/${matchId}/results`, { goalsFor, goalsAgainst, gameAssessment, goalEvents: goalEntries.map(g => ({
+          scorerId:   guestNameOf(g.scorerId)   ? null : g.scorerId,
+          assisterId: guestNameOf(g.assisterId) ? null : g.assisterId,
+          ...(guestNameOf(g.scorerId)   ? { scorerGuest:   guestNameOf(g.scorerId) }   : {}),
+          ...(guestNameOf(g.assisterId) ? { assisterGuest: guestNameOf(g.assisterId) } : {}),
+        })), longRead: longRead || null, manOfMatchId: motmId, gkFirstHalfId, gkSecondHalfId, players });
       // Submit any fines added in this session, then clear so a re-save can't duplicate them.
       if (matchFines.length > 0) {
         await Promise.all(matchFines.map(f => api.post('/fines', { playerId: f.playerId, fineTypeId: f.fineTypeId, matchId })));
@@ -630,6 +676,7 @@ export default function MatchResults() {
                         played ? 'border-brand-green bg-brand-green text-white' : 'border-gray-300'
                       }`}>{played ? '✓' : ''}</span>
                       <span className={`flex-1 truncate ${played ? '' : 'line-through'}`}>{p.name}</span>
+                      {p.isGuest && <GuestTag />}
                       {!played && <span className="text-xs font-normal shrink-0">{t('results.didNotPlay')}</span>}
                     </button>
                   );
@@ -664,6 +711,27 @@ export default function MatchResults() {
                       <PlayerButton key={p.userId} player={p} selected={false} onClick={() => addPlayer(p.userId)} />
                     ))}
                     {addablePlayers.length === 0 && <p className="text-xs text-gray-400">{t('results.noPlayersToAdd')}</p>}
+                  </div>
+
+                  <div className="space-y-2 border-t border-gray-100 pt-3">
+                    <p className="text-sm font-medium text-gray-700">{t('results.addGuestTitle')}</p>
+                    <form className="flex gap-2" onSubmit={e => { e.preventDefault(); addGuest(); }}>
+                      <input
+                        value={guestDraft}
+                        onChange={e => setGuestDraft(e.target.value)}
+                        placeholder={t('results.guestNamePlaceholder')}
+                        maxLength={60}
+                        className="flex-1 min-w-0 rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-green"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!guestDraft.trim()}
+                        className="bg-brand-dark text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-40 shrink-0"
+                      >
+                        {t('results.add')}
+                      </button>
+                    </form>
+                    <p className="text-xs text-gray-400">{t('results.guestNote')}</p>
                   </div>
                 </div>
               )}
@@ -812,7 +880,7 @@ export default function MatchResults() {
                     className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-green appearance-none"
                   >
                     <option value="">{t('results.unknown')}</option>
-                    {selectedPlayers.map(p => (
+                    {memberPlayers.map(p => (
                       <option key={p.userId} value={p.userId}>{p.name}</option>
                     ))}
                   </select>
@@ -853,7 +921,7 @@ export default function MatchResults() {
                     className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-green appearance-none"
                   >
                     <option value="">{t('results.unknown')}</option>
-                    {selectedPlayers.map(p => (
+                    {memberPlayers.map(p => (
                       <option key={p.userId} value={p.userId}>{p.name}</option>
                     ))}
                   </select>
@@ -908,7 +976,7 @@ export default function MatchResults() {
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><CardChip color="yellow" /> {t('stats.yellowCards')}</p>
                 <div className="space-y-1.5">
-                  {selectedPlayers.map(p => (
+                  {memberPlayers.map(p => (
                     <PlayerButton
                       key={p.userId}
                       player={p}
@@ -922,7 +990,7 @@ export default function MatchResults() {
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700 flex items-center gap-1.5"><CardChip color="red" /> {t('stats.redCards')}</p>
                 <div className="space-y-1.5">
-                  {selectedPlayers.map(p => (
+                  {memberPlayers.map(p => (
                     <PlayerButton
                       key={p.userId}
                       player={p}
@@ -972,7 +1040,7 @@ export default function MatchResults() {
                 >
                   {t('results.noMotm')}
                 </button>
-                {selectedPlayers.map(p => (
+                {memberPlayers.map(p => (
                   <PlayerButton
                     key={p.userId}
                     player={p}
@@ -1036,7 +1104,7 @@ export default function MatchResults() {
                   className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
                 >
                   <option value="">{t('results.playerPlaceholder')}</option>
-                  {poolPlayers.map(p => <option key={p.userId} value={p.userId}>{p.name}</option>)}
+                  {poolPlayers.filter(p => !p.isGuest).map(p => <option key={p.userId} value={p.userId}>{p.name}</option>)}
                 </select>
                 <select
                   value={fineDraftType}

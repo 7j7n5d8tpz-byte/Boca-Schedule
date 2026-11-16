@@ -375,9 +375,10 @@ router.get('/statistics/highlights', authenticate, async (req, res, next) => {
       walkover:       (r.matches.cancelled_by ?? null) as 'us' | 'opponent' | null,
       goals: (r.goal_events ?? []).map((g: any) => ({
         scorerId:     g.scorerId ?? null,
-        scorerName:   g.scorerId   ? (nameMap.get(g.scorerId)   ?? 'Unknown') : null,
+        // A guest has no account: the goal event carries their name instead of an id.
+        scorerName:   g.scorerId   ? (nameMap.get(g.scorerId)   ?? 'Unknown') : (g.scorerGuest   ?? null),
         assisterId:   g.assisterId ?? null,
-        assisterName: g.assisterId ? (nameMap.get(g.assisterId) ?? null)      : null,
+        assisterName: g.assisterId ? (nameMap.get(g.assisterId) ?? null)      : (g.assisterGuest ?? null),
       })),
       cleanSheets:  cleanSheetMap.get(r.match_id) ?? [],
       yellowCards:  yellowCardMap.get(r.match_id) ?? [],

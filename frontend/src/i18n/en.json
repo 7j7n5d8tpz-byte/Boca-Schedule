@@ -477,6 +477,10 @@
     "addPlayers": "+ Add more players",
     "addPlayersTitle": "Add players",
     "searchPlayers": "Search players…",
+    "guestTag": "Guest",
+    "addGuestTitle": "Add a guest player",
+    "guestNamePlaceholder": "Guest's name",
+    "guestNote": "Guests can be given goals and assists, but not cards, goalkeeper, man of the match or fines.",
     "noPlayersToAdd": "No more players to add",
     "steps": {
       "squad": "Squad",

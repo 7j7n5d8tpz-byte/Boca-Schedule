@@ -101,7 +101,7 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
       goalsFor: number;
       goalsAgainst: number;
       gameAssessment?: string | null;
-      goalEvents?: Array<{ scorerId: string | null; assisterId: string | null }>;
+      goalEvents?: Array<{ scorerId: string | null; assisterId: string | null; scorerGuest?: string; assisterGuest?: string }>;
       longRead?: string | null;
       manOfMatchId?: string | null;
       gkFirstHalfId?: string | null;

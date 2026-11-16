@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, must } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 
@@ -51,9 +51,9 @@ router.post('/', authenticate, requireRole('coach', 'admin'), async (req, res, n
 
     const updated = [...current, trimmed];
 
-    await supabaseAdmin
+    await must(supabaseAdmin
       .from('system_config')
-      .upsert({ config_key: CONFIG_KEY, config_value: updated, description: 'List of available match venues' }, { onConflict: 'config_key' });
+      .upsert({ config_key: CONFIG_KEY, config_value: updated, description: 'List of available match venues' }, { onConflict: 'config_key' }));
 
     res.json({ success: true, data: updated });
   } catch (err) {
@@ -81,9 +81,9 @@ router.delete('/', authenticate, requireRole('coach', 'admin'), async (req, res,
     const current: string[] = existing?.config_value ?? [];
     const updated = current.filter(l => l !== trimmed);
 
-    await supabaseAdmin
+    await must(supabaseAdmin
       .from('system_config')
-      .upsert({ config_key: CONFIG_KEY, config_value: updated, description: 'List of available match venues' }, { onConflict: 'config_key' });
+      .upsert({ config_key: CONFIG_KEY, config_value: updated, description: 'List of available match venues' }, { onConflict: 'config_key' }));
 
     res.json({ success: true, data: updated });
   } catch (err) {

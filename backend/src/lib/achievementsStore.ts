@@ -5,7 +5,7 @@
 // recording route (recompute on the fly), the backfill script, and the read
 // routes.
 
-import { supabaseAdmin } from './supabase.js';
+import { supabaseAdmin, must } from './supabase.js';
 import { seasonStartYear } from './season.js';
 import { playedMatch } from './participation.js';
 import { computeForPlayer, computeTeam, type PlayerMatch, type PlayerSeasonInput, type PlayerAchievementResult, type TeamMatch } from './achievements.js';
@@ -89,9 +89,9 @@ async function persist(playerId: string, seasonYear: number, result: PlayerAchie
   }));
   if (earnedRows.length > 0) {
     // ignoreDuplicates: keep the original earned_at on a tier already held.
-    await supabaseAdmin
+    await must(supabaseAdmin
       .from('player_achievements')
-      .upsert(earnedRows, { onConflict: 'player_id,achievement_code,tier,season_year', ignoreDuplicates: true });
+      .upsert(earnedRows, { onConflict: 'player_id,achievement_code,tier,season_year', ignoreDuplicates: true }));
   }
 
   // Reconcile: drop persisted crests the player no longer qualifies for. Upsert
@@ -114,13 +114,13 @@ async function persist(playerId: string, seasonYear: number, result: PlayerAchie
     staleByCode.set(r.achievement_code, tiers);
   }
   for (const [code, tiers] of staleByCode) {
-    await supabaseAdmin
+    await must(supabaseAdmin
       .from('player_achievements')
       .delete()
       .eq('player_id', playerId)
       .eq('season_year', seasonYear)
       .eq('achievement_code', code)
-      .in('tier', tiers);
+      .in('tier', tiers));
   }
 
   const streakRows = result.streaks.map(s => ({
@@ -133,9 +133,9 @@ async function persist(playerId: string, seasonYear: number, result: PlayerAchie
     updated_at: new Date().toISOString(),
   }));
   // Streaks always update (current/record move over time).
-  await supabaseAdmin
+  await must(supabaseAdmin
     .from('player_streaks')
-    .upsert(streakRows, { onConflict: 'player_id,streak_type,season_year' });
+    .upsert(streakRows, { onConflict: 'player_id,streak_type,season_year' }));
 }
 
 /** Recompute + persist for the given players in the season of `matchId`. */

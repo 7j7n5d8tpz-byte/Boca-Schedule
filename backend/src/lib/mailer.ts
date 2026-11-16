@@ -79,6 +79,12 @@ export interface SendResult {
 
 type Recipient = { name: string; email: string };
 
+// Names, venues and opponents are typed in by users (a name even by someone not
+// yet approved), and a mail client renders these bodies as HTML — so anything
+// interpolated into an html template goes through this. Subjects and the
+// plain-text bodies are not HTML and stay as typed.
+const esc = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+
 // Fan one templated email out to many recipients. The throttle above serialises
 // the API calls, so this stays inside the rate limit however long the list is.
 async function sendMany(
@@ -118,12 +124,12 @@ export async function sendSelectionNotifications(
 
   return sendMany(players, 'selection notifications', p => ({
     subject: `Du er udtaget — ${dateStr}`,
-    html: `<p>Hej <strong>${p.name}</strong>,</p>
+    html: `<p>Hej <strong>${esc(p.name)}</strong>,</p>
      <p>Du er udtaget til den kommende kamp.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${esc(match.location)}${esc(opponent)}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se på oversigten →</a>`,
     text: `Hej ${p.name},\n\nDu er udtaget til den kommende kamp.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
@@ -145,12 +151,12 @@ export async function sendDeselectionNotifications(
 
   return sendMany(players, 'deselection notifications', p => ({
     subject: `Ændring i truppen — ${dateStr}`,
-    html: `<p>Hej <strong>${p.name}</strong>,</p>
+    html: `<p>Hej <strong>${esc(p.name)}</strong>,</p>
      <p>Træneren har ændret truppen, og du er ikke længere udtaget til denne kamp.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${esc(match.location)}${esc(opponent)}</td></tr>
      </table>`,
     text: `Hej ${p.name},\n\nTræneren har ændret truppen, og du er ikke længere udtaget til denne kamp.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}`,
   }));
@@ -178,13 +184,13 @@ export async function sendCancellationNotifications(
 
   return sendMany(players, 'cancellation notifications', p => ({
     subject: `Kamp aflyst — ${dateStr}`,
-    html: `<p>Hej <strong>${p.name}</strong>,</p>
+    html: `<p>Hej <strong>${esc(p.name)}</strong>,</p>
      <p>Desværre er den kamp, du var udtaget til, blevet aflyst.</p>
      ${outcomeText ? `<p>${outcomeText}</p>` : ''}
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${esc(match.location)}${esc(opponent)}</td></tr>
      </table>`,
     text: `Hej ${p.name},\n\nDesværre er den kamp, du var udtaget til, blevet aflyst.\n${outcomeText ? `${outcomeText}\n` : ''}\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}`,
   }));
@@ -206,12 +212,12 @@ export async function sendReleaseNotification(
 
   return sendMany(coaches, 'release notifications', c => ({
     subject: `Plads frigivet — ${playerName} · ${dateStr}`,
-    html: `<p>Hej <strong>${c.name}</strong>,</p>
-     <p><strong>${playerName}</strong> har frigivet sin plads til kampen den ${dateStr}.</p>
+    html: `<p>Hej <strong>${esc(c.name)}</strong>,</p>
+     <p><strong>${esc(playerName)}</strong> har frigivet sin plads til kampen den ${dateStr}.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${esc(match.location)}${esc(opponent)}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/coach/matches/${matchId}/selections" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Administrér trup →</a>`,
     text: `Hej ${c.name},\n\n${playerName} har frigivet sin plads til kampen den ${dateStr}.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
@@ -232,12 +238,12 @@ export async function sendSpotOpenNotification(
 
   return sendMany(players, 'spot-open notifications', p => ({
     subject: `En plads er blevet ledig — ${dateStr}`,
-    html: `<p>Hej <strong>${p.name}</strong>,</p>
+    html: `<p>Hej <strong>${esc(p.name)}</strong>,</p>
      <p>Der er blevet en plads ledig til kampen den ${dateStr}. Vil du have den? Overtag den, så bekræfter træneren.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${esc(match.location)}${esc(opponent)}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Overtag pladsen →</a>`,
     text: `Hej ${p.name},\n\nDer er blevet en plads ledig til kampen den ${dateStr}. Overtag den, så bekræfter træneren.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
@@ -260,12 +266,12 @@ export async function sendSpotClaimNotification(
 
   return sendMany(coaches, 'spot-claim notifications', c => ({
     subject: `Plads ønsket — ${claimantName} · ${dateStr}`,
-    html: `<p>Hej <strong>${c.name}</strong>,</p>
-     <p><strong>${claimantName}</strong> vil gerne overtage en ledig plads til kampen den ${dateStr}. Bekræft vedkommende (eller en anden ansøger) i truppen.</p>
+    html: `<p>Hej <strong>${esc(c.name)}</strong>,</p>
+     <p><strong>${esc(claimantName)}</strong> vil gerne overtage en ledig plads til kampen den ${dateStr}. Bekræft vedkommende (eller en anden ansøger) i truppen.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${esc(match.location)}${esc(opponent)}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/coach/matches/${matchId}/selections" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se ansøgerne →</a>`,
     text: `Hej ${c.name},\n\n${claimantName} vil gerne overtage en ledig plads til kampen den ${dateStr}.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/coach/matches/${matchId}/selections`,
@@ -288,14 +294,14 @@ export async function sendClaimResolutionNotification(
   await send(
     claimant.email,
     `Plads ${accepted ? 'bekræftet' : 'gik til en anden'} — ${dateStr}`,
-    `<p>Hej <strong>${claimant.name}</strong>,</p>
+    `<p>Hej <strong>${esc(claimant.name)}</strong>,</p>
      <p>${accepted
         ? `Du er med i truppen til kampen den ${dateStr}!`
         : `Den ledige plads til kampen den ${dateStr} gik til en anden spiller denne gang.`}</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${esc(match.location)}${esc(opponent)}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se på oversigten →</a>`,
     `Hej ${claimant.name},\n\n${accepted ? `Du er med i truppen til kampen den ${dateStr}!` : `Den ledige plads til kampen den ${dateStr} gik til en anden spiller denne gang.`}\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
@@ -317,12 +323,12 @@ export async function sendSignupReminder(
 
   return sendMany(players, 'signup reminders', p => ({
     subject: `Tilmeldingen lukker snart — ${dateStr}`,
-    html: `<p>Hej <strong>${p.name}</strong>,</p>
+    html: `<p>Hej <strong>${esc(p.name)}</strong>,</p>
      <p>Tilmeldingen til den kommende kamp lukker <strong>${deadlineStr}</strong>, og du har ikke meldt dig til endnu.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${esc(match.location)}${esc(opponent)}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tilmelding lukker</td><td style="font-size:14px">${deadlineStr}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Tilmeld dig nu →</a>`,
@@ -350,8 +356,8 @@ export async function sendSignupOpenAnnouncement(
     return {
       label: `${dateStr}${opponent}`,
       html: `<li style="margin:10px 0;font-size:14px">
-               <strong>${dateStr}</strong>${opponent}<br>
-               <span style="color:#6b7280">${m.matchTime.slice(0, 5)} · ${m.location}</span><br>
+               <strong>${dateStr}</strong>${esc(opponent)}<br>
+               <span style="color:#6b7280">${m.matchTime.slice(0, 5)} · ${esc(m.location)}</span><br>
                <span style="color:#6b7280">Tilmeld dig senest ${deadline}</span>
              </li>`,
       text: `- ${dateStr}${opponent}\n  ${m.matchTime.slice(0, 5)} · ${m.location}\n  Tilmeld dig senest ${deadline}`,
@@ -368,7 +374,7 @@ export async function sendSignupOpenAnnouncement(
   await send(
     player.email,
     subject,
-    `<p>Hej <strong>${player.name}</strong>,</p>
+    `<p>Hej <strong>${esc(player.name)}</strong>,</p>
      <p>${intro}</p>
      <ul style="padding-left:18px;margin:12px 0">${rows.map(r => r.html).join('')}</ul>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Tilmeld dig nu →</a>`,
@@ -385,8 +391,8 @@ export async function sendAdminRegistrationNotification(playerName: string, play
     `Ny registrering: ${playerName}`,
     `<p>En ny spiller har registreret sig og afventer godkendelse.</p>
      <table style="border-collapse:collapse;margin:16px 0">
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Navn</td><td style="font-size:14px;font-weight:600">${playerName}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">E-mail</td><td style="font-size:14px">${playerEmail}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Navn</td><td style="font-size:14px;font-weight:600">${esc(playerName)}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">E-mail</td><td style="font-size:14px">${esc(playerEmail)}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/admin" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se i adminpanelet →</a>`,
     `En ny spiller har registreret sig og afventer godkendelse.\n\nNavn: ${playerName}\nE-mail: ${playerEmail}\n\n${FRONTEND_URL}/admin`,
@@ -401,7 +407,7 @@ export async function sendAccountActivatedEmail(player: Recipient) {
   await send(
     player.email,
     'Din konto er aktiveret',
-    `<p>Hej <strong>${player.name}</strong>,</p>
+    `<p>Hej <strong>${esc(player.name)}</strong>,</p>
      <p>Din konto hos Boca Boldisch er nu godkendt og aktiveret. Du kan logge ind og tilmelde dig kampe.</p>
      <a href="${FRONTEND_URL}/login" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Log ind →</a>`,
     `Hej ${player.name},\n\nDin konto hos Boca Boldisch er nu godkendt og aktiveret. Du kan logge ind og tilmelde dig kampe.\n\n${FRONTEND_URL}/login`,
@@ -424,7 +430,7 @@ function matchLines(matches: ReminderMatch[]): { html: string; text: string } {
     });
     const opponent = m.opponent ? ` vs ${m.opponent}` : '';
     return {
-      html: `<li style="margin:4px 0;font-size:14px"><strong>${dateStr}</strong> · ${m.matchTime.slice(0, 5)} · ${m.location}${opponent}</li>`,
+      html: `<li style="margin:4px 0;font-size:14px"><strong>${dateStr}</strong> · ${m.matchTime.slice(0, 5)} · ${esc(m.location)}${esc(opponent)}</li>`,
       text: `- ${dateStr} · ${m.matchTime.slice(0, 5)} · ${m.location}${opponent}`,
     };
   });
@@ -447,12 +453,12 @@ export async function sendMatchdayReminder(
 
   return sendMany(players, 'match-day reminders', p => ({
     subject: `Kamp i morgen — ${dateStr}`,
-    html: `<p>Hej <strong>${p.name}</strong>,</p>
+    html: `<p>Hej <strong>${esc(p.name)}</strong>,</p>
      <p>Husk: du er i truppen til morgendagens kamp.</p>
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
-       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${match.location}${opponent}</td></tr>
+       <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Sted</td><td style="font-size:14px">${esc(match.location)}${esc(opponent)}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Se på oversigten →</a>`,
     text: `Hej ${p.name},\n\nHusk: du er i truppen til morgendagens kamp.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\n\n${FRONTEND_URL}/dashboard`,
@@ -471,7 +477,7 @@ export async function sendSelectionReminder(
   await send(
     coach.email,
     n === 1 ? 'En trup mangler at blive udtaget' : `${n} trupper mangler at blive udtaget`,
-    `<p>Hej <strong>${coach.name}</strong>,</p>
+    `<p>Hej <strong>${esc(coach.name)}</strong>,</p>
      <p>Tilmeldingen er lukket til ${n === 1 ? 'denne kamp' : 'disse kampe'}, og truppen er ikke offentliggjort endnu:</p>
      ${html}
      <a href="${FRONTEND_URL}/coach" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Sammensæt truppen →</a>`,
@@ -490,7 +496,7 @@ export async function sendResultReminder(
   await send(
     recipient.email,
     n === 1 ? 'Registrér gårsdagens resultat' : `Registrér ${n} kampresultater`,
-    `<p>Hej <strong>${recipient.name}</strong>,</p>
+    `<p>Hej <strong>${esc(recipient.name)}</strong>,</p>
      <p>${n === 1 ? 'Denne kamp er' : 'Disse kampe er'} spillet, men resultatet er ikke registreret endnu:</p>
      ${html}
      <a href="${FRONTEND_URL}/coach" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Registrér resultatet →</a>`,

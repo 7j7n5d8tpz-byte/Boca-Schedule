@@ -48,14 +48,16 @@ push/PR to `main`:
 3. E2E tests (Playwright) — **push events only**, not PRs
 4. **Deploy (push to `main` only, after E2E passes):**
    - `supabase db push` — applies new migrations to the prod DB
-   - Backend → Fly.io (`boca-backend`)
+   - Backend → Fly.io (`boca-backend`), after the migrations
+   - Frontend → Vercel, last, via a deploy hook (secret `VERCEL_DEPLOY_HOOK`)
 
 Any push to `main` triggers the full pipeline, including a prod deploy — even a
 config-only commit will redeploy (a no-op if no code/migrations changed).
 
 ## Production
 
-- Frontend: https://boca-schedule.vercel.app — Vercel, auto-deploys on push to `main`.
+- Frontend: https://boca-schedule.vercel.app — Vercel. Git auto-deploy is **off** for `main`
+  ([vercel.json](vercel.json)); CI triggers the deploy once tests pass and the backend is live.
 - Backend: `boca-backend.fly.dev` (health: `/health`). Squad optimizer runs in-process
   (HiGHS-WASM) — no separate optimizer service.
 - DB/Auth: Supabase project `bqucqglcueffoqiywers` (West EU).

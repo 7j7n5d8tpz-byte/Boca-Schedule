@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, must } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { createNotifications } from '../lib/notifications.js';
@@ -126,7 +126,7 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
     }
 
     // Upsert team result
-    await supabaseAdmin.from('match_results').upsert({
+    await must(supabaseAdmin.from('match_results').upsert({
       match_id: matchId,
       goals_for: goalsFor,
       goals_against: goalsAgainst,
@@ -137,7 +137,7 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
       gk_second_half: gkSecondHalfId ?? null,
       recorded_by: userId,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'match_id' });
+    }, { onConflict: 'match_id' }));
 
     // Upsert individual performances
     if (Array.isArray(players) && players.length > 0) {
@@ -166,7 +166,7 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
         man_of_match: manOfMatchId ? p.playerId === manOfMatchId : false,
         submitted_by: userId,
       }));
-      await supabaseAdmin.from('match_performance').upsert(rows, { onConflict: 'match_id,player_id' });
+      await must(supabaseAdmin.from('match_performance').upsert(rows, { onConflict: 'match_id,player_id' }));
     }
 
     // A recorded result means the match is over — complete it from any live
@@ -174,9 +174,9 @@ router.post('/matches/:matchId/results', authenticate, async (req, res, next) =>
     // closed/published would otherwise keep its old status and linger under
     // "Upcoming" on the player home. Drafts and cancelled matches stay put.
     if (['signup_open', 'signup_closed', 'optimized', 'published'].includes(match.status)) {
-      await supabaseAdmin.from('matches')
+      await must(supabaseAdmin.from('matches')
         .update({ status: 'completed', completed_at: new Date().toISOString() })
-        .eq('match_id', matchId);
+        .eq('match_id', matchId));
     }
 
     // Recompute achievements/streaks for every player in this result. Fire-and-
@@ -316,14 +316,14 @@ router.put('/result-permissions/:requestId/respond', authenticate, requireRole('
       return;
     }
 
-    await supabaseAdmin.from('result_edit_requests').update({
+    await must(supabaseAdmin.from('result_edit_requests').update({
       status: approve ? 'approved' : 'rejected',
       resolved_at: new Date().toISOString(),
       resolved_by: req.user!.userId,
-    }).eq('request_id', requestId);
+    }).eq('request_id', requestId));
 
     if (approve) {
-      await supabaseAdmin.from('users').update({ can_enter_results: true }).eq('user_id', req_.player_id);
+      await must(supabaseAdmin.from('users').update({ can_enter_results: true }).eq('user_id', req_.player_id));
     }
 
     res.json({ success: true, data: { requestId, status: approve ? 'approved' : 'rejected' } });

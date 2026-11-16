@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, must } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { optimizeBatch } from '../lib/optimizer.js';
+import { lastPublishedSquad, NOT_OPTIMIZABLE } from './optimize.js';
 
 const router = Router();
 
@@ -43,6 +44,10 @@ router.post('/batch', authenticate, requireRole('coach', 'admin'), async (req, r
     for (const { matchId, match } of matchDataResults) {
       if (!match) {
         res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Match ${matchId} not found` } });
+        return;
+      }
+      if (NOT_OPTIMIZABLE.includes(match.status)) {
+        res.status(409).json({ success: false, error: { code: 'INVALID_STATE', message: 'Truppen kan ikke optimeres for en afsluttet eller aflyst kamp' } });
         return;
       }
     }
@@ -114,9 +119,10 @@ router.post('/batch', authenticate, requireRole('coach', 'admin'), async (req, r
     // Save selections for every match and advance status to 'optimized'
     await Promise.all(
       (batchResult.matches as any[]).map(async (matchResult: any) => {
-        const { matchId, signups, fairnessWeight } = matchDataResults.find(m => m.matchId === matchResult.match_id)!;
+        const { matchId, match, signups, fairnessWeight } = matchDataResults.find(m => m.matchId === matchResult.match_id)!;
+        const previouslyPublishedIds = await lastPublishedSquad(match);
 
-        await supabaseAdmin.from('selections').delete().eq('match_id', matchId);
+        await must(supabaseAdmin.from('selections').delete().eq('match_id', matchId));
 
         const rows = (matchResult.selected_ids as string[]).map(playerId => ({
           match_id: matchId,
@@ -140,11 +146,12 @@ router.post('/batch', authenticate, requireRole('coach', 'admin'), async (req, r
           selectedCount: (matchResult.selected_ids as string[]).length,
           solveTimeMs: batchResult.solve_time_ms ?? null,
           optimizedAt: new Date().toISOString(),
+          previouslyPublishedIds,
         };
 
-        await supabaseAdmin.from('matches')
+        await must(supabaseAdmin.from('matches')
           .update({ status: 'optimized', optimization_result: optimizationResult })
-          .eq('match_id', matchId);
+          .eq('match_id', matchId));
       })
     );
 

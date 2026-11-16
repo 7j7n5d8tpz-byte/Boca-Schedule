@@ -102,9 +102,10 @@ describe('Auth', () => {
       expect(res.status).toBe(401);
     });
 
-    it('returns 401 for an inactive (pending-approval) account', async () => {
+    it('tells an inactive (pending-approval) account that it is not active yet', async () => {
       // Accounts created via /register start as is_active: false until an admin approves them.
-      // The response must be identical to a wrong-password 401 to avoid revealing the account exists.
+      // The password was right, so this reveals nothing to a guesser — and "wrong
+      // password" sent new players off to reset a password that was fine.
       const email    = `inactive-${Date.now()}@bocatest.internal`;
       const password = 'Test123!';
       const { data: authData } = await supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true });
@@ -119,10 +120,33 @@ describe('Auth', () => {
 
       try {
         const res = await request(app).post('/api/auth/login').send({ email, password });
-        expect(res.status).toBe(401);
-        expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
+        expect(res.status).toBe(403);
+        expect(res.body.error.code).toBe('ACCOUNT_INACTIVE');
+
+        // …while a wrong password on the same account still looks like any other.
+        const wrong = await request(app).post('/api/auth/login').send({ email, password: 'WrongPass1!' });
+        expect(wrong.status).toBe(401);
+        expect(wrong.body.error.code).toBe('INVALID_CREDENTIALS');
       } finally {
         await deleteTestUser(authData.user!.id);
+      }
+    });
+
+    it('refuses the token of an account that has been deactivated', async () => {
+      // A token can outlive the approval it was issued under (deactivated while
+      // logged in) or be obtained without logging in at all (a recovery link).
+      const user = await createTestUser('player', '-deactivated');
+      try {
+        const before = await request(app).get('/api/matches/upcoming').set('Authorization', `Bearer ${user.token}`);
+        expect(before.status).toBe(200);
+
+        await supabaseAdmin.from('users').update({ is_active: false }).eq('user_id', user.userId);
+
+        const after = await request(app).get('/api/matches/upcoming').set('Authorization', `Bearer ${user.token}`);
+        expect(after.status).toBe(401);
+        expect(after.body.error.code).toBe('ACCOUNT_INACTIVE');
+      } finally {
+        await deleteTestUser(user.userId);
       }
     });
 
@@ -195,11 +219,23 @@ describe('Auth', () => {
     });
 
     it('rejects a regular session token (must be recovery token)', async () => {
+      // Log in afresh: the test above changed the password, which revokes every
+      // earlier session — so `player.token` would be turned away for being dead,
+      // not for being the wrong kind, and this test would pass whatever the
+      // recovery check did.
+      const login = await request(app).post('/api/auth/login').send({ email: player.email, password: player.password });
+      expect(login.status).toBe(200);
+      const liveToken = login.body.data.tokens.accessToken;
+
       const res = await request(app).post('/api/auth/reset-password').send({
-        accessToken: player.token, // regular login token, not recovery
+        accessToken: liveToken, // regular login token, not recovery
         newPassword: 'NewPass123!',
       });
       expect(res.status).toBe(401);
+
+      // And the password really is unchanged.
+      const again = await request(app).post('/api/auth/login').send({ email: player.email, password: player.password });
+      expect(again.status).toBe(200);
     });
 
     it('rejects missing fields', async () => {

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, must } from '../lib/supabase.js';
 import { authenticate } from '../middleware/authenticate.js';
 import { requireRole } from '../middleware/requireRole.js';
 import {
@@ -152,23 +152,23 @@ router.put('/claims/:claimId/resolve', authenticate, requireRole('coach', 'admin
         .is('withdrawn_at', null)
         .maybeSingle();
       if (!existing) {
-        await supabaseAdmin.from('signups').insert({ match_id: claim.match_id, player_id: claim.claimant_id });
+        await must(supabaseAdmin.from('signups').insert({ match_id: claim.match_id, player_id: claim.claimant_id }));
       }
 
       // Add claimant to selections (ignore if somehow already there)
-      await supabaseAdmin.from('selections').upsert({
+      await must(supabaseAdmin.from('selections').upsert({
         match_id: claim.match_id,
         player_id: claim.claimant_id,
         selected_by_optimization: false,
         manually_adjusted: true,
         is_priority_selection: false,
         selected_by: coachId,
-      }, { onConflict: 'match_id,player_id' });
+      }, { onConflict: 'match_id,player_id' }));
 
       // Accept this claim; reject all other pending claims for the same match
-      await supabaseAdmin.from('spot_claims')
+      await must(supabaseAdmin.from('spot_claims')
         .update({ status: 'accepted', resolved_at: new Date().toISOString() })
-        .eq('claim_id', claimId);
+        .eq('claim_id', claimId));
 
       const { data: rejected } = await supabaseAdmin.from('spot_claims')
         .update({ status: 'rejected', resolved_at: new Date().toISOString() })
@@ -178,9 +178,9 @@ router.put('/claims/:claimId/resolve', authenticate, requireRole('coach', 'admin
 
       notifyResolution(claim.match_id, claim.claimant_id, (rejected ?? []).map((r: any) => r.claimant_id));
     } else {
-      await supabaseAdmin.from('spot_claims')
+      await must(supabaseAdmin.from('spot_claims')
         .update({ status: 'rejected', resolved_at: new Date().toISOString() })
-        .eq('claim_id', claimId);
+        .eq('claim_id', claimId));
 
       notifyResolution(claim.match_id, null, [claim.claimant_id]);
     }
@@ -211,9 +211,9 @@ router.delete('/claims/:claimId', authenticate, async (req, res, next) => {
       return;
     }
 
-    await supabaseAdmin.from('spot_claims')
+    await must(supabaseAdmin.from('spot_claims')
       .update({ status: 'cancelled', resolved_at: new Date().toISOString() })
-      .eq('claim_id', claimId);
+      .eq('claim_id', claimId));
 
     res.json({ success: true });
   } catch (err) {

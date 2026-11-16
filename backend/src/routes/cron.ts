@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { supabaseAdmin } from '../lib/supabase.js';
+import { supabaseAdmin, must } from '../lib/supabase.js';
 import { sendSignupReminder, sendMatchdayReminder, sendSelectionReminder, sendResultReminder, sendSignupOpenAnnouncement } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
 import { notifySignupOpen, openDueDrafts } from '../lib/signupOpen.js';
@@ -38,7 +38,7 @@ function cronAuthorized(req: Request, res: Response): boolean {
 
 // POST /api/cron/signup-reminders
 //
-// Invoked by a scheduled GitHub Actions workflow (see .github/workflows/reminders.yml).
+// Invoked every 10 minutes by the in-process scheduler (see server.ts).
 // Guarded by a shared secret in the `x-cron-secret` header — there is no user auth
 // here because the caller is a machine, not a logged-in user.
 //
@@ -182,7 +182,7 @@ async function configNumber(key: string, fallback: number): Promise<number> {
 
 // POST /api/cron/match-announcements
 //
-// Invoked hourly by the same workflow as the reminders. Announces matches whose
+// Invoked by the same scheduler as the reminders. Announces matches whose
 // sign-up window has opened:
 //   1. drafts whose opening time has arrived become signup_open
 //   2. in-app notification for anything open but not yet announced
@@ -323,7 +323,7 @@ router.post('/match-announcements', async (req, res) => {
 
 // POST /api/cron/daily-reminders
 //
-// Invoked hourly by the same workflow as signup-reminders, but only does work at
+// Invoked by the same scheduler as signup-reminders, but only does work at
 // the 18:00 hour in Europe/Copenhagen — all three reminders below send at 18:00
 // local. Each is stamped once per match so a match is never re-reminded.
 //   • match-day   → selected players, the evening before kick-off
@@ -397,7 +397,7 @@ async function runMatchdayReminders(matchDate: string) {
         recipients += ids.length;
       }
       // Stamp regardless so the match isn't re-scanned next run.
-      await supabaseAdmin.from('matches').update({ matchday_reminder_sent_at: new Date().toISOString() }).eq('match_id', m.match_id);
+      await must(supabaseAdmin.from('matches').update({ matchday_reminder_sent_at: new Date().toISOString() }).eq('match_id', m.match_id));
     } catch (e) {
       console.error(`matchday reminder: match ${m.match_id} failed:`, e);
     }
@@ -439,9 +439,9 @@ async function runSelectionReminders(today: string, now: Date) {
   });
 
   // Stamp every included match so it isn't re-reminded.
-  await supabaseAdmin.from('matches')
+  await must(supabaseAdmin.from('matches')
     .update({ selection_reminder_sent_at: new Date().toISOString() })
-    .in('match_id', (matches as any[]).map(m => m.match_id));
+    .in('match_id', (matches as any[]).map(m => m.match_id)));
 
   return { matches: n, coaches: (coaches ?? []).length };
 }
@@ -479,9 +479,9 @@ async function runResultReminders(today: string) {
     link: '/coach',
   });
 
-  await supabaseAdmin.from('matches')
+  await must(supabaseAdmin.from('matches')
     .update({ result_reminder_sent_at: new Date().toISOString() })
-    .in('match_id', pending.map((m: any) => m.match_id));
+    .in('match_id', pending.map((m: any) => m.match_id)));
 
   return { matches: n, recipients: (recipients ?? []).length };
 }

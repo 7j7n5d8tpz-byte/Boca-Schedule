@@ -177,10 +177,32 @@ jobs:
     name: Deploy backend to Fly.io
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test-e2e]
+    # After `migrate`, not beside it: new code must never go live against a
+    # database whose migration failed or hasn't finished.
+    needs: [test-e2e, migrate]
     steps:
       - uses: actions/checkout@v6
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - run: flyctl deploy --remote-only --config backend/fly.toml
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  # The frontend goes last. Vercel no longer deploys `main` on push (vercel.json:
+  # git.deploymentEnabled) — it used to ship the new UI ten minutes before the API
+  # it calls, and shipped it even when the tests failed. A deploy hook builds the
+  # latest commit on `main` once the backend it depends on is live.
+  deploy-frontend:
+    name: Deploy frontend to Vercel
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [deploy-backend]
+    steps:
+      - name: Trigger the Vercel deploy hook
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK" ]; then
+            echo "::error::Secret VERCEL_DEPLOY_HOOK is not set, so the frontend was NOT deployed. Create a deploy hook for branch main (Vercel → Project → Settings → Git → Deploy Hooks) and store its URL with: gh secret set VERCEL_DEPLOY_HOOK"
+            exit 1
+          fi
+          curl -fsS -o /dev/null -X POST "$VERCEL_DEPLOY_HOOK"

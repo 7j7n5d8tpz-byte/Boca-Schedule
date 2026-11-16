@@ -19,7 +19,9 @@ async function writeAudit(
   oldValues?: object | null,
   newValues?: object | null,
 ) {
-  await supabaseAdmin.from('audit_log').insert({
+  // Logged, not thrown: the action it records has already happened, and failing
+  // the request now would tell the admin it hadn't.
+  const { error } = await supabaseAdmin.from('audit_log').insert({
     user_id: userId,
     action,
     entity_type: entityType,
@@ -27,6 +29,7 @@ async function writeAudit(
     old_values: oldValues ?? null,
     new_values: newValues ?? null,
   });
+  if (error) console.error('Failed to write audit log entry:', action, error);
 }
 
 // GET /api/admin/users
@@ -94,13 +97,19 @@ router.post('/users', async (req, res, next) => {
     }
 
     const userRole = role ?? 'player';
-    await supabaseAdmin.from('users').insert({
+    const { error: profileError } = await supabaseAdmin.from('users').insert({
       user_id: authData.user.id,
       email,
       name,
       role: userRole,
       preferred_positions: preferredPositions ?? [],
     });
+    if (profileError) {
+      // Don't leave a login behind with no profile to go with it.
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      res.status(400).json({ success: false, error: { code: 'CREATE_FAILED', message: profileError.message } });
+      return;
+    }
 
     await writeAudit(req.user!.userId, 'user_created', 'user', authData.user.id, null, { email, name, role: userRole });
 
@@ -178,8 +187,22 @@ router.delete('/users/:userId', async (req, res, next) => {
 
     const { data: target } = await supabaseAdmin.from('users').select('email, name, role').eq('user_id', userId).single();
 
-    await supabaseAdmin.auth.admin.deleteUser(userId);
-    await supabaseAdmin.from('users').delete().eq('user_id', userId);
+    // Profile first, login second. The profile is the half that can refuse: a
+    // user who created matches, picked squads or recorded results is still
+    // referenced by them (ON DELETE RESTRICT). Deleting the login first left
+    // exactly that user half-deleted — unable to log in, still on the list.
+    const { error: profileError } = await supabaseAdmin.from('users').delete().eq('user_id', userId);
+    if (profileError) {
+      if (profileError.code === '23503') {
+        res.status(409).json({ success: false, error: { code: 'USER_HAS_HISTORY', message: 'Brugeren har oprettet kampe, udtaget trupper eller registreret resultater og kan ikke slettes. Deaktivér kontoen, eller flet den ind i en anden.' } });
+        return;
+      }
+      throw profileError;
+    }
+
+    // A placeholder has no login to delete, hence 404 is fine.
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(String(userId));
+    if (authError && authError.status !== 404) throw authError;
 
     await writeAudit(req.user!.userId, 'user_deleted', 'user', userId, target ?? null, null);
 

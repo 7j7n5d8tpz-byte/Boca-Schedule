@@ -5,7 +5,12 @@
     "remove": "Remove",
     "optional": "(optional)",
     "loading": "Loading…",
-    "chooseImageFile": "Please choose an image file."
+    "chooseImageFile": "Please choose an image file.",
+    "actionFailed": "That didn't go through. Please try again.",
+    "loadFailed": "Couldn't load this. Check your connection.",
+    "retry": "Try again",
+    "crashed": "Something went wrong on this page.",
+    "reload": "Back to the start"
   },
   "positions": {
     "GK": "Goalkeeper",
@@ -83,6 +88,7 @@
     "signingIn": "Signing in...",
     "tooManyAttempts": "Too many sign-in attempts. Please wait a few minutes and try again.",
     "invalidCredentials": "Invalid email or password.",
+    "accountInactive": "Your account is not active yet. An administrator has to approve it before you can sign in.",
     "forgotPrompt": "Enter your email and we'll send you a link to reset your password.",
     "resetSent": "If that email address is registered, a reset link has been sent. Check your inbox.",
     "backToSignIn": "Back to sign in",

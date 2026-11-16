@@ -133,6 +133,19 @@ describe('mailer transport', () => {
     expect(result.failed).toHaveLength(1);
   });
 
+  it('escapes user-typed text in the HTML body, not in the subject or text', async () => {
+    const { sendAdminRegistrationNotification } = await loadMailer(1000);
+    sendMock.mockResolvedValue(ok);
+
+    // Anyone can register under any name; it lands in the admin's inbox.
+    await sendAdminRegistrationNotification('<a href="https://evil.example">Godkend her</a>', 'x@example.com');
+
+    const sent = sendMock.mock.calls[0][0];
+    expect(sent.html).not.toContain('<a href="https://evil.example">');
+    expect(sent.html).toContain('&#60;a href=&#34;https://evil.example&#34;&#62;');
+    expect(sent.text).toContain('<a href="https://evil.example">Godkend her</a>');
+  });
+
   it('sends the activated player a login link', async () => {
     const { sendAccountActivatedEmail } = await loadMailer(1000);
     sendMock.mockResolvedValue(ok);

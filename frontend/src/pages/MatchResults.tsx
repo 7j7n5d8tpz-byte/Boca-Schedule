@@ -37,7 +37,7 @@ interface GoalEntry {
   assisterId: string | null;
 }
 
-type Step = 'score' | 'goals' | 'goalkeepers' | 'cards' | 'motm' | 'fines' | 'assessment';
+type Step = 'squad' | 'score' | 'goals' | 'goalkeepers' | 'cards' | 'motm' | 'fines' | 'assessment';
 
 // ─── Highlights card ──────────────────────────────────────────────────────────
 
@@ -244,6 +244,7 @@ function PlayerButton({ player, selected, onClick, disabled }: {
 function StepProgress({ step, goalIndex, goalsFor }: { step: Step; goalIndex: number; goalsFor: number }) {
   const { t } = useTranslation();
   const steps = [
+    { key: 'squad',       label: t('results.steps.squad') },
     { key: 'score',       label: t('results.steps.score') },
     ...(goalsFor > 0 ? [{ key: 'goals', label: step === 'goals' ? t('results.steps.goalN', { index: goalIndex + 1, total: goalsFor }) : t('results.steps.goals') }] : []),
     { key: 'goalkeepers', label: t('results.steps.goalkeepers') },
@@ -276,7 +277,7 @@ export default function MatchResults() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const [step, setStep]               = useState<Step>('score');
+  const [step, setStep]               = useState<Step>('squad');
   const [goalIndex, setGoalIndex]     = useState(0);
   const [goalsFor, setGoalsFor]       = useState(0);
   const [goalsAgainst, setGoalsAgainst] = useState(0);
@@ -296,6 +297,13 @@ export default function MatchResults() {
   const [showHighlights, setShowHighlights] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError]             = useState('');
+  // Last-minute squad changes: squad members who didn't play, and players who
+  // weren't in the squad but did.
+  const [absentIds, setAbsentIds]     = useState<string[]>([]);
+  const [extraIds, setExtraIds]       = useState<string[]>([]);
+  const [showAddPlayers, setShowAddPlayers] = useState(false);
+  const [playerSearch, setPlayerSearch]     = useState('');
+  const squadSeeded = useRef(false);
   const cardRef    = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -351,8 +359,8 @@ export default function MatchResults() {
     setLongRead(existingResults.result.longRead ?? '');
   }, [existingResults]);
 
-  // Build player pool: selected players → all signed-up players → existing performances (editing fallback)
-  const selectedPlayers: SelectedPlayer[] = (() => {
+  // The published squad: selected players → all signed-up players → existing performances (editing fallback)
+  const squadPlayers: SelectedPlayer[] = (() => {
     const fromSelections = (selectionsData?.players ?? [])
       .filter((p: any) => p.isSelected)
       .map((p: any) => ({ userId: p.player.userId, name: p.player.name, preferredPositions: p.player.preferredPositions ?? [] }));
@@ -369,6 +377,61 @@ export default function MatchResults() {
     return (existingResults?.performances ?? [])
       .map((p: any) => ({ userId: p.playerId, name: p.name, preferredPositions: p.preferredPositions ?? [] }));
   })();
+
+  // GET /selections returns the whole roster, which is what late additions are
+  // picked from. Saved performances cover a player who has since left the roster.
+  const rosterPlayers: SelectedPlayer[] = (selectionsData?.players ?? [])
+    .map((p: any) => ({ userId: p.player.userId, name: p.player.name, preferredPositions: p.player.preferredPositions ?? [] }));
+  const squadIds = new Set(squadPlayers.map(p => p.userId));
+  const extraPlayers: SelectedPlayer[] = extraIds
+    .filter(id => !squadIds.has(id))
+    .map(id => {
+      const fromRoster = rosterPlayers.find(p => p.userId === id);
+      if (fromRoster) return fromRoster;
+      const perf = (existingResults?.performances ?? []).find((p: any) => p.playerId === id);
+      return perf ? { userId: perf.playerId, name: perf.name, preferredPositions: perf.preferredPositions ?? [] } : null;
+    })
+    .filter((p): p is SelectedPlayer => p !== null);
+  // Everyone on the squad step, playing or not…
+  const poolPlayers = [...squadPlayers, ...extraPlayers];
+  const poolIds = new Set(poolPlayers.map(p => p.userId));
+  // …and those who actually played: the list every later step picks from.
+  const selectedPlayers = poolPlayers.filter(p => !absentIds.includes(p.userId));
+  const addablePlayers = rosterPlayers.filter(p =>
+    !poolIds.has(p.userId) && p.name.toLowerCase().includes(playerSearch.trim().toLowerCase()));
+
+  // Editing a saved result: restore who was marked absent and who was added.
+  useEffect(() => {
+    if (squadSeeded.current || !existingResults?.result || !selectionsData) return;
+    squadSeeded.current = true;
+    const perfs: any[] = existingResults.performances ?? [];
+    setAbsentIds(perfs.filter(p => !p.attended && squadIds.has(p.playerId)).map(p => p.playerId));
+    setExtraIds(perfs.filter(p => p.attended && !squadIds.has(p.playerId)).map(p => p.playerId));
+  }, [existingResults, selectionsData]);
+
+  function toggleAttended(playerId: string) {
+    if (absentIds.includes(playerId)) {
+      setAbsentIds(prev => prev.filter(id => id !== playerId));
+      return;
+    }
+    setAbsentIds(prev => [...prev, playerId]);
+    // Someone who didn't play can't keep a goal, card, award or the gloves.
+    setGoalEntries(prev => prev.map(e => ({
+      scorerId:   e.scorerId   === playerId ? null : e.scorerId,
+      assisterId: e.assisterId === playerId ? null : e.assisterId,
+    })));
+    setYellowCardIds(prev => prev.filter(id => id !== playerId));
+    setRedCardIds(prev => prev.filter(id => id !== playerId));
+    if (motmId === playerId) setMotmId(null);
+    if (gkFirstHalfId === playerId)  { setGkFirstHalfId(null);  setGkFirstHalfCleanSheet(false); }
+    if (gkSecondHalfId === playerId) { setGkSecondHalfId(null); setGkSecondHalfCleanSheet(false); }
+  }
+
+  function addPlayer(playerId: string) {
+    setPlayerSearch('');
+    setExtraIds(prev => prev.includes(playerId) ? prev : [...prev, playerId]);
+    setAbsentIds(prev => prev.filter(id => id !== playerId));
+  }
 
   function handleContinueFromScore() {
     const entries = Array.from({ length: goalsFor }, (_, i) => goalEntries[i] ?? { scorerId: null, assisterId: null });
@@ -404,9 +467,11 @@ export default function MatchResults() {
       const csIds = new Set<string>();
       if (gkFirstHalfId  && gkFirstHalfCleanSheet)  csIds.add(gkFirstHalfId);
       if (gkSecondHalfId && gkSecondHalfCleanSheet) csIds.add(gkSecondHalfId);
-      const players = selectedPlayers.map(p => ({
+      // Send the whole pool, so a squad member who didn't make it is stored as
+      // not attended instead of silently counting as having played.
+      const players = poolPlayers.map(p => ({
         playerId: p.userId,
-        attended: true,
+        attended: !absentIds.includes(p.userId),
         goals:       goalEntries.filter(g => g.scorerId  === p.userId).length,
         assists:     goalEntries.filter(g => g.assisterId === p.userId).length,
         cleanSheet:  csIds.has(p.userId),
@@ -537,6 +602,82 @@ export default function MatchResults() {
           </div>
         </div>
 
+        {/* ── Squad ── */}
+        {step === 'squad' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-semibold text-gray-900">{t('results.squadTitle')}</h2>
+                  <span className="text-xs text-gray-400 shrink-0">{t('results.squadCount', { n: selectedPlayers.length })}</span>
+                </div>
+                <p className="text-sm text-gray-500 mt-1">{t('results.squadSub')}</p>
+              </div>
+
+              <div className="space-y-1.5">
+                {poolPlayers.map(p => {
+                  const played = !absentIds.includes(p.userId);
+                  return (
+                    <button
+                      key={p.userId}
+                      onClick={() => toggleAttended(p.userId)}
+                      aria-pressed={played}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border-2 text-sm font-medium transition-colors w-full text-left ${
+                        played ? 'border-brand-green bg-brand-green-50 text-gray-900' : 'border-gray-200 text-gray-400'
+                      }`}
+                    >
+                      <span className={`w-5 h-5 rounded border-2 flex items-center justify-center text-xs shrink-0 ${
+                        played ? 'border-brand-green bg-brand-green text-white' : 'border-gray-300'
+                      }`}>{played ? '✓' : ''}</span>
+                      <span className={`flex-1 truncate ${played ? '' : 'line-through'}`}>{p.name}</span>
+                      {!played && <span className="text-xs font-normal shrink-0">{t('results.didNotPlay')}</span>}
+                    </button>
+                  );
+                })}
+                {poolPlayers.length === 0 && <p className="text-xs text-gray-400">{t('results.squadEmpty')}</p>}
+              </div>
+
+              {!showAddPlayers ? (
+                <button
+                  onClick={() => setShowAddPlayers(true)}
+                  className="w-full border border-dashed border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  {t('results.addPlayers')}
+                </button>
+              ) : (
+                <div className="space-y-2 border-t border-gray-100 pt-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">{t('results.addPlayersTitle')}</p>
+                    <button onClick={() => { setShowAddPlayers(false); setPlayerSearch(''); }} className="text-xs text-gray-400 hover:text-gray-600">
+                      {t('results.addPlayersClose')}
+                    </button>
+                  </div>
+                  <input
+                    type="search"
+                    value={playerSearch}
+                    onChange={e => setPlayerSearch(e.target.value)}
+                    placeholder={t('results.searchPlayers')}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-brand-green"
+                  />
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {addablePlayers.map(p => (
+                      <PlayerButton key={p.userId} player={p} selected={false} onClick={() => addPlayer(p.userId)} />
+                    ))}
+                    {addablePlayers.length === 0 && <p className="text-xs text-gray-400">{t('results.noPlayersToAdd')}</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setStep('score')}
+              className="w-full bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+            >
+              {t('results.continue')}
+            </button>
+          </div>
+        )}
+
         {/* ── Score ── */}
         {step === 'score' && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
@@ -560,12 +701,17 @@ export default function MatchResults() {
                 </div>
               </div>
             </div>
-            <button
-              onClick={handleContinueFromScore}
-              className="w-full bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
-            >
-              {t('results.continue')}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setStep('squad')} className="flex-1 border border-gray-300 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-50 transition-colors">
+                {t('results.back')}
+              </button>
+              <button
+                onClick={handleContinueFromScore}
+                className="flex-[2] bg-brand-green hover:bg-brand-green-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+              >
+                {t('results.continue')}
+              </button>
+            </div>
           </div>
         )}
 
@@ -867,7 +1013,7 @@ export default function MatchResults() {
               {matchFines.length > 0 && (
                 <div className="space-y-1.5">
                   {matchFines.map((f, i) => {
-                    const player = selectedPlayers.find(p => p.userId === f.playerId);
+                    const player = poolPlayers.find(p => p.userId === f.playerId);
                     const type = (fineTypes ?? []).find(t => t.fineTypeId === f.fineTypeId);
                     return (
                       <div key={i} className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg px-3 py-2 text-sm">
@@ -890,7 +1036,7 @@ export default function MatchResults() {
                   className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green bg-white"
                 >
                   <option value="">{t('results.playerPlaceholder')}</option>
-                  {selectedPlayers.map(p => <option key={p.userId} value={p.userId}>{p.name}</option>)}
+                  {poolPlayers.map(p => <option key={p.userId} value={p.userId}>{p.name}</option>)}
                 </select>
                 <select
                   value={fineDraftType}

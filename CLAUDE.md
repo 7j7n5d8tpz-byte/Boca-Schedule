@@ -76,8 +76,9 @@ Secrets live in GitHub Actions and Vercel — never committed. `.env*` is gitign
 
 Migrations auto-apply to the **single** prod DB on push to `main`, with no staging
 dry-run. Before pushing a migration, test it locally with `supabase db reset` (replays
-all migrations from scratch). Confirm Supabase backups/PITR are enabled before relying
-on unattended migrations.
+all migrations from scratch). The deploy workflow requires an encrypted off-site
+backup before pending migrations; weekly/manual backups use the same script. See
+[database-backups.md](docs/database-backups.md) for coverage, secrets and restore drills.
 
 ## Conventions
 

@@ -1,0 +1,39 @@
+name: Database backup
+
+# Encrypted dump of the production database into the private backup repository.
+# The deploy workflow takes one before every migration; this adds a weekly one
+# for everything that happens in between, plus a button to take one by hand.
+#
+# GitHub starts scheduled runs late on this repository (often by hours). For a
+# weekly backup that does not matter.
+on:
+  schedule:
+    - cron: '0 3 * * 1' # Monday 03:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    name: Back up the database
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: database-backup
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: supabase/setup-cli@v1
+        # Pinned to the same version as deploy.yml — see the note there.
+        with: { version: 2.104.0 }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+      - uses: actions/setup-node@v6
+        with: { node-version: '22' }
+      - run: node --test scripts/backup-db.test.mjs
+      - run: |
+          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          scripts/backup-db.sh "${{ github.event_name == 'schedule' && 'weekly' || 'manual' }}"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          BACKUP_DEPLOY_KEY: ${{ secrets.BACKUP_DEPLOY_KEY }}
+          BACKUP_REPO: 7j7n5d8tpz-byte/boca-schedule-backups
+          # Public key — safe to publish. The secret key is not in CI at all.
+          AGE_RECIPIENT: age15fgt72hr9ty65kdjxnzcr5w5rcke4ap6ghh2z9rgh4c9zsemz49s2gvzmu

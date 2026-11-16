@@ -70,7 +70,11 @@ jobs:
   # ── 3. E2E tests (only on push, not on PRs) ────────────────────────────────
   test-e2e:
     name: E2E tests
-    runs-on: ubuntu-latest
+    # Pinned, NOT `ubuntu-latest`: that label started landing on Ubuntu 26.04,
+    # which Playwright 1.60 cannot install Chromium on ("does not support
+    # chromium on ubuntu26.04-x64") — the job failed before running a single
+    # test and blocked the deploy. Move this together with a Playwright bump.
+    runs-on: ubuntu-24.04
     if: github.event_name == 'push'
     needs: [test-frontend, test-backend]
     steps:
@@ -154,9 +158,12 @@ jobs:
   # ── 4. Deploy (only after all tests pass, only on main) ────────────────────
   migrate:
     name: Supabase migrations
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [test-e2e]
+    concurrency:
+      group: database-backup
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v6
       - uses: supabase/setup-cli@v1
@@ -164,14 +171,36 @@ jobs:
         # silently break CI/prod. v2.105.0's storage image runs an "Updating
         # vector buckets" step that 409s on `supabase start`. Bump deliberately.
         with: { version: 2.104.0 }
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq age
+      - uses: actions/setup-node@v6
+        with: { node-version: '22' }
+      - run: node --test scripts/backup-db.test.mjs
       # `db push` no longer accepts --project-ref; link to the project first,
       # then push. Both read the DB password from SUPABASE_DB_PASSWORD.
       - run: |
           supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+
+          # No backup, no migration. Unknown dry-run wording takes a backup;
+          # a failed dry run aborts instead of proceeding to db push.
+          migration_plan="$(supabase db push --dry-run 2>&1)" || {
+            printf '%s\n' "$migration_plan" >&2
+            exit 1
+          }
+          printf '%s\n' "$migration_plan"
+          if grep -qi 'database is up to date' <<< "$migration_plan"; then
+            echo "No pending migrations — no pre-migration backup needed."
+          else
+            scripts/backup-db.sh pre-migration
+          fi
+
           supabase db push
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          BACKUP_DEPLOY_KEY: ${{ secrets.BACKUP_DEPLOY_KEY }}
+          BACKUP_REPO: 7j7n5d8tpz-byte/boca-schedule-backups
+          # Public key — safe to publish. The secret key is not in CI at all.
+          AGE_RECIPIENT: age15fgt72hr9ty65kdjxnzcr5w5rcke4ap6ghh2z9rgh4c9zsemz49s2gvzmu
 
   deploy-backend:
     name: Deploy backend to Fly.io

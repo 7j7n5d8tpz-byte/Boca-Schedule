@@ -428,6 +428,7 @@ export default function MatchResults() {
   }
 
   function addPlayer(playerId: string) {
+    setPlayerSearch('');
     setExtraIds(prev => prev.includes(playerId) ? prev : [...prev, playerId]);
     setAbsentIds(prev => prev.filter(id => id !== playerId));
   }

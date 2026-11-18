@@ -18,6 +18,21 @@ interface AppNavProps {
 
 type TabId = 'home' | 'stats' | 'achievements' | 'fines' | 'coach' | 'more';
 
+// Every page mounts its own AppNav, so the bottom bar's sliding highlight
+// remembers where it last sat here and glides from there to the new tab.
+let lastPillSlot: number | null = null;
+
+function useSlidingPill(target: number) {
+  const [slot, setSlot] = useState(() => lastPillSlot ?? target);
+  useEffect(() => {
+    lastPillSlot = target;
+    // Two frames: let the start position paint before moving to the target.
+    let id = requestAnimationFrame(() => { id = requestAnimationFrame(() => setSlot(target)); });
+    return () => cancelAnimationFrame(id);
+  }, [target]);
+  return slot;
+}
+
 // Outline glyphs for the navigation (24×24, currentColor) — one per page.
 const GLYPH: Record<TabId, string> = {
   home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z',
@@ -200,10 +215,13 @@ export default function AppNav({ backHref, backLabel, onBack }: AppNavProps) {
   }
 
   // ── Phones: floating bell + bottom bar ───────────────────────────────────
+  // The green highlight is one shared pill that slides between the tabs
+  // (see BottomTabs), so the tabs themselves stay transparent.
   const tabCls = (active: boolean) =>
-    `flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 h-[52px] rounded-full transition-colors ${
-      active ? 'bg-brand-green text-white' : 'text-white/80 hover:text-white'
+    `relative z-10 flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 h-[52px] rounded-full transition-[color,transform] duration-200 active:scale-95 motion-reduce:transition-none ${
+      active ? 'text-white' : 'text-white/75 hover:text-white'
     }`;
+  const activeSlot = current.id === 'more' ? tabs.length : tabs.findIndex(tab => tab.active);
 
   return (
     <>
@@ -246,7 +264,7 @@ export default function AppNav({ backHref, backLabel, onBack }: AppNavProps) {
             <span className="text-[13px] font-semibold truncate">{current.label}</span>
           </button>
         ) : (
-          <div className="h-full flex items-center gap-0.5 px-2">
+          <BottomTabs slot={activeSlot} count={tabs.length + 1}>
             {tabs.map(tab => (
               <Link key={tab.id} to={tab.to} aria-current={tab.active ? 'page' : undefined} className={tabCls(tab.active)}>
                 <Glyph id={tab.id} />
@@ -266,9 +284,29 @@ export default function AppNav({ backHref, backLabel, onBack }: AppNavProps) {
                 </button>
               )}
             />
-          </div>
+          </BottomTabs>
         )}
       </nav>
     </>
+  );
+}
+
+// Row of bottom-bar tabs with the active-tab pill gliding underneath. Tabs are
+// equal flex-1 slots 2px apart (gap-0.5) inside 8px padding (px-2), so the pill
+// is one slot wide and moves by whole slots (+ gap) via translateX.
+function BottomTabs({ slot, count, children }: { slot: number; count: number; children: ReactNode }) {
+  const shown = useSlidingPill(slot);
+  return (
+    <div className="relative h-full flex items-center gap-0.5 px-2">
+      <span
+        aria-hidden
+        style={{
+          width: `calc((100% - 1rem - ${(count - 1) * 2}px) / ${count})`,
+          transform: `translateX(calc(${shown} * (100% + 2px)))`,
+        }}
+        className="absolute left-2 top-1/2 -mt-[26px] h-[52px] rounded-full bg-brand-green transition-transform duration-[420ms] ease-[cubic-bezier(0.32,1.25,0.5,1)] motion-reduce:transition-none"
+      />
+      {children}
+    </div>
   );
 }

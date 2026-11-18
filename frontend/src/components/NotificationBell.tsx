@@ -44,6 +44,8 @@ function iconFor(type: string): { tone: keyof typeof TONE; paths: ReactNode } {
       return { tone: 'green',  paths: <><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M8.5 12h7M8.5 16h4.5" /></> };
     case 'signup_reminder':            // "Signup closing soon"
       return { tone: 'amber',  paths: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5V12l3 1.5" /></> };
+    case 'shortage_alert':             // "Vi mangler DIG på banen!"
+      return { tone: 'red',    paths: <><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.01" /></> };
     case 'matchday_reminder':          // "Match tomorrow"
       return { tone: 'green',  paths: <><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 9.5h16" /><path d="M9 14.5l2 2 4-4" /></> };
     case 'selection_reminder':         // "N squads need picking" (coach)

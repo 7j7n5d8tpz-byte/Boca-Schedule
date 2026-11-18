@@ -382,6 +382,52 @@ export async function sendSignupOpenAnnouncement(
   );
 }
 
+// ─── Short-handed matches ─────────────────────────────────────────────────────
+
+export interface ShortMatch {
+  matchDate: string;
+  matchTime: string;
+  location: string;
+  opponent: string | null;
+  missing: number; // how many sign-ups short of min_players
+}
+
+export const SHORTAGE_SUBJECT = '🚨 Vi mangler DIG på banen!';
+
+// One line per short-handed match: "3 spillere til lørdag 22. november kl. 10:00 vs X · Sted".
+export function shortageLine(m: ShortMatch): string {
+  const dateStr = new Date(`${m.matchDate}T${m.matchTime}`).toLocaleDateString('da-DK', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const opponent = m.opponent ? ` vs ${m.opponent}` : '';
+  const players = m.missing === 1 ? '1 spiller' : `${m.missing} spillere`;
+  return `${players} til ${dateStr} kl. ${m.matchTime.slice(0, 5)}${opponent} · ${m.location}`;
+}
+
+// Sent by /api/cron/shortage-alerts when matches are below min_players close to
+// their sign-up deadline. Each player gets one email listing every short match
+// they haven't signed up for; `matchesFor` returns that list per recipient.
+export async function sendShortageAlerts(
+  players: Recipient[],
+  matchesFor: (p: Recipient) => ShortMatch[],
+): Promise<SendResult> {
+  return sendMany(players, 'shortage alerts', p => {
+    const matches = matchesFor(p);
+    const heading = matches.length === 1 ? 'Vi mangler spillere til kampen:' : 'Vi mangler spillere til kampene:';
+    const lines = matches.map(shortageLine);
+    return {
+      subject: SHORTAGE_SUBJECT,
+      html: `<p>Hej <strong>${esc(p.name)}</strong>,</p>
+     <p>Der er huller i startopstillingen. Coach mangler lige præcis <strong>DIG</strong>!</p>
+     <p>Så find støvlerne frem og hop ind i appen og tilmeld dig:</p>
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Tilmeld dig nu →</a>
+     <p style="margin-top:20px">${heading}</p>
+     <ul style="padding-left:18px;margin:12px 0">${lines.map(l => `<li style="margin:8px 0;font-size:14px">${esc(l)}</li>`).join('')}</ul>`,
+      text: `Hej ${p.name},\n\nDer er huller i startopstillingen. Coach mangler lige præcis DIG!\n\nSå find støvlerne frem og hop ind i appen og tilmeld dig:\n${FRONTEND_URL}/dashboard\n\n${heading}\n${lines.map(l => `- ${l}`).join('\n')}`,
+    };
+  });
+}
+
 // ─── New registration ─────────────────────────────────────────────────────────
 
 export async function sendAdminRegistrationNotification(playerName: string, playerEmail: string) {

@@ -159,4 +159,37 @@ describe('mailer transport', () => {
     expect(sent.text).toContain('Jacob Meier');
     expect(sent.text).toContain('/login');
   });
+
+  it('lists every short-handed match in one "Vi mangler DIG" email per player', async () => {
+    const { sendShortageAlerts } = await loadMailer(1000);
+    sendMock.mockResolvedValue(ok);
+
+    const short = [
+      { matchDate: '2026-11-21', matchTime: '10:00:00', location: 'Boldbanen', opponent: 'Premier United', missing: 3 },
+      { matchDate: '2026-11-28', matchTime: '13:10:00', location: 'Kunstgræs <2>', opponent: null, missing: 1 },
+    ];
+    const result = await sendShortageAlerts(players(1), () => short);
+
+    expect(result.sent).toBe(1);
+    const sent = sendMock.mock.calls[0][0];
+    expect(sent.subject).toBe('🚨 Vi mangler DIG på banen!');
+    expect(sent.text).toContain('Der er huller i startopstillingen. Coach mangler lige præcis DIG!');
+    expect(sent.text).toContain('Så find støvlerne frem og hop ind i appen og tilmeld dig:');
+    expect(sent.text).toContain('/dashboard');
+    expect(sent.text).toContain('Vi mangler spillere til kampene:');
+    expect(sent.text).toMatch(/- 3 spillere til .*21\. november kl\. 10:00 vs Premier United · Boldbanen/);
+    expect(sent.text).toMatch(/- 1 spiller til .*28\. november kl\. 13:10 · Kunstgræs <2>/);
+    expect(sent.html).toContain('Kunstgræs &#60;2&#62;');
+    expect(sent.text).not.toMatch(/walkover/i);
+  });
+
+  it('says "kampen" when only one match is short', async () => {
+    const { sendShortageAlerts } = await loadMailer(1000);
+    sendMock.mockResolvedValue(ok);
+
+    await sendShortageAlerts(players(1), () => [
+      { matchDate: '2026-11-21', matchTime: '10:00:00', location: 'Boldbanen', opponent: null, missing: 2 },
+    ]);
+    expect(sendMock.mock.calls[0][0].text).toContain('Vi mangler spillere til kampen:');
+  });
 });

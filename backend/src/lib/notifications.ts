@@ -6,6 +6,7 @@ type NotificationType =
   | 'match_cancelled'
   | 'match_moved'
   | 'signup_reminder'
+  | 'shortage_alert'
   | 'signup_open'
   | 'announcement'
   | 'spot_released'

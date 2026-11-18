@@ -264,3 +264,89 @@ describe('Cron: match announcements', () => {
     expect(row!.signup_open_emailed_at).toBeTruthy();
   });
 });
+
+describe('Cron: shortage alerts', () => {
+  let player: TestUser;
+  let shortSoonId: string;   // below min_players, deadline in 2h → triggers
+  let shortLaterId: string;  // below min_players, deadline in 10 days → listed only
+  let fullSoonId: string;    // enough sign-ups → never alerted
+  let prevSecret: string | undefined;
+
+  const soon = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+  const far = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+  const run = () => request(app).post('/api/cron/shortage-alerts?force=true').set('x-cron-secret', SECRET);
+
+  beforeAll(async () => {
+    player = await createTestUser('player', '-shortage');
+    // Matches left behind by other suites must not trigger here.
+    await supabaseAdmin.from('matches')
+      .update({ shortage_alert_sent_at: new Date().toISOString() })
+      .is('shortage_alert_sent_at', null);
+    const [a, b, c] = await Promise.all([
+      createTestMatch({ status: 'signup_open', signup_close_date: soon, min_players: 5 }),
+      createTestMatch({ status: 'signup_open', signup_close_date: far, min_players: 5 }),
+      createTestMatch({ status: 'signup_open', signup_close_date: soon, min_players: 1 }),
+    ]);
+    shortSoonId = a.match_id;
+    shortLaterId = b.match_id;
+    fullSoonId = c.match_id;
+    await signupPlayer(fullSoonId, player.userId);
+  });
+
+  afterAll(async () => {
+    await Promise.all([deleteTestMatch(shortSoonId), deleteTestMatch(shortLaterId), deleteTestMatch(fullSoonId)]);
+    await supabaseAdmin.from('notifications').delete().eq('user_id', player.userId);
+    await deleteTestUser(player.userId);
+  });
+
+  beforeEach(() => {
+    prevSecret = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = SECRET;
+  });
+
+  afterEach(() => {
+    if (prevSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = prevSecret;
+  });
+
+  it('rejects requests with a missing or wrong secret', async () => {
+    expect((await request(app).post('/api/cron/shortage-alerts')).status).toBe(401);
+    const res = await request(app).post('/api/cron/shortage-alerts').set('x-cron-secret', 'wrong');
+    expect(res.status).toBe(401);
+  });
+
+  it('alerts a short-handed match near its deadline, listing the other short match too', async () => {
+    const res = await run();
+    expect(res.status).toBe(200);
+    expect(res.body.data.triggered).toBe(1);
+    expect(res.body.data.listed).toBeGreaterThanOrEqual(2);
+    expect(res.body.data.recipients).toBeGreaterThanOrEqual(1);
+
+    const { data: rows } = await supabaseAdmin
+      .from('matches').select('match_id, shortage_alert_sent_at')
+      .in('match_id', [shortSoonId, shortLaterId, fullSoonId]);
+    const stamped = Object.fromEntries(rows!.map(r => [r.match_id, r.shortage_alert_sent_at]));
+    expect(stamped[shortSoonId]).toBeTruthy();
+    expect(stamped[shortLaterId]).toBeNull(); // listed, but its own alert is still to come
+    expect(stamped[fullSoonId]).toBeNull();
+
+    const { count } = await supabaseAdmin
+      .from('notifications').select('notification_id', { count: 'exact', head: true })
+      .eq('user_id', player.userId).eq('type', 'shortage_alert').eq('match_id', shortSoonId);
+    expect(count).toBe(1);
+  });
+
+  it('does not alert the same match twice', async () => {
+    const res = await run();
+    expect(res.status).toBe(200);
+    expect(res.body.data.triggered).toBe(0);
+    expect(res.body.data.recipients).toBe(0);
+  });
+
+  it('only runs at 18:00 club time unless forced', async () => {
+    const res = await request(app).post('/api/cron/shortage-alerts').set('x-cron-secret', SECRET);
+    expect(res.status).toBe(200);
+    // Either the gate skipped it, or it is 18:00 and there is nothing left to alert.
+    expect(res.body.data.skipped === true || res.body.data.triggered === 0).toBe(true);
+  });
+});

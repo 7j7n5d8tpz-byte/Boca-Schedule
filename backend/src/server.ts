@@ -17,7 +17,7 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 //
 // shortcut: assumes ONE backend machine — two would each send the reminders;
 // move this to a single scheduled machine (or claim a lock row) before scaling out.
-const CRON_JOBS = ['signup-reminders', 'match-announcements', 'daily-reminders'];
+const CRON_JOBS = ['signup-reminders', 'match-announcements', 'daily-reminders', 'shortage-alerts'];
 const TICK_MS = 10 * 60 * 1000;
 let ticking = false;
 

@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { supabaseAdmin, must } from '../lib/supabase.js';
-import { sendSignupReminder, sendMatchdayReminder, sendSelectionReminder, sendResultReminder, sendSignupOpenAnnouncement, sendShortageAlerts, shortageLine, SHORTAGE_SUBJECT, type ShortMatch } from '../lib/mailer.js';
+import { sendSignupReminder, sendMatchdayReminder, sendSelectionReminder, sendResultReminder, sendSignupOpenAnnouncement, sendShortageAlerts, sendCoachShortageAlerts, shortageLine, SHORTAGE_SUBJECT, type ShortMatch } from '../lib/mailer.js';
 import { createNotifications } from '../lib/notifications.js';
 import { notifySignupOpen, openDueDrafts } from '../lib/signupOpen.js';
 // The daily reminders all send at 18:00 club time.
@@ -71,7 +71,7 @@ router.post('/signup-reminders', async (req, res) => {
     // Matches whose signup closes within the window, still open, not yet reminded.
     const { data: matches, error: matchErr } = await supabaseAdmin
       .from('matches')
-      .select('match_id, match_date, match_time, location, opponent, signup_close_date, signups(player_id, is_active)')
+      .select('match_id, match_date, match_time, location, opponent, min_players, signup_close_date, signups(player_id, is_active)')
       .eq('status', 'signup_open')
       .is('signup_reminder_sent_at', null)
       .gt('signup_close_date', now.toISOString())
@@ -113,6 +113,7 @@ router.post('/signup-reminders', async (req, res) => {
             location: m.location,
             opponent: m.opponent ?? null,
             signupCloseDate: m.signup_close_date,
+            missing: Math.max(0, (m.min_players ?? 0) - signedUp.size),
           });
           await createNotifications(recipientUsers.map((u: any) => u.user_id), {
             type: 'signup_reminder',
@@ -595,6 +596,85 @@ router.post('/shortage-alerts', async (req, res) => {
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     console.error('shortage-alerts failed:', err);
+    res.status(500).json({ success: false, error: { code: 'CRON_ERROR', message: detail } });
+  }
+});
+
+// POST /api/cron/coach-shortage-alerts
+//
+// Runs on every scheduler tick (no 18:00 gate: the point is to warn the coach
+// as soon as sign-ups close). Picks up matches whose sign-up deadline passed in
+// the last `COACH_ALERT_LOOKBACK_DAYS`, that are not cancelled or published, are
+// still to be played, and have fewer active sign-ups than min_players. Every
+// coach/admin gets one batched email plus an in-app notification, and each
+// match is stamped (`coach_shortage_alert_sent_at`) so it alerts once. A match
+// that had enough players at the deadline keeps being checked during the
+// look-back, so a withdrawal straight after the deadline is still caught.
+const COACH_ALERT_LOOKBACK_DAYS = 2;
+
+router.post('/coach-shortage-alerts', async (req, res) => {
+  try {
+    if (!cronAuthorized(req, res)) return;
+
+    const now = new Date();
+    const since = new Date(now.getTime() - COACH_ALERT_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+
+    const { data: closed, error: matchErr } = await supabaseAdmin
+      .from('matches')
+      .select('match_id, match_date, match_time, location, opponent, min_players, signups(player_id, is_active)')
+      .neq('status', 'cancelled')
+      .is('published_at', null)
+      .is('coach_shortage_alert_sent_at', null)
+      .lte('signup_close_date', now.toISOString())
+      .gt('signup_close_date', since.toISOString())
+      .gte('match_date', clubDate(now))
+      .order('match_date').order('match_time');
+    if (matchErr) throw matchErr;
+
+    const short = ((closed ?? []) as any[])
+      .map(m => ({ m, missing: (m.min_players ?? 0) - (m.signups ?? []).filter((s: any) => s.is_active).length }))
+      .filter(x => x.missing > 0);
+    if (short.length === 0) {
+      res.json({ success: true, data: { matches: 0, coaches: 0 } });
+      return;
+    }
+
+    const { data: coaches, error: coachErr } = await supabaseAdmin
+      .from('users').select('user_id, name, email')
+      .in('role', ['coach', 'admin']).eq('is_active', true).not('email', 'is', null);
+    if (coachErr) throw coachErr;
+
+    const list: ShortMatch[] = short.map(x => ({
+      matchDate: x.m.match_date, matchTime: x.m.match_time, location: x.m.location,
+      opponent: x.m.opponent ?? null, missing: x.missing,
+    }));
+    const recipients = ((coaches ?? []) as any[]).map(c => ({ name: c.name, email: c.email }));
+    const result = await sendCoachShortageAlerts(recipients, list);
+    if (recipients.length > 0 && result.sent === 0) {
+      throw new Error(`all ${result.failed.length} coach shortage alert(s) failed: ${result.failed[0]?.reason}`);
+    }
+
+    for (let i = 0; i < short.length; i++) {
+      await createNotifications(((coaches ?? []) as any[]).map(c => c.user_id), {
+        type: 'shortage_alert',
+        title: 'Kampen mangler spillere',
+        body: `Tilmeldingen er lukket. Der mangler ${shortageLine(list[i])}`,
+        link: '/coach',
+        matchId: short[i].m.match_id,
+      });
+    }
+
+    await must(supabaseAdmin.from('matches')
+      .update({ coach_shortage_alert_sent_at: now.toISOString() })
+      .in('match_id', short.map(x => x.m.match_id)));
+
+    res.json({
+      success: true,
+      data: { matches: short.length, coaches: result.sent, failures: result.failed.map(f => f.email) },
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('coach-shortage-alerts failed:', err);
     res.status(500).json({ success: false, error: { code: 'CRON_ERROR', message: detail } });
   }
 });

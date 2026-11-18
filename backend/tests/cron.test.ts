@@ -386,3 +386,83 @@ describe('Cron: shortage alerts', () => {
     expect(res.body.data.skipped === true || res.body.data.triggered === 0).toBe(true);
   });
 });
+
+describe('Cron: coach shortage alerts', () => {
+  let coach: TestUser;
+  let shortClosedId: string;  // sign-up closed an hour ago, below min_players → alerts
+  let fullClosedId: string;   // sign-up closed, enough players → no alert
+  let stillOpenId: string;    // short but sign-up still open → not yet
+  let prevSecret: string | undefined;
+
+  const day = 24 * 60 * 60 * 1000;
+  const matchIn3 = new Date(Date.now() + 3 * day).toISOString().split('T')[0];
+  const closed = {
+    match_date: matchIn3,
+    signup_open_date: new Date(Date.now() - 5 * day).toISOString(),
+    signup_close_date: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+  };
+  const run = () => request(app).post('/api/cron/coach-shortage-alerts').set('x-cron-secret', SECRET);
+
+  beforeAll(async () => {
+    coach = await createTestUser('coach', '-coachshort');
+    // Matches left behind by other suites must not alert here.
+    await supabaseAdmin.from('matches')
+      .update({ coach_shortage_alert_sent_at: new Date().toISOString() })
+      .is('coach_shortage_alert_sent_at', null);
+    const [a, b, c] = await Promise.all([
+      createTestMatch({ status: 'signup_closed', ...closed, min_players: 5 }),
+      createTestMatch({ status: 'signup_closed', ...closed, min_players: 1 }),
+      createTestMatch({ status: 'signup_open', match_date: matchIn3, signup_close_date: new Date(Date.now() + day).toISOString(), min_players: 5 }),
+    ]);
+    shortClosedId = a.match_id;
+    fullClosedId = b.match_id;
+    stillOpenId = c.match_id;
+    await signupPlayer(fullClosedId, coach.userId);
+  });
+
+  afterAll(async () => {
+    await Promise.all([deleteTestMatch(shortClosedId), deleteTestMatch(fullClosedId), deleteTestMatch(stillOpenId)]);
+    await supabaseAdmin.from('notifications').delete().eq('user_id', coach.userId);
+    await deleteTestUser(coach.userId);
+  });
+
+  beforeEach(() => {
+    prevSecret = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = SECRET;
+  });
+
+  afterEach(() => {
+    if (prevSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = prevSecret;
+  });
+
+  it('rejects requests with a missing or wrong secret', async () => {
+    expect((await request(app).post('/api/cron/coach-shortage-alerts')).status).toBe(401);
+  });
+
+  it('warns coaches about a match still short once sign-ups have closed', async () => {
+    const res = await run();
+    expect(res.status).toBe(200);
+    expect(res.body.data.matches).toBe(1);
+    expect(res.body.data.coaches).toBeGreaterThanOrEqual(1);
+
+    const { data: rows } = await supabaseAdmin
+      .from('matches').select('match_id, coach_shortage_alert_sent_at')
+      .in('match_id', [shortClosedId, fullClosedId, stillOpenId]);
+    const stamped = Object.fromEntries(rows!.map(r => [r.match_id, r.coach_shortage_alert_sent_at]));
+    expect(stamped[shortClosedId]).toBeTruthy();
+    expect(stamped[fullClosedId]).toBeNull();
+    expect(stamped[stillOpenId]).toBeNull();
+
+    const { count } = await supabaseAdmin
+      .from('notifications').select('notification_id', { count: 'exact', head: true })
+      .eq('user_id', coach.userId).eq('type', 'shortage_alert').eq('match_id', shortClosedId);
+    expect(count).toBe(1);
+  });
+
+  it('does not warn about the same match twice', async () => {
+    const res = await run();
+    expect(res.status).toBe(200);
+    expect(res.body.data.matches).toBe(0);
+  });
+});

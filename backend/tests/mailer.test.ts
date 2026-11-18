@@ -193,4 +193,36 @@ describe('mailer transport', () => {
     ]);
     expect(sendMock.mock.calls[0][0].text).toContain('Vi mangler spillere til kampen:');
   });
+
+  it('adds the shortage line to the deadline reminder when the match is short', async () => {
+    const { sendSignupReminder } = await loadMailer(1000);
+    sendMock.mockResolvedValue(ok);
+
+    await sendSignupReminder(players(1), { ...match, missing: 2 });
+    const short = sendMock.mock.calls[0][0];
+    expect(short.subject).toMatch(/^Vi mangler stadig 2 spillere til /);
+    expect(short.text).toContain('Vi mangler stadig 2 spillere til kampen, så din tilmelding tæller!');
+
+    sendMock.mockClear();
+    await sendSignupReminder(players(1), { ...match, missing: 0 });
+    const full = sendMock.mock.calls[0][0];
+    expect(full.subject).toMatch(/^Tilmeldingen lukker snart/);
+    expect(full.text).not.toContain('Vi mangler');
+  });
+
+  it('sends coaches one batched email listing every short match', async () => {
+    const { sendCoachShortageAlerts } = await loadMailer(1000);
+    sendMock.mockResolvedValue(ok);
+
+    const result = await sendCoachShortageAlerts(players(2), [
+      { matchDate: '2026-11-21', matchTime: '10:00:00', location: 'Boldbanen', opponent: 'Premier United', missing: 3 },
+      { matchDate: '2026-11-28', matchTime: '13:10:00', location: 'Kunstgræs', opponent: null, missing: 1 },
+    ]);
+    expect(result.sent).toBe(2);
+    const sent = sendMock.mock.calls[0][0];
+    expect(sent.subject).toBe('2 kampe mangler spillere');
+    expect(sent.text).toMatch(/- 3 spillere til .*21\. november/);
+    expect(sent.text).toMatch(/- 1 spiller til .*28\. november/);
+    expect(sent.text).toContain('/coach');
+  });
 });

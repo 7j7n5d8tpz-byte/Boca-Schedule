@@ -6,6 +6,10 @@
 -- NULL = not yet alerted.
 ALTER TABLE matches ADD COLUMN IF NOT EXISTS shortage_alert_sent_at TIMESTAMPTZ;
 
+-- POST /api/cron/coach-shortage-alerts warns coaches once sign-ups have closed
+-- on a match that is still below min_players. Same once-per-match stamp.
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS coach_shortage_alert_sent_at TIMESTAMPTZ;
+
 INSERT INTO system_config (config_key, config_value, description) VALUES
   ('shortage_alert_days',
    '7',

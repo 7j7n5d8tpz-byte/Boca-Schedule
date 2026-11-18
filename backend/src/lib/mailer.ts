@@ -312,7 +312,11 @@ export async function sendClaimResolutionNotification(
 
 export async function sendSignupReminder(
   players: { name: string; email: string }[],
-  match: { matchDate: string; matchTime: string; location: string; opponent: string | null; signupCloseDate: string },
+  match: {
+    matchDate: string; matchTime: string; location: string; opponent: string | null; signupCloseDate: string;
+    // Sign-ups still needed to reach min_players; 0 or absent when the match has enough.
+    missing?: number;
+  },
 ): Promise<SendResult> {
   const dateStr = new Date(`${match.matchDate}T${match.matchTime}`).toLocaleDateString('da-DK', {
     weekday: 'long', day: 'numeric', month: 'long',
@@ -320,11 +324,17 @@ export async function sendSignupReminder(
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
   const deadlineStr = formatClubDeadline(match.signupCloseDate);
+  const missing = match.missing && match.missing > 0 ? match.missing : 0;
+  const missingStr = missing === 1 ? '1 spiller' : `${missing} spillere`;
+  const shortLine = missing ? `Vi mangler stadig ${missingStr} til kampen, så din tilmelding tæller!` : '';
 
   return sendMany(players, 'signup reminders', p => ({
-    subject: `Tilmeldingen lukker snart — ${dateStr}`,
+    subject: missing
+      ? `Vi mangler stadig ${missingStr} til ${dateStr}`
+      : `Tilmeldingen lukker snart — ${dateStr}`,
     html: `<p>Hej <strong>${esc(p.name)}</strong>,</p>
      <p>Tilmeldingen til den kommende kamp lukker <strong>${deadlineStr}</strong>, og du har ikke meldt dig til endnu.</p>
+     ${shortLine ? `<p><strong>${shortLine}</strong></p>` : ''}
      <table style="border-collapse:collapse;margin:16px 0">
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Dato</td><td style="font-size:14px;font-weight:600">${dateStr}</td></tr>
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tidspunkt</td><td style="font-size:14px">${timeStr}</td></tr>
@@ -332,7 +342,7 @@ export async function sendSignupReminder(
        <tr><td style="padding:4px 12px 4px 0;color:#6b7280;font-size:14px">Tilmelding lukker</td><td style="font-size:14px">${deadlineStr}</td></tr>
      </table>
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Tilmeld dig nu →</a>`,
-    text: `Hej ${p.name},\n\nTilmeldingen til den kommende kamp lukker ${deadlineStr}, og du har ikke meldt dig til endnu.\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\nTilmelding lukker: ${deadlineStr}\n\n${FRONTEND_URL}/dashboard`,
+    text: `Hej ${p.name},\n\nTilmeldingen til den kommende kamp lukker ${deadlineStr}, og du har ikke meldt dig til endnu.${shortLine ? `\n\n${shortLine}` : ''}\n\nDato: ${dateStr}\nTidspunkt: ${timeStr}\nSted: ${match.location}${opponent}\nTilmelding lukker: ${deadlineStr}\n\n${FRONTEND_URL}/dashboard`,
   }));
 }
 
@@ -380,6 +390,77 @@ export async function sendSignupOpenAnnouncement(
      <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Tilmeld dig nu →</a>`,
     `Hej ${player.name},\n\n${intro}\n${rows.map(r => r.text).join('\n')}\n\n${FRONTEND_URL}/dashboard`,
   );
+}
+
+// ─── Short-handed matches ─────────────────────────────────────────────────────
+
+export interface ShortMatch {
+  matchDate: string;
+  matchTime: string;
+  location: string;
+  opponent: string | null;
+  missing: number; // how many sign-ups short of min_players
+}
+
+export const SHORTAGE_SUBJECT = 'Vi mangler DIG på banen!';
+
+// One line per short-handed match: "3 spillere til lørdag 22. november kl. 10:00 vs X · Sted".
+export function shortageLine(m: ShortMatch): string {
+  const dateStr = new Date(`${m.matchDate}T${m.matchTime}`).toLocaleDateString('da-DK', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const opponent = m.opponent ? ` vs ${m.opponent}` : '';
+  const players = m.missing === 1 ? '1 spiller' : `${m.missing} spillere`;
+  return `${players} til ${dateStr} kl. ${m.matchTime.slice(0, 5)}${opponent} · ${m.location}`;
+}
+
+// Sent by /api/cron/shortage-alerts when matches are below min_players close to
+// their sign-up deadline. Each player gets one email listing every short match
+// they haven't signed up for; `matchesFor` returns that list per recipient.
+export async function sendShortageAlerts(
+  players: Recipient[],
+  matchesFor: (p: Recipient) => ShortMatch[],
+): Promise<SendResult> {
+  return sendMany(players, 'shortage alerts', p => {
+    const matches = matchesFor(p);
+    const heading = matches.length === 1 ? 'Vi mangler spillere til kampen:' : 'Vi mangler spillere til kampene:';
+    const lines = matches.map(shortageLine);
+    return {
+      subject: SHORTAGE_SUBJECT,
+      html: `<p>Hej <strong>${esc(p.name)}</strong>,</p>
+     <p>Der er huller i startopstillingen. Coach mangler lige præcis <strong>DIG</strong>!</p>
+     <p>Så find støvlerne frem og hop ind i appen og tilmeld dig:</p>
+     <a href="${FRONTEND_URL}/dashboard" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Tilmeld dig nu →</a>
+     <p style="margin-top:20px">${heading}</p>
+     <ul style="padding-left:18px;margin:12px 0">${lines.map(l => `<li style="margin:8px 0;font-size:14px">${esc(l)}</li>`).join('')}</ul>`,
+      text: `Hej ${p.name},\n\nDer er huller i startopstillingen. Coach mangler lige præcis DIG!\n\nSå find støvlerne frem og hop ind i appen og tilmeld dig:\n${FRONTEND_URL}/dashboard\n\n${heading}\n${lines.map(l => `- ${l}`).join('\n')}`,
+    };
+  });
+}
+
+// Sent to coaches/admins once sign-ups have closed on a match that is still
+// below min_players, so there is time to find guests or talk to the opponent.
+// Batched across every such match, like the other coach reminders.
+export async function sendCoachShortageAlerts(
+  coaches: Recipient[],
+  matches: ShortMatch[],
+): Promise<SendResult> {
+  const n = matches.length;
+  const lines = matches.map(shortageLine);
+  const subject = n === 1 ? 'Kampen mangler spillere' : `${n} kampe mangler spillere`;
+  const intro = n === 1
+    ? 'Tilmeldingen er lukket, og der er ikke nok spillere til at stille hold. Der mangler:'
+    : `Tilmeldingen er lukket til ${n} kampe, og der er ikke nok spillere til at stille hold. Der mangler:`;
+  const outro = 'Find gæstespillere, ring rundt, eller tag kontakt til modstanderen i god tid.';
+  return sendMany(coaches, 'coach shortage alerts', c => ({
+    subject,
+    html: `<p>Hej <strong>${esc(c.name)}</strong>,</p>
+     <p>${intro}</p>
+     <ul style="padding-left:18px;margin:12px 0">${lines.map(l => `<li style="margin:8px 0;font-size:14px">${esc(l)}</li>`).join('')}</ul>
+     <p>${outro}</p>
+     <a href="${FRONTEND_URL}/coach" style="display:inline-block;background:#205B3B;color:#fff;text-decoration:none;padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600">Gå til coach-oversigten →</a>`,
+    text: `Hej ${c.name},\n\n${intro}\n${lines.map(l => `- ${l}`).join('\n')}\n\n${outro}\n\n${FRONTEND_URL}/coach`,
+  }));
 }
 
 // ─── New registration ─────────────────────────────────────────────────────────

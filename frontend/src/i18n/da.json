@@ -1130,5 +1130,29 @@
     },
     "pctDetail": "Udtaget {{selected}} af {{considered}}",
     "pctNone": "Ingen afgjorte kampe"
+  },
+  "push": {
+    "banner": {
+      "title": "Få besked når vi mangler dig på banen",
+      "description": "Slå notifikationer til, så får du besked om udtagelser, kampe og når holdet mangler spillere.",
+      "enable": "Slå notifikationer til",
+      "later": "Ikke nu",
+      "iosTitle": "Få notifikationer på din iPhone",
+      "iosDescription": "Tryk på Del-knappen i Safari og vælg «Føj til hjemmeskærm». Åbn Boca fra hjemmeskærmen og slå notifikationer til.",
+      "dismiss": "Skjul",
+      "enabled": "Notifikationer er slået til",
+      "denied": "Notifikationer blev ikke slået til. Du kan altid slå dem til under Indstillinger."
+    },
+    "settings": {
+      "title": "Push-notifikationer",
+      "help": "Få besked på denne enhed om udtagelser, kampe og når holdet mangler spillere. E-mails fortsætter som før.",
+      "switch": "Notifikationer på denne enhed",
+      "test": "Send en testnotifikation",
+      "testSent": "Testnotifikation sendt",
+      "failed": "Kunne ikke ændre notifikationer. Prøv igen.",
+      "unsupported": "Din browser understøtter ikke push-notifikationer.",
+      "ios": "På iPhone virker notifikationer kun i appen på hjemmeskærmen: Tryk på Del-knappen i Safari, vælg «Føj til hjemmeskærm», og åbn Boca derfra.",
+      "denied": "Notifikationer er blokeret på denne enhed. Slå dem til igen under Indstillinger → Notifikationer → Boca på iPhone, eller i browserens indstillinger for siden."
+    }
   }
 }

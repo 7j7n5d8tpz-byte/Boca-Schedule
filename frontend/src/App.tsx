@@ -19,6 +19,7 @@ import PlayerHub from './pages/player/PlayerHub';
 import Statistics from './pages/player/Statistics';
 import Achievements from './pages/player/Achievements';
 import CrestSprite from './components/CrestSprite';
+import PushSync from './components/PushSync';
 import FinesPage from './pages/player/Fines';
 import ManageFinesPage from './pages/player/ManageFines';
 import MatchResults from './pages/MatchResults';
@@ -51,6 +52,7 @@ export default function App() {
       <ErrorBoundary>
       <AuthProvider>
         <CrestSprite />
+        <PushSync />
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />

@@ -1130,5 +1130,29 @@
     },
     "pctDetail": "Selected {{selected}} of {{considered}}",
     "pctNone": "No decided matches"
+  },
+  "push": {
+    "banner": {
+      "title": "Get notified when we need you on the pitch",
+      "description": "Turn on notifications to hear about selections, matches and when the team is short of players.",
+      "enable": "Turn on notifications",
+      "later": "Not now",
+      "iosTitle": "Get notifications on your iPhone",
+      "iosDescription": "Tap the Share button in Safari and choose “Add to Home Screen”. Open Boca from your home screen and turn on notifications.",
+      "dismiss": "Hide",
+      "enabled": "Notifications are on",
+      "denied": "Notifications were not turned on. You can always turn them on in Settings."
+    },
+    "settings": {
+      "title": "Push notifications",
+      "help": "Get notified on this device about selections, matches and when the team is short of players. Emails continue as before.",
+      "switch": "Notifications on this device",
+      "test": "Send a test notification",
+      "testSent": "Test notification sent",
+      "failed": "Could not change notifications. Please try again.",
+      "unsupported": "Your browser does not support push notifications.",
+      "ios": "On iPhone, notifications only work in the home-screen app: tap the Share button in Safari, choose “Add to Home Screen”, and open Boca from there.",
+      "denied": "Notifications are blocked on this device. Turn them back on in Settings → Notifications → Boca on iPhone, or in your browser's site settings."
+    }
   }
 }

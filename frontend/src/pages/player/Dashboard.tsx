@@ -13,6 +13,7 @@ import { CardListSkeleton } from '../../components/Skeleton';
 import Icon from '../../components/Icon';
 import CountUp from '../../components/CountUp';
 import CrestUnlock from '../../components/CrestUnlock';
+import PushPrompt from '../../components/PushPrompt';
 import { useCatalog, type PlayerAchievements } from '../../api/achievements';
 
 interface Match {
@@ -535,6 +536,9 @@ export default function PlayerDashboard() {
           <h1 className="text-2xl font-extrabold text-gray-900">{t('dashboard.welcome', { name: user?.name?.split(' ')[0] })}</h1>
           <p className="text-gray-500 text-sm mt-1">{t('dashboard.subtitle')}</p>
         </div>
+
+        {/* Push-notification opt-in; renders nothing once decided or snoozed. */}
+        <PushPrompt />
 
         {/* Announcements */}
         {(announcements ?? []).length > 0 && (

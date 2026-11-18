@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { api } from '../api/client';
+import { forgetDeviceOnServer } from '../push';
 import { DEFAULT_LANGUAGE, setLanguage, type Language } from '../i18n';
 
 // Players open the app a few times a week from their phone's home screen; a
@@ -55,6 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const logout = useCallback(async () => {
+    // Stop this device receiving the logged-out player's push notifications
+    // (needs the token, so before the session is cleared).
+    await forgetDeviceOnServer();
     try { await api.post('/auth/logout'); } catch { /* ignore */ }
     clearSession();
     setUser(null);

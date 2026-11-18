@@ -18,6 +18,7 @@ import cronRoutes from './routes/cron.js';
 import calendarRoutes from './routes/calendar.js';
 import announcementRoutes from './routes/announcements.js';
 import notificationRoutes from './routes/notifications.js';
+import pushRoutes from './routes/push.js';
 import fineRoutes from './routes/fines.js';
 import opponentRoutes from './routes/opponents.js';
 import achievementRoutes from './routes/achievements.js';
@@ -105,6 +106,7 @@ app.use('/api/cron', cronRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/push', pushRoutes);
 app.use('/api', fineRoutes);
 
 app.use(errorHandler);

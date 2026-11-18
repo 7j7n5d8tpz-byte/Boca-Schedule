@@ -68,6 +68,10 @@ Secrets live in GitHub Actions and Vercel — never committed. `.env*` is gitign
 
 - [vercel.json](vercel.json) must keep the `/api/(.*)` → `boca-backend.fly.dev` rewrite
   **before** the SPA catch-all, or the live app silently can't reach the backend.
+- Push notifications (`backend/src/lib/push.ts`, `frontend/public/sw.js`) need the Fly
+  secrets `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`. Without them push is
+  off and the opt-in UI hides itself. Don't rotate the keys: it orphans every device's
+  subscription. Every `createNotifications()` call also pushes.
 - RLS is on for all tables but the backend uses `service_role`, which needs explicit
   table GRANTs (migration `20260602000001`). Without them every backend query fails
   with "permission denied for table …".

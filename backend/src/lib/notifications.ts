@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase.js';
+import { sendPush } from './push.js';
 
 type NotificationType =
   | 'selected'
@@ -54,4 +55,14 @@ export async function createNotifications(userIds: Array<string | null | undefin
 
   const { error } = await supabaseAdmin.from('notifications').insert(rows);
   if (error) console.error('Failed to create notifications:', error);
+
+  // Every in-app notification also goes to the recipients' opted-in devices.
+  // Not awaited: a slow push service must not hold up the request or cron run
+  // that created the notification. sendPush never throws.
+  void sendPush(recipients, {
+    title: n.title,
+    body: n.body,
+    url: n.link,
+    tag: n.matchId ? `${n.type}:${n.matchId}` : n.type,
+  });
 }

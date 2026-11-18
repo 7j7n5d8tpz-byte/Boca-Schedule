@@ -7,6 +7,7 @@ import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { LANGUAGES, type Language } from '../../i18n';
 import AvatarCropper from '../../components/AvatarCropper';
+import PushSettings from '../../components/PushSettings';
 
 function PasswordStrength({ password }: { password: string }) {
   const { t } = useTranslation();
@@ -376,6 +377,9 @@ export default function Settings() {
             </div>
           )}
         </div>
+
+        {/* Push notifications on this device (hidden while the server has push off) */}
+        <PushSettings />
 
         {/* Calendar subscription */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">

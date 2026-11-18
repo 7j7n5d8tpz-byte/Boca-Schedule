@@ -9,6 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import RavenIcon from './RavenIcon';
 import NotificationBell from './NotificationBell';
 import { DASHBOARD_ORIGIN } from '../hubOrigin';
+import Glyph, { type GlyphId } from './NavGlyph';
+import MoreSheet, { type SheetRow } from './MoreSheet';
 
 interface AppNavProps {
   backHref?: string;
@@ -16,7 +18,7 @@ interface AppNavProps {
   onBack?: () => void;
 }
 
-type TabId = 'home' | 'stats' | 'achievements' | 'fines' | 'coach' | 'more';
+type TabId = Extract<GlyphId, 'home' | 'stats' | 'achievements' | 'fines' | 'coach' | 'more'>;
 
 // Every page mounts its own AppNav, so the bottom bar's sliding highlight
 // remembers where it last sat here and glides from there to the new tab.
@@ -31,24 +33,6 @@ function useSlidingPill(target: number) {
     return () => cancelAnimationFrame(id);
   }, [target]);
   return slot;
-}
-
-// Outline glyphs for the navigation (24×24, currentColor) — one per page.
-const GLYPH: Record<TabId, string> = {
-  home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z',
-  stats: 'M4 20V10M10 20V4M16 20v-7M2 20h20',
-  achievements: 'M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3Zm-3 9 2.2 2.2L15 10.5',
-  fines: 'M3 7h18v10H3V7Zm9 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM6.5 10.5v3M17.5 10.5v3',
-  coach: 'M9 4h6v3H9V4ZM6 7h12v13H6V7Zm3 5h6M9 16h4',
-  more: 'M5 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm7 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm7 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z',
-};
-
-function Glyph({ id, className = 'w-[22px] h-[22px]' }: { id: TabId; className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <path d={GLYPH[id]} />
-    </svg>
-  );
 }
 
 // Astryx link slots hand over an `href`; route it through react-router so the
@@ -138,6 +122,18 @@ export default function AppNav({ backHref, backLabel, onBack }: AppNavProps) {
     ...(isAdmin ? [{ label: t('nav.adminPanel'), onClick: () => navigate('/admin') }] : []),
     { label: t('nav.settings'), onClick: () => navigate('/settings') },
     { label: t('nav.logOut'), variant: 'destructive' as const, onClick: () => { void logout(); } },
+  ];
+
+  // Phone "More" sheet: the same destinations as menuItems, grouped, with the
+  // page you're on marked.
+  const manageRows: SheetRow[] = [
+    ...(isCoach ? [{ id: 'coach', glyph: 'coach' as const, label: t('nav.coachView'), description: t('nav.coachViewDesc'), isCurrent: under('/coach'), onSelect: () => navigate('/coach') }] : []),
+    ...(isFineAdmin ? [{ id: 'fines', glyph: 'fines' as const, label: t('nav.manageFines'), description: t('nav.manageFinesDesc'), isCurrent: under('/fines/manage'), onSelect: () => navigate('/fines/manage') }] : []),
+    ...(isAdmin ? [{ id: 'admin', glyph: 'admin' as const, label: t('nav.adminPanel'), description: t('nav.adminPanelDesc'), isCurrent: under('/admin'), onSelect: () => navigate('/admin') }] : []),
+  ];
+  const accountRows: SheetRow[] = [
+    { id: 'settings', glyph: 'settings', label: t('nav.settings'), isCurrent: under('/settings'), onSelect: () => navigate('/settings') },
+    { id: 'logout', glyph: 'logout', label: t('nav.logOut'), isDestructive: true, onSelect: () => { void logout(); } },
   ];
 
   const backControl = (cls: string): ReactNode => {
@@ -271,22 +267,30 @@ export default function AppNav({ backHref, backLabel, onBack }: AppNavProps) {
                 <span className="text-[11px] font-semibold leading-tight max-w-full truncate px-1">{tab.label}</span>
               </Link>
             ))}
-            <DropdownMenu
-              items={menuItems}
-              presentation="bottom-sheet"
-              hasChevron={false}
-              isMenuOpen={menuOpen}
-              onOpenChange={setMenuOpen}
-              renderTrigger={props => (
-                <button {...props} className={tabCls(current.id === 'more')}>
-                  <Glyph id="more" />
-                  <span className="text-[11px] font-semibold leading-tight">{t('nav.more')}</span>
-                </button>
-              )}
-            />
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={menuOpen}
+              className={tabCls(current.id === 'more')}
+            >
+              <Glyph id="more" />
+              <span className="text-[11px] font-semibold leading-tight">{t('nav.more')}</span>
+            </button>
           </BottomTabs>
         )}
       </nav>
+      <MoreSheet
+        isOpen={menuOpen}
+        onOpenChange={setMenuOpen}
+        userId={user?.userId}
+        name={user?.name ?? t('nav.yourProfile')}
+        roleLabel={user?.role ? t(`nav.roles.${user.role}`) : null}
+        avatar={avatar('w-12 h-12 text-lg')}
+        onOpenProfile={() => navigate(profilePath, { state: DASHBOARD_ORIGIN })}
+        manageRows={manageRows}
+        accountRows={accountRows}
+      />
     </>
   );
 }

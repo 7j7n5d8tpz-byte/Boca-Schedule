@@ -392,7 +392,7 @@ export interface ShortMatch {
   missing: number; // how many sign-ups short of min_players
 }
 
-export const SHORTAGE_SUBJECT = '🚨 Vi mangler DIG på banen!';
+export const SHORTAGE_SUBJECT = 'Vi mangler DIG på banen!';
 
 // One line per short-handed match: "3 spillere til lørdag 22. november kl. 10:00 vs X · Sted".
 export function shortageLine(m: ShortMatch): string {

@@ -490,8 +490,9 @@ async function runResultReminders(today: string) {
 //
 // "Vi mangler DIG på banen!" Runs at 18:00 club time (`?force=true` bypasses the
 // gate). A match triggers the alert when it is still open for sign-up, has
-// fewer active sign-ups than min_players, and its sign-up deadline falls within
-// the next `shortage_alert_hours` (system_config, default 48).
+// fewer active sign-ups than min_players, and kicks off within the next
+// `shortage_alert_days` (system_config, default 7) — so the club hears about the
+// first short-handed match a week before it is played.
 //
 // When anything triggers, each active player gets ONE email listing every
 // short-handed open match they haven't signed up for — not only the ones that
@@ -509,8 +510,10 @@ router.post('/shortage-alerts', async (req, res) => {
       return;
     }
 
-    const alertHours = await configNumber('shortage_alert_hours', 48);
-    const windowEnd = new Date(now.getTime() + alertHours * 60 * 60 * 1000);
+    const alertDays = await configNumber('shortage_alert_days', 7);
+    // Compare calendar dates in club time: at 18:00 a match exactly a week out
+    // is in, whatever its kick-off hour.
+    const lastMatchDate = shiftDate(clubDate(now), alertDays);
 
     const { data: open, error: matchErr } = await supabaseAdmin
       .from('matches')
@@ -527,7 +530,7 @@ router.post('/shortage-alerts', async (req, res) => {
       })
       .filter(x => x.missing > 0);
     const triggering = short.filter(x =>
-      !x.m.shortage_alert_sent_at && new Date(x.m.signup_close_date) <= windowEnd);
+      !x.m.shortage_alert_sent_at && x.m.match_date <= lastMatchDate);
 
     if (triggering.length === 0) {
       res.json({ success: true, data: { triggered: 0, listed: short.length, recipients: 0 } });

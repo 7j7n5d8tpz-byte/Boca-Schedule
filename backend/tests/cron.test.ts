@@ -267,13 +267,16 @@ describe('Cron: match announcements', () => {
 
 describe('Cron: shortage alerts', () => {
   let player: TestUser;
-  let shortSoonId: string;   // below min_players, deadline in 2h → triggers
-  let shortLaterId: string;  // below min_players, deadline in 10 days → listed only
+  let shortSoonId: string;   // below min_players, kicks off in 5 days → triggers
+  let shortLaterId: string;  // below min_players, kicks off in 14 days → listed only
   let fullSoonId: string;    // enough sign-ups → never alerted
   let prevSecret: string | undefined;
 
-  const soon = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-  const far = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+  const day = 24 * 60 * 60 * 1000;
+  const dateIn = (days: number) => new Date(Date.now() + days * day).toISOString().split('T')[0];
+  const closeBefore = (days: number) => new Date(Date.now() + (days - 1) * day).toISOString();
+  const soon = { match_date: dateIn(5), signup_close_date: closeBefore(5) };
+  const later = { match_date: dateIn(14), signup_close_date: closeBefore(14) };
   const run = () => request(app).post('/api/cron/shortage-alerts?force=true').set('x-cron-secret', SECRET);
 
   beforeAll(async () => {
@@ -283,9 +286,9 @@ describe('Cron: shortage alerts', () => {
       .update({ shortage_alert_sent_at: new Date().toISOString() })
       .is('shortage_alert_sent_at', null);
     const [a, b, c] = await Promise.all([
-      createTestMatch({ status: 'signup_open', signup_close_date: soon, min_players: 5 }),
-      createTestMatch({ status: 'signup_open', signup_close_date: far, min_players: 5 }),
-      createTestMatch({ status: 'signup_open', signup_close_date: soon, min_players: 1 }),
+      createTestMatch({ status: 'signup_open', ...soon, min_players: 5 }),
+      createTestMatch({ status: 'signup_open', ...later, min_players: 5 }),
+      createTestMatch({ status: 'signup_open', ...soon, min_players: 1 }),
     ]);
     shortSoonId = a.match_id;
     shortLaterId = b.match_id;
@@ -315,7 +318,7 @@ describe('Cron: shortage alerts', () => {
     expect(res.status).toBe(401);
   });
 
-  it('alerts a short-handed match near its deadline, listing the other short match too', async () => {
+  it('alerts a short-handed match a week before kick-off, listing the later short match too', async () => {
     const res = await run();
     expect(res.status).toBe(200);
     expect(res.body.data.triggered).toBe(1);

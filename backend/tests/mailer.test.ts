@@ -172,7 +172,8 @@ describe('mailer transport', () => {
 
     expect(result.sent).toBe(1);
     const sent = sendMock.mock.calls[0][0];
-    expect(sent.subject).toBe('🚨 Vi mangler DIG på banen!');
+    expect(sent.subject).toBe('Vi mangler DIG på banen!');
+    expect(sent.subject + sent.text + sent.html).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(sent.text).toContain('Der er huller i startopstillingen. Coach mangler lige præcis DIG!');
     expect(sent.text).toContain('Så find støvlerne frem og hop ind i appen og tilmeld dig:');
     expect(sent.text).toContain('/dashboard');

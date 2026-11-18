@@ -336,6 +336,39 @@ describe('Cron: shortage alerts', () => {
     expect(count).toBe(1);
   });
 
+  it('leaves out players already signed up for every short match', async () => {
+    const eager = await createTestUser('player', '-shortage-eager');
+    try {
+      await supabaseAdmin.from('matches').update({ shortage_alert_sent_at: null }).eq('match_id', shortSoonId);
+      // Signed up for every short-handed open match → nothing to tell them.
+      const { data: shortOpen } = await supabaseAdmin
+        .from('matches').select('match_id, min_players, signups(is_active)')
+        .eq('status', 'signup_open').gt('signup_close_date', new Date().toISOString());
+      for (const m of shortOpen ?? []) {
+        const active = (m.signups ?? []).filter((s: any) => s.is_active).length;
+        if (active < (m.min_players ?? 0)) await signupPlayer(m.match_id, eager.userId);
+      }
+
+      const res = await run();
+      expect(res.status).toBe(200);
+      expect(res.body.data.triggered).toBe(1);
+
+      const { count: eagerCount } = await supabaseAdmin
+        .from('notifications').select('notification_id', { count: 'exact', head: true })
+        .eq('user_id', eager.userId).eq('type', 'shortage_alert');
+      expect(eagerCount).toBe(0);
+      // ...while a player not signed up still gets it.
+      const { count } = await supabaseAdmin
+        .from('notifications').select('notification_id', { count: 'exact', head: true })
+        .eq('user_id', player.userId).eq('type', 'shortage_alert').eq('match_id', shortSoonId);
+      expect(count).toBe(2);
+    } finally {
+      await supabaseAdmin.from('signups').delete().eq('player_id', eager.userId);
+      await supabaseAdmin.from('notifications').delete().eq('user_id', eager.userId);
+      await deleteTestUser(eager.userId);
+    }
+  });
+
   it('does not alert the same match twice', async () => {
     const res = await run();
     expect(res.status).toBe(200);

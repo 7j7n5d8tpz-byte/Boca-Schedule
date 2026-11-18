@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { BottomSheet } from '@astryxdesign/core/BottomSheet';
@@ -39,6 +39,17 @@ export default function MoreSheet({
 }: MoreSheetProps) {
   const { t } = useTranslation();
 
+  // Astryx BottomSheet keeps its children in the DOM while closed. Mount the
+  // content only while the sheet is open (plus its exit animation), so a closed
+  // sheet holds no duplicate text — e.g. the profile page's rank and rating.
+  const [isMounted, setIsMounted] = useState(isOpen);
+  if (isOpen && !isMounted) setIsMounted(true);
+  useEffect(() => {
+    if (isOpen) return;
+    const id = setTimeout(() => setIsMounted(false), 500);
+    return () => clearTimeout(id);
+  }, [isOpen]);
+
   const group = (header: string, rows: SheetRow[]) => rows.length > 0 && (
     <List
       header={<span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 pt-3">{header}</span>}
@@ -74,6 +85,7 @@ export default function MoreSheet({
 
   return (
     <BottomSheet isOpen={isOpen} onOpenChange={onOpenChange} label={t('nav.more')} height="hug">
+      {isMounted && <>
       <button
         type="button"
         onClick={() => { onOpenChange(false); onOpenProfile(); }}
@@ -104,6 +116,7 @@ export default function MoreSheet({
 
       {group(t('nav.groupManage'), manageRows)}
       {group(t('nav.groupAccount'), accountRows)}
+      </>}
     </BottomSheet>
   );
 }

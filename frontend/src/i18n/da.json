@@ -56,7 +56,13 @@
       "player": "spiller",
       "coach": "træner",
       "admin": "admin"
-    }
+    },
+    "here": "Her",
+    "groupManage": "Styring",
+    "groupAccount": "Konto",
+    "coachViewDesc": "Hold og kampe",
+    "manageFinesDesc": "Bøder og betalinger",
+    "adminPanelDesc": "Brugere og sæson"
   },
   "notifications": {
     "aria": "Notifikationer",

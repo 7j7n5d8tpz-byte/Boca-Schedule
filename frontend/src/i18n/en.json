@@ -56,7 +56,13 @@
       "player": "player",
       "coach": "coach",
       "admin": "admin"
-    }
+    },
+    "here": "Here",
+    "groupManage": "Manage",
+    "groupAccount": "Account",
+    "coachViewDesc": "Squads and matches",
+    "manageFinesDesc": "Fines and payments",
+    "adminPanelDesc": "Users and season"
   },
   "notifications": {
     "aria": "Notifications",

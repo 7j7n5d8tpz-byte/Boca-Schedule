@@ -1,0 +1,77 @@
+name: Set up push keys
+
+# One-off, by hand: Actions → "Set up push keys" → Run workflow.
+#
+# Generates the VAPID key pair Web Push needs and sets it on the Fly backend
+# (VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT). The keys are made
+# inside this run and masked, so the private key is never shown anywhere.
+#
+# Refuses to run if the backend already has keys: replacing them silently cuts
+# off every device that has opted in (each subscription is bound to the public
+# key). To rotate on purpose, delete the secrets on Fly first, and every player
+# has to switch notifications on again.
+on:
+  workflow_dispatch:
+    inputs:
+      subject:
+        description: 'Contact for the push services (https:// URL or mailto: address)'
+        required: true
+        default: 'https://boca-schedule.vercel.app'
+
+permissions:
+  contents: read
+
+jobs:
+  set-keys:
+    name: Generate and set VAPID keys
+    runs-on: ubuntu-latest
+    concurrency:
+      group: push-keys
+      cancel-in-progress: false
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      FLY_APP: boca-backend
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - uses: actions/setup-node@v6
+        with: { node-version: '22' }
+
+      - name: Stop if the backend already has push keys
+        run: |
+          # Raw-text match so it can't miss the key over a JSON field rename; the
+          # default shell runs with pipefail, so a failed list stops the run.
+          secrets=$(flyctl secrets list -a "$FLY_APP" --json)
+          if echo "$secrets" | grep -q '"VAPID_PUBLIC_KEY"'; then
+            echo "::error::$FLY_APP already has VAPID keys. Not replacing them: that would cut off every opted-in device."
+            exit 1
+          fi
+
+      - name: Generate keys and set them on Fly
+        env:
+          SUBJECT: ${{ inputs.subject }}
+        run: |
+          case "$SUBJECT" in
+            https://*|mailto:*) ;;
+            *) echo "::error::subject must start with https:// or mailto:"; exit 1 ;;
+          esac
+          keys=$(npx --yes web-push@3.6.7 generate-vapid-keys --json)
+          public=$(echo "$keys" | jq -r .publicKey)
+          private=$(echo "$keys" | jq -r .privateKey)
+          echo "::add-mask::$private"
+          test -n "$public" && test -n "$private"
+          # Sets all three at once; Fly restarts the backend with them.
+          flyctl secrets set -a "$FLY_APP" \
+            VAPID_PUBLIC_KEY="$public" \
+            VAPID_PRIVATE_KEY="$private" \
+            VAPID_SUBJECT="$SUBJECT"
+          echo "Push keys set on $FLY_APP. Public key: $public"
+
+      - name: Check the backend reports push as on
+        run: |
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            if curl -fsS "https://$FLY_APP.fly.dev/api/push/config" | jq -e '.data.enabled == true' >/dev/null; then
+              echo "Push is on."; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Backend did not report push as enabled after 2 minutes."; exit 1

@@ -225,18 +225,18 @@ export default function AppNav({ backHref, backLabel, onBack }: AppNavProps) {
           the floating controls. The optional back pill (left) and the bell
           (right) are both fixed, so they stay put while the page scrolls. */}
       <div
-        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top))' }}
+        style={{ paddingTop: 'calc(0.75rem + env(safe-area-inset-top) + var(--top-pill-offset))' }}
         className="box-content h-11 pb-1"
         aria-hidden
       />
       <div
-        style={{ top: 'calc(0.75rem + env(safe-area-inset-top))' }}
+        style={{ top: 'calc(0.75rem + env(safe-area-inset-top) + var(--top-pill-offset))' }}
         className="fixed left-3 z-40 max-w-[calc(100vw-5.5rem)]"
       >
         {backControl('flex items-center gap-1 max-w-full truncate rounded-full bg-white/90 border border-gray-200 shadow-md backdrop-blur hover:bg-white text-brand-dark text-sm font-medium pl-2.5 pr-3.5 h-11 transition-colors')}
       </div>
       <div
-        style={{ top: 'calc(0.75rem + env(safe-area-inset-top))' }}
+        style={{ top: 'calc(0.75rem + env(safe-area-inset-top) + var(--top-pill-offset))' }}
         className="fixed right-3 z-40"
       >
         <NotificationBell floating />

@@ -165,3 +165,15 @@ html, body { background-color: #f2f2f2; } /* page grey — matches .boca-page / 
 @media (prefers-reduced-motion: reduce) {
   .boca-coin { animation: bocaBreathe 2s ease-in-out infinite; }
 }
+
+/* Installed (Home Screen) app only: iOS draws a soft blur under the status
+   bar, above the web view, that clipped the top of the floating back pill and
+   bell. Push them (and their spacer) just below it. 0 in a Safari tab. */
+:root {
+  --top-pill-offset: 0px;
+}
+@media (display-mode: standalone) {
+  :root {
+    --top-pill-offset: 8px;
+  }
+}

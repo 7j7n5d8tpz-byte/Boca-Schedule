@@ -466,3 +466,59 @@ describe('Cron: coach shortage alerts', () => {
     expect(res.body.data.matches).toBe(0);
   });
 });
+
+describe('Cron: selection reminders', () => {
+  let upcomingId: string;  // sign-up closed, kick-off ahead → reminded straight away
+  let kickedOffId: string; // sign-up closed, kicked off earlier today → never reminded
+  let prevSecret: string | undefined;
+
+  const day = 24 * 60 * 60 * 1000;
+  const clubToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Copenhagen' }).format(new Date());
+  const run = () => request(app).post('/api/cron/daily-reminders').set('x-cron-secret', SECRET);
+  const sentAt = async (id: string) =>
+    (await supabaseAdmin.from('matches').select('selection_reminder_sent_at').eq('match_id', id).single()).data?.selection_reminder_sent_at;
+
+  beforeAll(async () => {
+    // Matches left behind by other suites must not be reminded here.
+    await supabaseAdmin.from('matches')
+      .update({ selection_reminder_sent_at: new Date().toISOString() })
+      .is('selection_reminder_sent_at', null);
+    const closed = {
+      status: 'signup_closed',
+      signup_open_date: new Date(Date.now() - 5 * day).toISOString(),
+      signup_close_date: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    };
+    const [a, b] = await Promise.all([
+      createTestMatch({ ...closed, match_date: new Date(Date.now() + 3 * day).toISOString().split('T')[0] }),
+      createTestMatch({ ...closed, match_date: clubToday, match_time: '00:00:01' }),
+    ]);
+    upcomingId = a.match_id;
+    kickedOffId = b.match_id;
+  });
+
+  afterAll(async () => {
+    await Promise.all([deleteTestMatch(upcomingId), deleteTestMatch(kickedOffId)]);
+  });
+
+  beforeEach(() => {
+    prevSecret = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = SECRET;
+  });
+
+  afterEach(() => {
+    if (prevSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = prevSecret;
+  });
+
+  it('reminds coaches on the first tick after sign-up closed, whatever the hour', async () => {
+    const res = await run();
+    expect(res.status).toBe(200);
+    expect(res.body.data.selection.matches).toBe(1);
+    expect(await sentAt(upcomingId)).toBeTruthy();
+  });
+
+  it('never reminds about a match that already kicked off', async () => {
+    await run();
+    expect(await sentAt(kickedOffId)).toBeNull();
+  });
+});

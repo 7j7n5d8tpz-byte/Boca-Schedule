@@ -4,7 +4,7 @@ import { sendSignupReminder, sendMatchdayReminder, sendSelectionReminder, sendRe
 import { createNotifications } from '../lib/notifications.js';
 import { notifySignupOpen, openDueDrafts } from '../lib/signupOpen.js';
 // The daily reminders all send at 18:00 club time.
-import { CLUB_TZ } from '../lib/clubTime.js';
+import { CLUB_TZ, kickoffInstant } from '../lib/clubTime.js';
 
 const router = Router();
 
@@ -324,12 +324,14 @@ router.post('/match-announcements', async (req, res) => {
 
 // POST /api/cron/daily-reminders
 //
-// Invoked by the same scheduler as signup-reminders, but only does work at
-// the 18:00 hour in Europe/Copenhagen — all three reminders below send at 18:00
-// local. Each is stamped once per match so a match is never re-reminded.
-//   • match-day   → selected players, the evening before kick-off
-//   • selection   → coaches, the day after sign-ups closed if no squad published
-//   • result      → result-enterers, the day after a played match with no result
+// Invoked by the same scheduler as signup-reminders. Each reminder is stamped
+// once per match so a match is never re-reminded.
+//   • selection   → coaches, on the first tick after sign-ups closed if no squad
+//                   is published (every tick, NOT 18:00-gated: deadlines are
+//                   20:00 the night before, so waiting for 18:00 mailed the coach
+//                   after a daytime kick-off)
+//   • match-day   → selected players, the evening before kick-off (18:00 local)
+//   • result      → result-enterers, the day after a played match with no result (18:00 local)
 router.post('/daily-reminders', async (req, res) => {
   try {
     if (!cronAuthorized(req, res)) return;
@@ -337,17 +339,18 @@ router.post('/daily-reminders', async (req, res) => {
     const now = new Date();
     // `?force=true` bypasses the time gate for manual/ops triggers (still secret-gated).
     const force = req.query.force === 'true';
+    const today = clubDate(now);
+
+    const data: Record<string, unknown> = {};
+    data.selection = await runSelectionReminders(today, now).catch(e => ({ error: String(e) }));
+
     if (!force && clubHour(now) !== 18) {
-      res.json({ success: true, data: { skipped: true, reason: 'only runs at 18:00 Europe/Copenhagen' } });
+      res.json({ success: true, data: { ...data, skipped: true, reason: 'match-day/result reminders only run at 18:00 Europe/Copenhagen' } });
       return;
     }
 
-    const today = clubDate(now);
     const tomorrow = shiftDate(today, 1);
-
-    const data: Record<string, unknown> = {};
     data.matchday  = await runMatchdayReminders(tomorrow).catch(e => ({ error: String(e) }));
-    data.selection = await runSelectionReminders(today, now).catch(e => ({ error: String(e) }));
     data.result    = await runResultReminders(today).catch(e => ({ error: String(e) }));
 
     res.json({ success: true, data });
@@ -407,19 +410,21 @@ async function runMatchdayReminders(matchDate: string) {
 }
 
 // Pick-your-squad: one batched email per coach for matches whose sign-up has
-// closed (deadlines are 20:00 local, so "deadline passed" at the 18:00 run means
-// the day after) but whose squad isn't published yet.
+// closed but whose squad isn't published yet. Runs every tick, so it goes out
+// within ~10 min of the deadline — never after kick-off.
 async function runSelectionReminders(today: string, now: Date) {
-  const { data: matches, error } = await supabaseAdmin
+  const { data: rows, error } = await supabaseAdmin
     .from('matches')
     .select('match_id, match_date, match_time, location, opponent')
     .is('published_at', null)
-    .neq('status', 'cancelled')
+    .not('status', 'in', '(cancelled,completed)')
     .lt('signup_close_date', now.toISOString())
     .gte('match_date', today)                       // don't nag about matches already in the past
     .is('selection_reminder_sent_at', null);
   if (error) throw error;
-  if (!matches || matches.length === 0) return { matches: 0, coaches: 0 };
+  // match_date >= today still lets through a match that kicked off earlier today.
+  const matches = (rows ?? []).filter((m: any) => kickoffInstant(m.match_date, m.match_time) > now);
+  if (matches.length === 0) return { matches: 0, coaches: 0 };
 
   const reminderMatches = (matches as any[]).map(m => ({ matchDate: m.match_date, matchTime: m.match_time, location: m.location, opponent: m.opponent ?? null }));
 
@@ -622,7 +627,7 @@ router.post('/coach-shortage-alerts', async (req, res) => {
     const { data: closed, error: matchErr } = await supabaseAdmin
       .from('matches')
       .select('match_id, match_date, match_time, location, opponent, min_players, signups(player_id, is_active)')
-      .neq('status', 'cancelled')
+      .not('status', 'in', '(cancelled,completed)')
       .is('published_at', null)
       .is('coach_shortage_alert_sent_at', null)
       .lte('signup_close_date', now.toISOString())
@@ -632,6 +637,7 @@ router.post('/coach-shortage-alerts', async (req, res) => {
     if (matchErr) throw matchErr;
 
     const short = ((closed ?? []) as any[])
+      .filter(m => kickoffInstant(m.match_date, m.match_time) > now) // not one that already kicked off today
       .map(m => ({ m, missing: (m.min_players ?? 0) - (m.signups ?? []).filter((s: any) => s.is_active).length }))
       .filter(x => x.missing > 0);
     if (short.length === 0) {

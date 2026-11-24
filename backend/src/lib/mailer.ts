@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import { formatClubDeadline } from './clubTime.js';
+import { emailsWithPush } from './push.js';
 
 const FROM = process.env.EMAIL_FROM || '"Boca Boldisch" <boca_admin@bocaboldisch.dk>';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -69,6 +70,13 @@ async function send(to: string, subject: string, html: string, text: string) {
   }
 }
 
+// Email for a notification that also goes out in-app (and so as a push). Skipped
+// for users who get push notifications on a device: they already have it.
+async function notify(to: string, subject: string, html: string, text: string) {
+  if ((await emailsWithPush([to])).has(to)) return;
+  await send(to, subject, html, text);
+}
+
 // What a fan-out actually delivered. Callers that stamp "already notified" state
 // need this: stamping a run in which every send failed would drop the whole club
 // from that notification with nothing to show for it.
@@ -92,20 +100,26 @@ async function sendMany(
   label: string,
   build: (r: Recipient) => { subject: string; html: string; text: string },
 ): Promise<SendResult> {
-  const settled = await Promise.allSettled(recipients.map(r => {
+  // Recipients with push on get this as a push notification instead (see
+  // notify()). They count as delivered: callers stamp "already notified" off
+  // `sent`, and a run where everyone has push must not look like a failure.
+  const pushed = await emailsWithPush(recipients.map(r => r.email));
+  const toEmail = recipients.filter(r => !pushed.has(r.email));
+
+  const settled = await Promise.allSettled(toEmail.map(r => {
     const { subject, html, text } = build(r);
     return send(r.email, subject, html, text);
   }));
 
   const failed = settled.flatMap((outcome, i) => outcome.status === 'rejected'
     ? [{
-        email: recipients[i].email,
+        email: toEmail[i].email,
         reason: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
       }]
     : []);
 
   if (failed.length > 0) {
-    console.error(`${label}: ${failed.length}/${recipients.length} email(s) failed`, failed);
+    console.error(`${label}: ${failed.length}/${toEmail.length} email(s) failed`, failed);
   }
   return { sent: recipients.length - failed.length, failed };
 }
@@ -291,7 +305,7 @@ export async function sendClaimResolutionNotification(
   const timeStr = match.matchTime.slice(0, 5);
   const opponent = match.opponent ? ` vs ${match.opponent}` : '';
 
-  await send(
+  await notify(
     claimant.email,
     `Plads ${accepted ? 'bekræftet' : 'gik til en anden'} — ${dateStr}`,
     `<p>Hej <strong>${esc(claimant.name)}</strong>,</p>
@@ -381,7 +395,7 @@ export async function sendSignupOpenAnnouncement(
     ? 'Tilmeldingen er åben til en ny kamp:'
     : `Tilmeldingen er åben til ${n} nye kampe:`;
 
-  await send(
+  await notify(
     player.email,
     subject,
     `<p>Hej <strong>${esc(player.name)}</strong>,</p>
@@ -467,7 +481,7 @@ export async function sendCoachShortageAlerts(
 
 export async function sendAdminRegistrationNotification(playerName: string, playerEmail: string) {
   const adminEmail = process.env.ADMIN_EMAIL || 'andreas@brendstrup.dk';
-  await send(
+  await notify(
     adminEmail,
     `Ny registrering: ${playerName}`,
     `<p>En ny spiller har registreret sig og afventer godkendelse.</p>
@@ -555,7 +569,7 @@ export async function sendSelectionReminder(
 ) {
   const n = matches.length;
   const { html, text } = matchLines(matches);
-  await send(
+  await notify(
     coach.email,
     n === 1 ? 'En trup mangler at blive udtaget' : `${n} trupper mangler at blive udtaget`,
     `<p>Hej <strong>${esc(coach.name)}</strong>,</p>
@@ -574,7 +588,7 @@ export async function sendResultReminder(
 ) {
   const n = matches.length;
   const { html, text } = matchLines(matches);
-  await send(
+  await notify(
     recipient.email,
     n === 1 ? 'Registrér gårsdagens resultat' : `Registrér ${n} kampresultater`,
     `<p>Hej <strong>${esc(recipient.name)}</strong>,</p>

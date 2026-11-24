@@ -9,6 +9,10 @@ vi.mock('resend', () => ({
   },
 }));
 
+// Who has push on. Empty by default, so every other test emails everyone.
+const pushMock = vi.fn(async (_emails: string[]) => new Set<string>());
+vi.mock('../src/lib/push.js', () => ({ emailsWithPush: pushMock }));
+
 const match = {
   matchDate: '2026-08-15',
   matchTime: '13:10:00',
@@ -35,6 +39,8 @@ const rateLimited = { data: null, error: { name: 'rate_limit_exceeded', message:
 describe('mailer transport', () => {
   beforeEach(() => {
     sendMock.mockReset();
+    pushMock.mockReset();
+    pushMock.mockResolvedValue(new Set());
   });
 
   afterEach(() => {
@@ -224,5 +230,49 @@ describe('mailer transport', () => {
     expect(sent.text).toMatch(/- 3 spillere til .*21\. november/);
     expect(sent.text).toMatch(/- 1 spiller til .*28\. november/);
     expect(sent.text).toContain('/coach');
+  });
+
+  it('skips the email for players who get push notifications, and counts them as delivered', async () => {
+    const { sendSignupReminder } = await loadMailer(1000);
+    sendMock.mockResolvedValue(ok);
+    pushMock.mockResolvedValue(new Set(['p1@example.com']));
+
+    const result = await sendSignupReminder(players(3), match);
+
+    expect(sendMock.mock.calls.map(c => c[0].to)).toEqual(['p0@example.com', 'p2@example.com']);
+    // Counted: cron leaves a match unstamped when `sent` is 0.
+    expect(result).toEqual({ sent: 3, failed: [] });
+  });
+
+  it('reports a run as delivered when everyone has push', async () => {
+    const { sendShortageAlerts } = await loadMailer(1000);
+    pushMock.mockResolvedValue(new Set(['p0@example.com', 'p1@example.com']));
+
+    const result = await sendShortageAlerts(players(2), () => [
+      { matchDate: '2026-11-21', matchTime: '10:00:00', location: 'Boldbanen', opponent: null, missing: 2 },
+    ]);
+
+    expect(sendMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ sent: 2, failed: [] });
+  });
+
+  it('skips a single-recipient email when that user has push', async () => {
+    const { sendResultReminder } = await loadMailer(1000);
+    pushMock.mockResolvedValue(new Set(['coach@example.com']));
+
+    await sendResultReminder({ name: 'Coach', email: 'coach@example.com' }, [match]);
+
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('still sends the account-activated email to a user with push', async () => {
+    // No in-app twin for this one, so push can't stand in for it.
+    const { sendAccountActivatedEmail } = await loadMailer(1000);
+    sendMock.mockResolvedValue(ok);
+    pushMock.mockResolvedValue(new Set(['jacob@example.com']));
+
+    await sendAccountActivatedEmail({ name: 'Jacob Meier', email: 'jacob@example.com' });
+
+    expect(sendMock).toHaveBeenCalledTimes(1);
   });
 });

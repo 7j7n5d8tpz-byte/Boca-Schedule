@@ -519,8 +519,8 @@ function IssueFineForm({ onDone }: { onDone: () => void }) {
   const { data: players } = useQuery<PlayerLite[]>({ queryKey: ['players-lite'], queryFn: () => api.get('/players').then(r => r.data.data), enabled: open });
   const { data: matches } = useQuery<MatchLite[]>({ ...matchesQuery, enabled: open });
 
-  // Fines are handed out around a match, so open on today's — else the last
-  // played one. The admin can still switch, or clear it to "no match".
+  // Fines are handed out around a match, so open on the one closest to today
+  // (today's own, if any). The admin can still switch, or clear it to "no match".
   useEffect(() => {
     if (!open || matchTouched || !matches) return;
     setMatchId(pickDefaultMatchId(matches) ?? '');

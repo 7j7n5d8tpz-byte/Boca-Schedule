@@ -96,19 +96,40 @@ describe('pickDefaultMatchId', () => {
     expect(pickDefaultMatchId(matches, '2026-06-10')).toBe('today');
   });
 
-  it('falls back to the most recently played match', () => {
+  it('picks the most recently played match when it is the nearest', () => {
     const matches = [m('next', '2026-06-20'), m('last', '2026-06-10'), m('older', '2026-06-03')];
     expect(pickDefaultMatchId(matches, '2026-06-12')).toBe('last');
+  });
+
+  it('picks the upcoming match when it is nearer than the last played one', () => {
+    const matches = [m('next', '2026-06-20'), m('last', '2026-06-10'), m('older', '2026-06-03')];
+    expect(pickDefaultMatchId(matches, '2026-06-18')).toBe('next');
+  });
+
+  it('prefers the played match on a tie', () => {
+    const matches = [m('next', '2026-06-16'), m('last', '2026-06-10')];
+    expect(pickDefaultMatchId(matches, '2026-06-13')).toBe('last');
   });
 
   it('ignores the incoming order', () => {
     const matches = [m('older', '2026-06-03'), m('next', '2026-06-20'), m('last', '2026-06-10')];
     expect(pickDefaultMatchId(matches, '2026-06-12')).toBe('last');
+    expect(pickDefaultMatchId(matches, '2026-06-18')).toBe('next');
+  });
+
+  it('works across month and year boundaries', () => {
+    const matches = [m('dec', '2026-12-20'), m('jan', '2027-01-05')];
+    expect(pickDefaultMatchId(matches, '2026-12-31')).toBe('jan'); // 5 days vs 11
   });
 
   it('picks the nearest upcoming match when nothing has been played yet', () => {
     const matches = [m('later', '2026-08-01'), m('first', '2026-07-15')];
     expect(pickDefaultMatchId(matches, '2026-06-30')).toBe('first');
+  });
+
+  it('picks the latest match when everything is in the past', () => {
+    const matches = [m('a', '2026-05-01'), m('b', '2026-06-01')];
+    expect(pickDefaultMatchId(matches, '2026-11-24')).toBe('b');
   });
 
   it('leaves the picker on "no match" when there are none', () => {

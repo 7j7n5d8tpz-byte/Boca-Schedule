@@ -60,10 +60,16 @@ describe('Issue a fine — default match', () => {
     await waitFor(() => expect(matchSelect().value).toBe('today'));
   });
 
-  it('falls back to the last played match on a non-match day', async () => {
+  it('picks the nearest match on a non-match day — just played', async () => {
     vi.setSystemTime(new Date(2026, 5, 12, 10, 0));
     await openIssueForm();
-    await waitFor(() => expect(matchSelect().value).toBe('today')); // 10 Jun is now the latest played
+    await waitFor(() => expect(matchSelect().value).toBe('today')); // 10 Jun: 2 days back vs 8 ahead
+  });
+
+  it('picks the nearest match on a non-match day — coming up', async () => {
+    vi.setSystemTime(new Date(2026, 5, 18, 10, 0));
+    await openIssueForm();
+    await waitFor(() => expect(matchSelect().value).toBe('next')); // 20 Jun: 2 days ahead vs 8 back
   });
 
   it('keeps the admin\'s own choice, including "No match"', async () => {

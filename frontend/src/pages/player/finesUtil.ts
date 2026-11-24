@@ -71,22 +71,33 @@ export function todayIso(now: Date = new Date()): string {
 }
 
 /**
- * The match a newly issued fine should be filed under by default.
+ * The match a newly issued fine should be filed under by default: the one whose
+ * date is closest to today, in either direction.
  *
  * Fine admins hand out fines around a match — in the dressing room just before
- * kick-off and again right after — so today's match is almost always the right
- * one. Failing that, the most recent match already played; and if the list is
- * all in the future (a new season), the next one up. Returns null for an empty
+ * kick-off and again in the days after — so today's match wins when there is
+ * one, and otherwise whichever match is nearest. On a tie (e.g. three days after
+ * one match and three days before the next) the match already played wins, since
+ * fines are more often about something that happened. Returns null for an empty
  * list, leaving the picker on "no match".
  *
- * `matchDate` is a plain `YYYY-MM-DD`, so string comparison is date comparison.
+ * `matchDate` is a plain `YYYY-MM-DD`; parsed as UTC midnight so day differences
+ * are exact regardless of DST.
  */
 export function pickDefaultMatchId(matches: MatchDateLike[] | undefined, today: string = todayIso()): string | null {
   if (!matches?.length) return null;
-  const byDate = [...matches].sort((a, b) => a.matchDate.localeCompare(b.matchDate));
-  // Last match on or before today (today's own match wins, as it sorts last).
-  for (let i = byDate.length - 1; i >= 0; i--) {
-    if (byDate[i].matchDate <= today) return byDate[i].matchId;
+  const day = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / 86_400_000;
+  const t = day(today);
+  let best: MatchDateLike | null = null;
+  let bestDist = Infinity;
+  for (const m of matches) {
+    const diff = day(m.matchDate) - t;
+    const dist = Math.abs(diff);
+    // Strictly closer wins; on a tie, prefer the earlier (already played) match.
+    if (dist < bestDist || (dist === bestDist && best && m.matchDate < best.matchDate)) {
+      best = m;
+      bestDist = dist;
+    }
   }
-  return byDate[0].matchId; // nothing played yet — the nearest upcoming match
+  return best?.matchId ?? null;
 }

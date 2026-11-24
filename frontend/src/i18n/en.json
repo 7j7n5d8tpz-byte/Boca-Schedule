@@ -1151,7 +1151,7 @@
     },
     "settings": {
       "title": "Push notifications",
-      "help": "Get notified on this device about selections, matches and when the team is short of players. Emails continue as before.",
+      "help": "Get notified on this device about selections, matches and when the team is short of players. While notifications are on, we won't send you the same messages by email.",
       "switch": "Notifications on this device",
       "test": "Send a test notification",
       "testSent": "Test notification sent",

@@ -1151,7 +1151,7 @@
     },
     "settings": {
       "title": "Push-notifikationer",
-      "help": "Få besked på denne enhed om udtagelser, kampe og når holdet mangler spillere. E-mails fortsætter som før.",
+      "help": "Få besked på denne enhed om udtagelser, kampe og når holdet mangler spillere. Så længe notifikationer er slået til, sender vi ikke de samme beskeder på e-mail.",
       "switch": "Notifikationer på denne enhed",
       "test": "Send en testnotifikation",
       "testSent": "Testnotifikation sendt",

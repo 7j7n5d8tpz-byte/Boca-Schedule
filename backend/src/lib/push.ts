@@ -83,3 +83,24 @@ export async function sendPush(userIds: string[], payload: PushPayload): Promise
     return { sent: 0, removed: 0 };
   }
 }
+
+// Which of these addresses belong to a user with at least one opted-in device.
+// The mailer skips those: everything it sends (bar the account-activated mail,
+// sent before anyone can opt in) also goes out as an in-app notification, and
+// createNotifications pushes that to the phone — an email on top is a duplicate.
+// Empty when push is off or the lookup fails, so email stays the fallback.
+export async function emailsWithPush(emails: string[]): Promise<Set<string>> {
+  const wanted = [...new Set(emails.filter(Boolean))];
+  if (!pushEnabled() || wanted.length === 0) return new Set();
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .select('email, push_subscriptions!inner(subscription_id)')
+      .in('email', wanted);
+    if (error) throw error;
+    return new Set((data ?? []).map((u: { email: string }) => u.email));
+  } catch (err) {
+    console.error('emailsWithPush failed, emailing everyone:', err);
+    return new Set();
+  }
+}
